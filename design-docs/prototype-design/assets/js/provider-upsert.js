@@ -193,11 +193,27 @@ window.ProviderUpsert = (function () {
           ? clone(row.instance_pool)
           : [{ name: '', addr: '', weight: 100, port: 443 }],
       model_protocols: (row.model_protocols || ['openai']).slice(),
+      protocol_paths: (function () {
+        var src = row.protocol_paths || {};
+        var out = {};
+        Object.keys(src).forEach(function (k) { out[k] = src[k]; });
+        return out;
+      })(),
       time_zone: row.time_zone || 'Asia/Shanghai',
       tiers: clone(row.tiers || []),
       create_time: row.create_time || 0,
       update_time: row.update_time || 0,
     };
+  }
+
+  function isValidProtocolPath(path) {
+    if (!path || typeof path !== 'string') return false;
+    if (path.charAt(0) !== '/') return false;
+    if (path.charAt(path.length - 1) === '/') return false;
+    if (/[?$#]/.test(path)) return false;
+    if (/\.\./.test(path)) return false;
+    if (path.length > 128) return false;
+    return true;
   }
 
   function renderProtocolSelect(data, isView) {
@@ -498,6 +514,71 @@ window.ProviderUpsert = (function () {
     );
   }
 
+  function renderProtocolPaths(data, isView) {
+    var paths = data.protocol_paths || {};
+    var keys = Object.keys(paths);
+
+    var helpTip =
+      '按协议配置上游路径前缀，BFE 转发时将标准入口 /v1/... 改写到该前缀。未配置的协议请求路径原样转发。';
+
+    function pathRow(proto, path) {
+      var protoDisplay = isView
+        ? IvuUI.escapeHtml(proto)
+        : '<select class="ivu-input proto-path-proto-select" style="width:130px;height:32px;">' +
+          PROTOCOL_OPTIONS.map(function (p) {
+            return '<option value="' + IvuUI.escapeHtml(p) + '"' +
+              (p === proto ? ' selected' : '') + '>' +
+              IvuUI.escapeHtml(p) + '</option>';
+          }).join('') +
+          '</select>';
+      var pathInput =
+        '<input type="text" class="ivu-input proto-path-value" value="' +
+        IvuUI.escapeHtml(path || '') +
+        '" placeholder="/v1"' +
+        (isView ? ' disabled="disabled"' : '') +
+        ' />';
+      return (
+        '<tr>' +
+        '<td>' + protoDisplay + '</td>' +
+        '<td>' + pathInput + '</td>' +
+        (isView
+          ? ''
+          : '<td style="width:80px;"><button type="button" class="ivu-btn ivu-btn-error ivu-btn-small" data-action="remove-path"><span>删除</span></button></td>') +
+        '</tr>'
+      );
+    }
+
+    var headerActions = isView ? '' : '<th style="width:80px;">操作</th>';
+    var bodyRows = keys.length
+      ? keys
+          .map(function (k) {
+            return pathRow(k, paths[k]);
+          })
+          .join('')
+      : '<tr class="proto-paths-empty-row"><td colspan="' +
+        (isView ? 2 : 3) +
+        '" style="text-align:center;color:#999;">未配置协议路径映射</td></tr>';
+
+    return (
+      '<div class="llm-card"><div class="llm-card-title">' +
+      '协议路径映射' +
+      '<span class="form-help-icon" title="' +
+      IvuUI.escapeHtml(helpTip) +
+      '">?</span>' +
+      '</div><div class="llm-card-body">' +
+      '<table class="mapping-table">' +
+      '<thead><tr><th style="width:140px;">协议</th><th>上游路径前缀</th>' +
+      headerActions +
+      '</tr></thead><tbody id="proto-paths-body">' +
+      bodyRows +
+      '</tbody></table>' +
+      (isView
+        ? ''
+        : '<button type="button" class="ivu-btn ivu-btn-primary ivu-btn-small" id="proto-add-path" style="margin-top:12px;"><span>+ 添加映射</span></button>') +
+      '</div></div>'
+    );
+  }
+
   function renderDetail(data) {
     data = data || createDefaultData({});
     var mode = inferInstanceMode(data.instance_pool || []);
@@ -581,6 +662,7 @@ window.ProviderUpsert = (function () {
             IvuUI.formTopItem('模型列表接口', IvuUI.escapeHtml(endpointUrl)),
         ),
       ) +
+      renderProtocolPaths(data, true) +
       IvuUI.card(
         '服务鉴权 Keys',
         renderDetailTable(
@@ -735,6 +817,7 @@ window.ProviderUpsert = (function () {
           ),
       ) +
       '</div></div>' +
+      renderProtocolPaths(data, isView) +
       '<div class="llm-card"><div class="llm-card-title">服务鉴权 Keys</div><div class="llm-card-body">' +
       '<table class="mapping-table">' +
       '<thead><tr>' +
@@ -769,6 +852,16 @@ window.ProviderUpsert = (function () {
       .forEach(function (item) {
         data.model_protocols.push(item.getAttribute('data-value'));
       });
+
+    data.protocol_paths = {};
+    root.querySelectorAll('#proto-paths-body tr').forEach(function (row) {
+      if (row.classList.contains('proto-paths-empty-row')) return;
+      var protoSel = row.querySelector('.proto-path-proto-select');
+      var pathInp = row.querySelector('.proto-path-value');
+      var proto = protoSel ? protoSel.value : '';
+      var val = pathInp ? (pathInp.value || '').trim() : '';
+      if (proto && val) data.protocol_paths[proto] = val;
+    });
 
     data.instance_pool = [];
     var domainInput = root.querySelector('.proto-domain-addr');
@@ -836,6 +929,19 @@ window.ProviderUpsert = (function () {
     }
     var uri = (data.model_endpoint && data.model_endpoint.uri) || '';
     if (uri && uri.charAt(0) !== '/') return '模型接口 URI 必须以 / 开头';
+
+    var paths = data.protocol_paths || {};
+    var protoKeys = Object.keys(paths);
+    for (var pi = 0; pi < protoKeys.length; pi++) {
+      var pk = protoKeys[pi];
+      if (protocolSet[pk]) {
+        if (!isValidProtocolPath(paths[pk])) {
+          return '协议 "' + pk + '" 的路径前缀格式不正确，须以 / 开头，不以 / 结尾，不含 ?、$、#、..';
+        }
+      } else {
+        return '协议 "' + pk + '" 未在模型协议中启用，请先在模型协议中选择';
+      }
+    }
 
     var instances = data.instance_pool || [];
     if (!instances.length) return '实例池至少需要 1 个实例';
@@ -1118,6 +1224,38 @@ window.ProviderUpsert = (function () {
               1,
             );
             render();
+          });
+        });
+
+      var addPathBtn = bodyEl.querySelector('#proto-add-path');
+      if (addPathBtn) {
+        addPathBtn.addEventListener('click', function () {
+          syncFromDom(bodyEl, state.data);
+          var paths = state.data.protocol_paths || {};
+          var protocols = state.data.model_protocols || PROTOCOL_OPTIONS;
+          var available = protocols.filter(function (p) {
+            return !paths.hasOwnProperty(p);
+          });
+          var proto = available.length ? available[0] : PROTOCOL_OPTIONS[0];
+          paths[proto] = '';
+          state.data.protocol_paths = paths;
+          render();
+        });
+      }
+      bodyEl
+        .querySelectorAll('[data-action="remove-path"]')
+        .forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            syncFromDom(bodyEl, state.data);
+            var row = btn.closest('tr');
+            var protoSel = row && row.querySelector('.proto-path-proto-select');
+            var proto = protoSel ? protoSel.value : '';
+            if (proto) {
+              var paths = state.data.protocol_paths || {};
+              delete paths[proto];
+              state.data.protocol_paths = paths;
+              render();
+            }
           });
         });
 

@@ -843,6 +843,7 @@ export default {
     instanceHostInvalid: 'Invalid host format',
     instancePortInvalid: 'Port must be 1-65535',
     instanceHostPortDup: '"{hostPort}" is duplicated',
+    instanceCountMax: 'Max 2 instances per group (primary + standby)',
     formInvalid: 'Form has validation errors, please fix before saving',
   },
   eppAssignment: {
@@ -1048,6 +1049,16 @@ export default {
     protocolRequired: 'Please select at least one model protocol',
     protocolInvalid:
       'Model protocol only supports openai, anthropic and gemini',
+    protocolPathMapping: 'Protocol Path Mapping',
+    protocolPathHelp: 'Configure upstream base path per protocol. BFE rewrites the standard /v1/... requests to this prefix. Unconfigured protocols pass through unchanged.',
+    protocolPathProto: 'Protocol',
+    protocolPathPrefix: 'Upstream Path Prefix',
+    protocolPathAdd: '+ Add Mapping',
+    protocolPathProtoInvalid: 'Protocol "{proto}" is not in model protocols',
+    protocolPathPrefixInvalid: 'Path prefix must start with /',
+    protocolPathPrefixTrailingSlash: 'Path prefix must not end with /',
+    protocolPathPrefixInvalidChars: 'Path prefix contains invalid characters (? $ # ..)',
+    protocolPathNoAvailableProto: 'No available protocols',
     deleteFailed:
       'Delete failed. The provider may still be referenced by a cluster',
     viewModelPrices: 'View Model Pricing',

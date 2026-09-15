@@ -256,6 +256,7 @@ window.MockData = {
         },
       ],
       model_protocols: ['openai'],
+      protocol_paths: { openai: '/v1' },
       time_zone: 'Asia/Shanghai',
       tiers: [
         {
