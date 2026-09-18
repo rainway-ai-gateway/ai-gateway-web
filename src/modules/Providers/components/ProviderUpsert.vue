@@ -200,16 +200,16 @@
       </Card>
 
       <Card class="llm-section-card">
-        <p slot="title" class="field-label">
-          {{ $t('provider.modelList') }}
-          <Tooltip placement="top" transfer max-width="360">
-            <div slot="content" class="field-tip-content">
-              <p>{{ $t('provider.modelsListTip') }}</p>
-            </div>
-            <Icon type="ios-help-circle-outline" class="field-help-icon" />
-          </Tooltip>
-        </p>
         <FormItem prop="models">
+          <p slot="label" class="field-label">
+            {{ $t('provider.modelList') }}
+            <Tooltip placement="top" transfer max-width="360">
+              <div slot="content" class="field-tip-content">
+                <p>{{ $t('provider.modelsListTip') }}</p>
+              </div>
+              <Icon type="ios-help-circle-outline" class="field-help-icon" />
+            </Tooltip>
+          </p>
           <div class="models-row">
             <el-select
               v-model="formData.models"
@@ -410,6 +410,24 @@ export default {
             }
             callback();
         };
+        var validateModels = function(rule, value, callback) {
+            var models = (value || []).filter(function(m) {
+                return String(m || '').trim() !== '';
+            });
+            if (!models.length) {
+                callback(new Error(that.$t('provider.modelsListRequired')));
+                return;
+            }
+            var seen = {};
+            for (var mi = 0; mi < models.length; mi++) {
+                if (seen[models[mi]]) {
+                    callback(new Error(that.$t('provider.modelNameDuplicate', { name: models[mi] })));
+                    return;
+                }
+                seen[models[mi]] = true;
+            }
+            callback();
+        };
         var validateProtocolPaths = function(rule, value, callback) {
             var paths = value || [];
             var protocols = that.formData.model_protocols || [];
@@ -465,7 +483,8 @@ export default {
                 model_protocols: [{ validator: validateProtocols, trigger: 'change', required: true }],
                 model_endpoint: [{ validator: validateEndpoint, trigger: 'blur' }],
                 keys: [{ validator: validateKeys, trigger: 'change' }],
-                protocol_paths: [{ validator: validateProtocolPaths, trigger: 'change' }]
+                protocol_paths: [{ validator: validateProtocolPaths, trigger: 'change' }],
+                models: [{ validator: validateModels, trigger: 'change', required: true }]
             }
         };
     },

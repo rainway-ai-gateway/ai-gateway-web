@@ -1,7 +1,7 @@
 window.ProviderUpsert = (function () {
   var PROTOCOL_OPTIONS = ['openai', 'anthropic', 'gemini'];
   var MODEL_LIST_TIP =
-    '须先填写上方的模型协议、实例池、模型列表接口与密钥（按需）；「获取」将从上游拉取可用模型并回填到列表，未完成必要配置时按钮置灰。也可直接输入模型名称按回车添加，或点击「批量添加」粘贴多行/分隔的模型名（合并进现有列表，不覆盖）。';
+    '模型列表为必填项（至少 1 个元素）。「获取」将从上游拉取可用模型并回填到列表，未完成必要配置时按钮置灰。也可直接输入模型名称按回车添加，或点击「批量添加」粘贴多行/分隔的模型名（合并进现有列表，不覆盖）。';
   var MODEL_LIST_PLACEHOLDER =
     '点击「获取」拉取上游模型列表，输入模型名回车添加，或使用「批量添加」';
   var BATCH_MODAL_ID = 'modal-provider-batch-models';
@@ -764,8 +764,8 @@ window.ProviderUpsert = (function () {
       }
       return (
         '<div class="llm-card"><div class="llm-card-title">' +
-        '模型列表' +
-        helpIcon(MODEL_LIST_TIP) +
+'<span style="color:#ed4014;margin-right:4px;">*</span>模型列表' +
+helpIcon(MODEL_LIST_TIP) +
         '</div><div class="llm-card-body">' +
         '<div class="proto-model-select-wrap" style="display:flex;align-items:flex-start;gap:10px;">' +
         '<div class="proto-model-select" id="proto-provider-models" style="flex:1;min-height:32px;">' +
@@ -941,6 +941,15 @@ window.ProviderUpsert = (function () {
       } else {
         return '协议 "' + pk + '" 未在模型协议中启用，请先在模型协议中选择';
       }
+    }
+
+    var models = data.models || [];
+    if (!models.length) return '模型列表为必填项，请至少添加 1 个模型';
+    var modelSet = {};
+    for (var mi = 0; mi < models.length; mi++) {
+      if (!models[mi] || String(models[mi]).trim() === '') return '模型名不能为空';
+      if (modelSet[models[mi]]) return '模型名不能重复：' + models[mi];
+      modelSet[models[mi]] = true;
     }
 
     var instances = data.instance_pool || [];

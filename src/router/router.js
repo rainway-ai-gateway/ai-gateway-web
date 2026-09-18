@@ -154,6 +154,16 @@ export default [
         component: r => require.ensure([], () => r(require('../modules/Cert')), 'certs.list'),
         path: 'cert',
         name: 'certs.list'
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/Report')),
+            'report.list',
+          ),
+        path: 'report',
+        name: 'report.list',
       }
     ],
   },

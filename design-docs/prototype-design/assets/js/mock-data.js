@@ -1190,4 +1190,242 @@ window.MockData = {
       created_at: 1725144400,
     },
   ],
+
+  // ========== 报表查询 ==========
+  reportOverview: {
+    request_total: 152300,
+    error_total: 1200,
+    error_rate: 0.00788,
+    input_tokens: 88341233,
+    output_tokens: 12093441,
+    total_tokens: 100434674,
+    latency_avg_ms: 1234.5,
+    latency_max_ms: 9876,
+    latency_p50_ms: 1100,
+    latency_p90_ms: 2100,
+    latency_p99_ms: 4500,
+    ttft_avg_ms: 320.4,
+    tpot_avg_ms: 25.1,
+    cost: [{ currency: 'USD', value: 15230000 }, { currency: 'RMB', value: 98000 }],
+    rate_limit_hits: 320,
+    auth_rejects: 45,
+    logs_total: 152300,
+  },
+
+  reportTimeseries: {
+    qps: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, value: 12.3 }, { time: 1782345060, value: 14.1 },
+        { time: 1782345120, value: 10.8 }, { time: 1782345180, value: 15.6 },
+        { time: 1782345240, value: 13.2 }, { time: 1782345300, value: 11.7 },
+        { time: 1782345360, value: 9.5 },  { time: 1782345420, value: 16.2 },
+        { time: 1782345480, value: 14.8 }, { time: 1782345540, value: 12.1 },
+      ],
+    },
+    tokens: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, input: 55000, output: 12000, total: 67000 },
+        { time: 1782345060, input: 62000, output: 14000, total: 76000 },
+        { time: 1782345120, input: 48000, output: 11000, total: 59000 },
+        { time: 1782345180, input: 71000, output: 15000, total: 86000 },
+        { time: 1782345240, input: 53000, output: 13000, total: 66000 },
+      ],
+    },
+    latency: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, avg: 1100.2, max: 5600 },
+        { time: 1782345060, avg: 980.5, max: 4300 },
+        { time: 1782345120, avg: 1250.8, max: 7800 },
+        { time: 1782345180, avg: 1050.3, max: 5200 },
+        { time: 1782345240, avg: 1180.1, max: 6100 },
+      ],
+    },
+    ttft: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, avg: 310.5 },
+        { time: 1782345060, avg: 290.2 },
+        { time: 1782345120, avg: 340.1 },
+        { time: 1782345180, avg: 305.8 },
+        { time: 1782345240, avg: 325.3 },
+      ],
+    },
+    tpot: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, avg: 23.5 },
+        { time: 1782345060, avg: 25.1 },
+        { time: 1782345120, avg: 22.8 },
+        { time: 1782345180, avg: 26.3 },
+        { time: 1782345240, avg: 24.0 },
+      ],
+    },
+    cost: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, currency: 'USD', value: 1200 },
+        { time: 1782345060, currency: 'USD', value: 1350 },
+        { time: 1782345120, currency: 'USD', value: 1100 },
+        { time: 1782345180, currency: 'USD', value: 1500 },
+        { time: 1782345240, currency: 'USD', value: 1280 },
+      ],
+    },
+  },
+
+  reportRankings: {
+    model: {
+      items: [
+        { name: 'gpt-4o', request_count: 90000, error_count: 500, input_tokens: 55000000, output_tokens: 7000000 },
+        { name: 'gpt-4o-mini', request_count: 45000, error_count: 320, input_tokens: 25000000, output_tokens: 3500000 },
+        { name: 'claude-3-opus', request_count: 12000, error_count: 85, input_tokens: 7000000, output_tokens: 1200000 },
+        { name: 'gpt-3.5-turbo', request_count: 5300, error_count: 120, input_tokens: 1300000, output_tokens: 390000 },
+      ],
+    },
+    provider: {
+      items: [
+        { name: 'openai', request_count: 120000, error_count: 750, input_tokens: 72000000, output_tokens: 9500000 },
+        { name: 'anthropic', request_count: 25000, error_count: 200, input_tokens: 13000000, output_tokens: 2000000 },
+        { name: 'azure', request_count: 7300, error_count: 120, input_tokens: 3400000, output_tokens: 590000 },
+      ],
+    },
+    apikey: {
+      items: [
+        { name: 'key-web-prod', request_count: 80000, error_count: 400, input_tokens: 48000000, output_tokens: 6000000 },
+        { name: 'key-mobile', request_count: 50000, error_count: 350, input_tokens: 30000000, output_tokens: 4000000 },
+        { name: 'key-internal', request_count: 22300, error_count: 150, input_tokens: 10300000, output_tokens: 2000000 },
+      ],
+    },
+    host: {
+      items: [
+        { name: 'gw-01', request_count: 60000, error_count: 300, input_tokens: 35000000, output_tokens: 4500000 },
+        { name: 'gw-02', request_count: 55000, error_count: 420, input_tokens: 32000000, output_tokens: 4200000 },
+        { name: 'gw-03', request_count: 37300, error_count: 250, input_tokens: 21300000, output_tokens: 3300000 },
+      ],
+    },
+    status: {
+      items: [
+        { name: '200', request_count: 149000, error_count: 0, input_tokens: 87000000, output_tokens: 11800000 },
+        { name: '500', request_count: 2300, error_count: 1100, input_tokens: 800000, output_tokens: 200000 },
+        { name: '429', request_count: 800, error_count: 80, input_tokens: 400000, output_tokens: 90000 },
+        { name: '401', request_count: 200, error_count: 20, input_tokens: 140000, output_tokens: 3000 },
+      ],
+    },
+    protocol: {
+      items: [
+        { name: 'openai', request_count: 140000, error_count: 950, input_tokens: 82000000, output_tokens: 11000000 },
+        { name: 'anthropic', request_count: 12300, error_count: 200, input_tokens: 6300000, output_tokens: 1000000 },
+      ],
+    },
+    mode: {
+      items: [
+        { name: 'chat', request_count: 148000, error_count: 1100, input_tokens: 87000000, output_tokens: 11900000 },
+        { name: 'completion', request_count: 4300, error_count: 100, input_tokens: 1340000, output_tokens: 190000 },
+      ],
+    },
+  },
+
+  reportDistribution: {
+    status: {
+      items: [
+        { name: '200', request_count: 149000, ratio: 0.9783 },
+        { name: '500', request_count: 2300, ratio: 0.0151 },
+        { name: '429', request_count: 800, ratio: 0.0053 },
+        { name: '401', request_count: 200, ratio: 0.0013 },
+      ],
+    },
+    protocol: {
+      items: [
+        { name: 'openai', request_count: 140000, ratio: 0.919 },
+        { name: 'anthropic', request_count: 12300, ratio: 0.081 },
+      ],
+    },
+    mode: {
+      items: [
+        { name: 'chat', request_count: 148000, ratio: 0.972 },
+        { name: 'completion', request_count: 4300, ratio: 0.028 },
+      ],
+    },
+    stream: {
+      items: [
+        { name: '1', request_count: 120000, ratio: 0.788 },
+        { name: '0', request_count: 32300, ratio: 0.212 },
+      ],
+    },
+  },
+
+  reportLogs: {
+    total: 152300,
+    page: 1,
+    page_size: 20,
+    items: [
+      {
+        logid: 12345, log_time: 1782345500, hostid: 'gw-01', product: 'BFE',
+        ai_apikey_id: 'key-001', ai_requested_model: 'gpt-4', ai_target_model: 'gpt-4o',
+        ai_provider: 'openai', ai_protocol: 'openai', ai_mode: 'chat', ai_stream: 1,
+        res_status_code: 200, err_code: null, err_msg: 'ok',
+        ai_input_tokens: 1000, ai_output_tokens: 200, ai_total_tokens: 1200,
+        all_time: 1200, ai_ttft_us: 500000, ai_tpot_us: 25000,
+        ai_cost_value: 5000, ai_cost_currency: 'USD',
+        ai_rate_limit_hits: null, ai_auth_reject_quota_plans: null,
+        level1Name: 'dep', level1: 'ops',
+        client_ip: '10.0.0.1', header_host: 'api.example.org', origin_uri: '/v1/chat',
+        req_headers: null, res_headers: null,
+      },
+      {
+        logid: 12346, log_time: 1782345490, hostid: 'gw-02', product: 'BFE',
+        ai_apikey_id: 'key-mobile', ai_requested_model: 'claude-3-opus', ai_target_model: 'claude-3-opus',
+        ai_provider: 'anthropic', ai_protocol: 'anthropic', ai_mode: 'chat', ai_stream: 0,
+        res_status_code: 500, err_code: 'UPSTREAM_TIMEOUT', err_msg: 'upstream request timeout after 30s',
+        ai_input_tokens: 2000, ai_output_tokens: 0, ai_total_tokens: 2000,
+        all_time: 30000, ai_ttft_us: null, ai_tpot_us: null,
+        ai_cost_value: 30000, ai_cost_currency: 'USD',
+        ai_rate_limit_hits: null, ai_auth_reject_quota_plans: null,
+        level1Name: 'team', level1: 'dev',
+        client_ip: '10.0.0.2', header_host: 'api.example.org', origin_uri: '/v1/messages',
+        req_headers: null, res_headers: null,
+      },
+      {
+        logid: 12347, log_time: 1782345480, hostid: 'gw-01', product: 'BFE',
+        ai_apikey_id: 'key-internal', ai_requested_model: 'gpt-4o-mini', ai_target_model: 'gpt-4o-mini',
+        ai_provider: 'azure', ai_protocol: 'openai', ai_mode: 'chat', ai_stream: 1,
+        res_status_code: 200, err_code: null, err_msg: 'ok',
+        ai_input_tokens: 500, ai_output_tokens: 150, ai_total_tokens: 650,
+        all_time: 800, ai_ttft_us: 300000, ai_tpot_us: 18000,
+        ai_cost_value: 800, ai_cost_currency: 'USD',
+        ai_rate_limit_hits: null, ai_auth_reject_quota_plans: '["quota-plan-1"]',
+        level1Name: 'dep', level1: 'ops', level2Name: 'group', level2: 'platform',
+        client_ip: '10.0.0.3', header_host: 'api.example.org', origin_uri: '/v1/chat/completions',
+        req_headers: '{"Content-Type":"application/json"}', res_headers: '{"x-request-id":"abc-123"}',
+      },
+      {
+        logid: 12348, log_time: 1782345470, hostid: 'gw-03', product: 'BFE',
+        ai_apikey_id: null, ai_requested_model: 'gpt-4', ai_target_model: 'gpt-4o',
+        ai_provider: 'openai', ai_protocol: 'openai', ai_mode: 'completion', ai_stream: 0,
+        res_status_code: 401, err_code: 'UNAUTHORIZED', err_msg: 'invalid api key',
+        ai_input_tokens: 0, ai_output_tokens: 0, ai_total_tokens: 0,
+        all_time: 10, ai_ttft_us: null, ai_tpot_us: null,
+        ai_cost_value: 0, ai_cost_currency: 'USD',
+        ai_rate_limit_hits: null, ai_auth_reject_quota_plans: null,
+        level1Name: null, level1: null,
+        client_ip: '192.168.1.100', header_host: 'api.example.org', origin_uri: '/v1/chat',
+        req_headers: null, res_headers: null,
+      },
+      {
+        logid: 12349, log_time: 1782345460, hostid: 'gw-01', product: 'BFE',
+        ai_apikey_id: 'key-web-prod', ai_requested_model: 'gpt-4o', ai_target_model: 'gpt-4o',
+        ai_provider: 'openai', ai_protocol: 'openai', ai_mode: 'chat', ai_stream: 1,
+        res_status_code: 429, err_code: 'RATE_LIMITED', err_msg: 'rate limit exceeded for model gpt-4o',
+        ai_input_tokens: 0, ai_output_tokens: 0, ai_total_tokens: 0,
+        all_time: 5, ai_ttft_us: null, ai_tpot_us: null,
+        ai_cost_value: 0, ai_cost_currency: 'USD',
+        ai_rate_limit_hits: '["tpm_1min"]', ai_auth_reject_quota_plans: null,
+        level1Name: 'dep', level1: 'ops',
+        client_ip: '10.0.0.10', header_host: 'api.example.org', origin_uri: '/v1/chat/completions',
+        req_headers: null, res_headers: null,
+      },
+    ],
+  },
 };

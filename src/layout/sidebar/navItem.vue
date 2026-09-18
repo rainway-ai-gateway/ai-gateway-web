@@ -100,6 +100,8 @@ export default {
                 'EppPool.list': 'iconfont icon-jiqun',
                 'ModelPrice.list': 'ivu-icon-logo-yen',
 
+                'report.list': 'ivu-icon-ios-stats',
+
                 'OperationLog.list': 'ivu-icon-md-list-box',
             }
         };

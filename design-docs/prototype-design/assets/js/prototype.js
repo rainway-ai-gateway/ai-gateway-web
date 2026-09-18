@@ -31,6 +31,8 @@ window.Prototype = {
       'nav.UserManage': '用户管理',
       'nav.OperationLogManage': '操作日志',
       'nav.EppPoolManage': 'EPP调度',
+      'nav.CertsManage': '证书管理',
+      'nav.ReportManage': '数据报表',
     },
     en: {
       'login.gateway': 'Rainway AI Gateway',
@@ -59,6 +61,7 @@ window.Prototype = {
       'nav.UserManage': 'User Manage',
       'nav.OperationLogManage': 'Operation Logs',
       'nav.EppPoolManage': 'EPP Scheduling',
+      'nav.ReportManage': 'Data Report',
     },
   },
 

@@ -502,7 +502,7 @@ models:
 | provider | string | 按 Provider 过滤 | N | - | - |
 | mode | string | 按 Mode 过滤 | N | - | 须为 `mode` 枚举值 |
 | page | int | 页码 | N | 默认1 | 必须 >0 |
-| page_size | int | 每页条数 | N | 默认20，最大100 | 取值范围 1-100 |
+| page_size | int | 每页条数 | N | 默认50，最大1000 | 取值范围 1-1000 |
 
 **返回数据（Data内容）**
 
@@ -510,6 +510,8 @@ models:
 | - | - | - | - |
 | list | []ModelPrice | 模型定价记录列表 | 元素字段同 [1. 数据模型](#1-数据模型) |
 | pagination | object | 分页信息 | 包含 `page`、`page_size`、`total` |
+
+> 路由分发说明：当请求携带 `model` 参数时，本端点改按 §3.6 单记录语义处理（详见 §3.6）；不带 `model` 时，`provider`/`mode` 为本节列表过滤参数。
 
 ---
 
@@ -558,6 +560,8 @@ models:
 **返回数据（Data内容）**
 
 字段同 [1. 数据模型](#1-数据模型)。
+
+> 错误处理：三参任一缺失或 `mode` 非枚举值时返回参数错误（不回落列表语义）；组合键不存在时返回 Record Not Exist。
 
 ---
 
