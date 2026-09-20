@@ -30,13 +30,6 @@ window.PrototypeNav = [
     icon: navIcon('resource.admin.list'),
     children: [
       {
-        id: 'AIGatewayInstancePool.list',
-        i18n: 'AIGatewayInstancePoolManage',
-        page: 'instance-pool-ai.html',
-        text: 'AI网关实例池',
-        icon: navIcon('AIGatewayInstancePool.list'),
-      },
-      {
         id: 'Provider.list',
         i18n: 'ProviderManage',
         page: 'providers.html',

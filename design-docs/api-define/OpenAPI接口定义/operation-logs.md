@@ -52,7 +52,7 @@
 | `user_agent` | string | User-Agent | - |
 | `created_at` | int64 | 操作时间 | Unix 时间戳（秒） |
 
-> **说明**：`change_summary` 中已对 api-key token、密码、证书私钥等敏感字段进行脱敏，不会记录原始敏感信息。
+> **说明**：`change_summary` 中已对 api-key token、密码、证书私钥等敏感字段进行脱敏；`error_msg` 同样不回显原始敏感信息（凭证值经掩码后记录，issue #185）。不会记录原始敏感信息。
 
 ---
 

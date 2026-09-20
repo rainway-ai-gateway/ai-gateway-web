@@ -72,6 +72,24 @@
       </div>
     </Card>
 
+    <Card :title="$t('provider.protocolPathMapping')" class="info-card">
+      <table v-if="protocolPaths.length" class="kv-table">
+        <thead>
+          <tr>
+            <th>{{ $t('provider.protocolPathProto') }}</th>
+            <th>{{ $t('provider.protocolPathPrefix') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(item, index) in protocolPaths" :key="'pp-' + index">
+            <td>{{ item.protocol }}</td>
+            <td>{{ item.path }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <span v-else class="empty-text">-</span>
+    </Card>
+
     <Card :title="$t('gatewayConfig.serviceAuthKeys')" class="info-card">
       <table v-if="keys.length" class="kv-table">
         <thead>
@@ -179,6 +197,13 @@ export default {
             return (this.currentData.keys || []).filter(
                 item => (item.name && item.name.trim()) || (item.key && item.key.trim())
             );
+        },
+        protocolPaths() {
+            const pp = this.currentData.protocol_paths;
+            if (!pp || typeof pp !== 'object') return [];
+            return Object.keys(pp).map(function(proto) {
+                return { protocol: proto, path: pp[proto] || '' };
+            });
         },
         peakTimeRanges() {
             const peak = (this.currentData.tiers || []).find(item => item && item.name === 'peak');

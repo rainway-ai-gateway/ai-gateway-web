@@ -567,11 +567,18 @@ Data为null。
 
 **执行逻辑**
 
-1. 找到该Entity的quota_plan（如果不存在或unlimited=true，返回404）
-2. 若传入quota，更新quota_plan.quota为新的值
-3. 触发balance的reset：
+1. 若 Entity 不存在，返回 404；找到该 Entity 的 quota_plan：若未关联 quota plan 或 `unlimited=true`，返回 422（Param Illegal；不产生配额变更，并记录 `status=2` 的操作日志）；若传入 quota，更新 quota_plan.quota 为新的值
+2. 触发balance的reset：
    - balance.remaining = 当前quota（或新的quota）
    - balance.used = 0
+
+**失败响应说明**
+
+| HTTP status | ErrNum | ErrMsg | 触发条件 |
+|------|------|------|------|
+| 404 | 404 | `Entity Record Not Exist` | 路径中的 Entity 不存在 |
+| 422 | 422 | `Param Illegal: <原因>` | 未关联 quota plan；unlimited 配额计划（`cannot reset balance for unlimited quota`）；quota 参数非法 |
+| 500 | 500 | `Unknown Exception: <原因>` | 内部故障 |
 
 **返回数据（Data内容）**
 

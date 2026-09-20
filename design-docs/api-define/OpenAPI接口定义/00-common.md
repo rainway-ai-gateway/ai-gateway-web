@@ -56,7 +56,7 @@
 
 3. **外部系统强制要求的字段可为例外，但须显式说明**
    - 若字段名由下游系统（如 BFE）强制规定，可在特定场景下使用非 snake_case 命名，但必须在文档中标注为例外并说明原因。
-   - 例如：`alb-pool.md` 中 `ports` 的 `Default` 键为 BFE 实例池端口名称；InnerAPI 导出给 BFE 的路由配置保持 `Cond`、`ClusterName`、`Model`、`Weight` 不变。
+   - 例如：InnerAPI 导出给 BFE 的路由配置保持 `Cond`、`ClusterName`、`Model`、`Weight` 不变。
 
 4. **新增字段须先行核对本规范**
    - 新增公共类型、请求体或响应体字段时，须先检查是否与本规范冲突；若冲突，应采用 snake_case 命名。

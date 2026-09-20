@@ -889,9 +889,7 @@ export default {
                     protocolPaths[proto] = path;
                 }
             });
-            if (Object.keys(protocolPaths).length) {
-                payload.protocol_paths = protocolPaths;
-            }
+            payload.protocol_paths = protocolPaths;
             // 创建模式需要传 name，编辑模式 name 通过 URL 路径传递，请求体不传 name
             if (this.isAdd) {
                 payload.name = String(this.formData.name || '').trim();

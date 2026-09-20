@@ -60,16 +60,6 @@ export default [
       },
       {
         component: (r) =>
-          require.ensure(
-            [],
-            () => r(require('../modules/AIInstancePool')),
-            'instance-pool-ai',
-          ),
-        path: 'instance-pool-ai',
-        name: 'AIGatewayInstancePool.list',
-      },
-      {
-        component: (r) =>
           require.ensure([], () => r(require('../modules/User')), 'user'),
         path: 'user',
         name: 'user.list',

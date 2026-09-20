@@ -469,9 +469,6 @@ export default {
     type: '调度方式',
     config: '配置',
   },
-  bfeClusters: {
-    clusterInstancePool: 'AI网关实例池',
-  },
   domain: {
     name: '域名',
     formatInvalid: '域名格式不符合规范',

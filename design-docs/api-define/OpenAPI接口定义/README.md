@@ -16,7 +16,6 @@
 | /entities | [entities.md](./entities.md) |
 | /global-route-rules | [global-route-rules.md](./global-route-rules.md) |
 | /route-tables | [route-tables.md](./route-tables.md) |
-| /alb-pool | [alb-pool.md](./alb-pool.md) |
 | /auth | [auth.md](./auth.md) |
 | /certificates | [certificates.md](./certificates.md) |
 | /providers | [providers.md](./providers.md) |
