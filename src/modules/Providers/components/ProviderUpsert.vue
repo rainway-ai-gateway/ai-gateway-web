@@ -78,6 +78,50 @@
             />
           </div>
         </FormItem>
+
+        <FormItem prop="models">
+          <p slot="label" class="field-label">
+            {{ $t('provider.modelList') }}
+            <Tooltip placement="top" transfer max-width="360">
+              <div slot="content" class="field-tip-content">
+                <p>{{ $t('provider.modelsListTip') }}</p>
+              </div>
+              <Icon type="ios-help-circle-outline" class="field-help-icon" />
+            </Tooltip>
+          </p>
+          <div class="models-row">
+            <el-select
+              v-model="formData.models"
+              style="flex: 1;"
+              size="small"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              :placeholder="modelsSelectPlaceholder"
+              @paste.native="onModelsPaste"
+            >
+              <el-option
+                v-for="item in modelsList"
+                :key="item"
+                :value="item"
+                :label="item"
+              />
+            </el-select>
+            <span class="discover-btn-wrap">
+              <Button @click="showBatchModelsModal">{{
+                $t('provider.batchAddModels')
+              }}</Button>
+              <Button
+                type="primary"
+                :loading="discoverLoading"
+                :disabled="!canDiscoverModels"
+                @click="discoverModels"
+                >{{ $t('provider.syncModels') }}</Button
+              >
+            </span>
+          </div>
+        </FormItem>
       </Card>
 
       <Card class="llm-section-card">
@@ -199,51 +243,6 @@
         </FormItem>
       </Card>
 
-      <Card class="llm-section-card">
-        <FormItem prop="models">
-          <p slot="label" class="field-label">
-            {{ $t('provider.modelList') }}
-            <Tooltip placement="top" transfer max-width="360">
-              <div slot="content" class="field-tip-content">
-                <p>{{ $t('provider.modelsListTip') }}</p>
-              </div>
-              <Icon type="ios-help-circle-outline" class="field-help-icon" />
-            </Tooltip>
-          </p>
-          <div class="models-row">
-            <el-select
-              v-model="formData.models"
-              style="flex: 1;"
-              size="small"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              :placeholder="modelsSelectPlaceholder"
-              @paste.native="onModelsPaste"
-            >
-              <el-option
-                v-for="item in modelsList"
-                :key="item"
-                :value="item"
-                :label="item"
-              />
-            </el-select>
-            <span class="discover-btn-wrap">
-              <Button @click="showBatchModelsModal">{{
-                $t('provider.batchAddModels')
-              }}</Button>
-              <Button
-                type="primary"
-                :loading="discoverLoading"
-                :disabled="!canDiscoverModels"
-                @click="discoverModels"
-                >{{ $t('provider.syncModels') }}</Button
-              >
-            </span>
-          </div>
-        </FormItem>
-      </Card>
     </Form>
 
     <Modal

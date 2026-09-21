@@ -70,6 +70,13 @@
         <span class="info-label">{{ $t('gatewayConfig.modelListEndpoint') }}</span>
         <span class="info-value">{{ endpointUrl }}</span>
       </div>
+      <div class="info-row">
+        <span class="info-label">{{ $t('provider.modelList') }}</span>
+        <span class="info-value">
+          <Tag v-for="item in currentData.models || []" :key="item">{{ item }}</Tag>
+          <span v-if="!(currentData.models || []).length">-</span>
+        </span>
+      </div>
     </Card>
 
     <Card :title="$t('provider.protocolPathMapping')" class="info-card">
@@ -106,16 +113,6 @@
         </tbody>
       </table>
       <span v-else class="empty-text">-</span>
-    </Card>
-
-    <Card :title="$t('provider.modelList')" class="info-card">
-      <div class="info-row">
-        <span class="info-label">{{ $t('provider.models') }}</span>
-        <span class="info-value">
-          <Tag v-for="item in currentData.models || []" :key="item">{{ item }}</Tag>
-          <span v-if="!(currentData.models || []).length">-</span>
-        </span>
-      </div>
     </Card>
 
     <Card :title="$t('provider.pricingTiers')" class="info-card">

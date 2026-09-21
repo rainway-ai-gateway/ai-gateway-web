@@ -659,7 +659,8 @@ window.ProviderUpsert = (function () {
         '模型服务配置',
         IvuUI.formTop(
           IvuUI.formTopItem('模型协议', renderTags(data.model_protocols)) +
-            IvuUI.formTopItem('模型列表接口', IvuUI.escapeHtml(endpointUrl)),
+            IvuUI.formTopItem('模型列表接口', IvuUI.escapeHtml(endpointUrl)) +
+            IvuUI.formTopItem('模型列表', renderTags(data.models)),
         ),
       ) +
       renderProtocolPaths(data, true) +
@@ -669,12 +670,6 @@ window.ProviderUpsert = (function () {
           [{ title: 'Key 名称' }, { title: 'Key 值' }],
           keyRows,
         ),
-      ) +
-      IvuUI.card(
-        '模型列表',
-        '<div class="info-row"><div class="info-label">模型</div><div class="info-value">' +
-          renderTags(data.models) +
-          '</div></div>',
       ) +
       renderPricingTiersDetail(data) +
       '</div>'
@@ -744,7 +739,7 @@ window.ProviderUpsert = (function () {
           .join('')
       : '';
 
-    function renderModelListCard() {
+    function renderModelListField() {
       var inputHtml = isView
         ? ''
         : '<input type="text" class="proto-model-input" placeholder="' +
@@ -762,25 +757,23 @@ window.ProviderUpsert = (function () {
           MODEL_LIST_PLACEHOLDER +
           '</span>';
       }
-      return (
-        '<div class="llm-card"><div class="llm-card-title">' +
-'<span style="color:#ed4014;margin-right:4px;">*</span>模型列表' +
-helpIcon(MODEL_LIST_TIP) +
-        '</div><div class="llm-card-body">' +
+      return IvuUI.formTopItem(
+        '模型列表' + helpIcon(MODEL_LIST_TIP),
         '<div class="proto-model-select-wrap" style="display:flex;align-items:flex-start;gap:10px;">' +
-        '<div class="proto-model-select" id="proto-provider-models" style="flex:1;min-height:32px;">' +
-        '<div class="proto-model-select-tags">' +
-        modelTags +
-        inputHtml +
-        placeholderHtml +
-        '</div></div>' +
-        (isView
-          ? ''
-          : '<span style="display:flex;gap:8px;flex-shrink:0;">' +
-            '<button type="button" class="ivu-btn ivu-btn-default" id="provider-batch-add-models"><span>批量添加</span></button>' +
-            renderDiscoverButton(data) +
-            '</span>') +
-        '</div></div></div>'
+          '<div class="proto-model-select" id="proto-provider-models" style="flex:1;min-height:32px;">' +
+          '<div class="proto-model-select-tags">' +
+          modelTags +
+          inputHtml +
+          placeholderHtml +
+          '</div></div>' +
+          (isView
+            ? ''
+            : '<span style="display:flex;gap:8px;flex-shrink:0;">' +
+              '<button type="button" class="ivu-btn ivu-btn-default" id="provider-batch-add-models"><span>批量添加</span></button>' +
+              renderDiscoverButton(data) +
+              '</span>') +
+          '</div>',
+        true,
       );
     }
 
@@ -814,7 +807,8 @@ helpIcon(MODEL_LIST_TIP) +
           IvuUI.formTopItem(
             '模型列表接口',
             renderEndpointUrlGroup(data, isView),
-          ),
+          ) +
+          renderModelListField(),
       ) +
       '</div></div>' +
       renderProtocolPaths(data, isView) +
@@ -829,7 +823,6 @@ helpIcon(MODEL_LIST_TIP) +
         ? ''
         : '<button type="button" class="ivu-btn ivu-btn-primary ivu-btn-small" id="provider-add-key" style="margin-top:20px;"><span>+ 添加 Key</span></button>') +
       '</div></div>' +
-      renderModelListCard() +
       '</div>'
     );
   }
