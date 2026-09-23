@@ -305,8 +305,8 @@ findHorizontalScroller(root) {
 | `docs/zh-cn/images/04-provider-view.png` | 修改 | 重拍 |
 | `docs/zh-cn/images/04-provider-list.png` | 修改 | 重拍 |
 | `docs/zh-cn/images/04-provider-pricing-tiers.png` | 修改 | 重拍 |
-| `docs/zh-cn/site/images/04-provider-*.png` | 修改 | 由 `docs/scripts/build-manual.js` 同步 |
-| `src/main.js` | 修改 | 版本串 `_VERSION_` → `0.0.10@20260920182438`，**构建产物，非功能变更** |
+
+> `docs/zh-cn/site/images/04-provider-*.png` 为 `docs/scripts/build-manual.js` 的生成产物，不单独列出。
 
 ---
 

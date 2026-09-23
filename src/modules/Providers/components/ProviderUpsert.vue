@@ -162,12 +162,15 @@
                     :rules="protocolPathValueRules(index)"
                     class="inline-form-item"
                   >
-                    <Input v-model="item.path" placeholder="/v1" />
+                    <Input v-model="item.path" :placeholder="$t('provider.protocolPathValuePlaceholder')" />
                   </FormItem>
                 </td>
                 <td>
                   <Button type="error" size="small" @click="removeProtocolPath(index)">{{ $t('com.del') }}</Button>
                 </td>
+              </tr>
+              <tr v-if="!(formData.protocol_paths || []).length" class="proto-paths-empty-row">
+                <td colspan="3" style="text-align:center;color:#999;">{{ $t('provider.protocolPathEmpty') }}</td>
               </tr>
             </tbody>
           </table>

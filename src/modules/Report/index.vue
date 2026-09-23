@@ -20,9 +20,11 @@
               v-model="startTime"
               type="datetime"
               format="yyyy-MM-dd HH:mm:ss"
+              :options="startDateOptions"
               :placeholder="$t('report.startTime')"
               style="width:190px"
-              @on-change="onStartChange"
+              @on-change="onTimeChange"
+              @on-ok="applyFilters"
             />
           </div>
           <span class="filter-separator">—</span>
@@ -31,9 +33,11 @@
               v-model="endTime"
               type="datetime"
               format="yyyy-MM-dd HH:mm:ss"
+              :options="endDateOptions"
               :placeholder="$t('report.endTime')"
               style="width:190px"
-              @on-change="onEndChange"
+              @on-change="onTimeChange"
+              @on-ok="applyFilters"
             />
           </div>
         </div>
@@ -140,6 +144,12 @@ const TIME_SHORTCUTS = [
   { value: '7d', label: '7 天', hours: 168 },
 ];
 
+// 与后端 ireport.MaxWindow 保持一致（7 天），超出会被拒绝
+const MAX_WINDOW_MS = 7 * 24 * 3600 * 1000;
+
+// 取某天的 0 点，DatePicker 的 disabledDate 传入的是当天 0 点，按天比较可避免边界日期被误禁用
+const dayStart = date => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
 export default {
   name: 'Report',
 
@@ -164,12 +174,33 @@ export default {
       apikeyOptions: [],
       providerOptions: [],
       hostOptions: [],
+      filterOptionsRange: null,
     };
   },
 
   computed: {
     timeShortcuts() {
       return TIME_SHORTCUTS;
+    },
+
+    // 起始时间：不晚于结束时间，且不早于「结束时间 - 7 天」
+    startDateOptions() {
+      const end = this.validDate(this.endTime);
+      if (!end) return {};
+      const min = new Date(end.getTime() - MAX_WINDOW_MS);
+      return {
+        disabledDate: date => date.getTime() < dayStart(min) || date.getTime() > dayStart(end),
+      };
+    },
+
+    // 结束时间：不早于起始时间，且不晚于「起始时间 + 7 天」
+    endDateOptions() {
+      const start = this.validDate(this.startTime);
+      if (!start) return {};
+      const max = new Date(start.getTime() + MAX_WINDOW_MS);
+      return {
+        disabledDate: date => date.getTime() < dayStart(start) || date.getTime() > dayStart(max),
+      };
     },
 
     helpers() {
@@ -235,6 +266,27 @@ export default {
       return '';
     },
 
+    validDate(value) {
+      if (!value) return null;
+      const date = value instanceof Date ? value : new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+    },
+
+    // 与后端校验对齐：起止时间必须有效、顺序正确，且跨度不超过 7 天
+    validateTimeRange() {
+      const start = this.validDate(this.startTime);
+      const end = this.validDate(this.endTime);
+      if (!start || !end || end.getTime() <= start.getTime()) {
+        this.$Message.error(this.$t('report.timeRangeInvalid'));
+        return false;
+      }
+      if (end.getTime() - start.getTime() > MAX_WINDOW_MS) {
+        this.$Message.error(this.$t('report.timeRangeExceeded'));
+        return false;
+      }
+      return true;
+    },
+
     // ==================== Filters ====================
     buildFilterParams() {
       const params = {
@@ -258,14 +310,19 @@ export default {
         const start = end - opt.hours * 3600;
         this.endTime = new Date(end * 1000);
         this.startTime = new Date(start * 1000);
+        this.applyFilters();
       }
     },
 
-    onStartChange() {},
-    onEndChange() {},
+    // 手动修改时间后取消快捷选项选中状态，避免误导
+    onTimeChange() {
+      this.shortcut = '';
+    },
 
     applyFilters() {
+      if (!this.validateTimeRange()) return;
       const params = this.buildFilterParams();
+      this.loadFilterOptions();
       if (this.activeTab === 'overview') {
         this.$refs.overview && this.$refs.overview.load(params);
       } else {
@@ -306,10 +363,13 @@ export default {
 
     // ==================== Filter Options ====================
     loadFilterOptions() {
-      const params = {
-        start: this.toUnixTimestamp(new Date((this.now() - 86400) * 1000)),
-        end: this.toUnixTimestamp(new Date(this.now() * 1000)),
-      };
+      const start = this.toUnixTimestamp(this.startTime);
+      const end = this.toUnixTimestamp(this.endTime);
+      // 时间范围未变化时无需重复请求，避免分页等操作带来多余开销
+      if (this.filterOptionsRange && this.filterOptionsRange.start === start && this.filterOptionsRange.end === end) return;
+      this.filterOptionsRange = { start, end };
+
+      const params = { start, end };
       const dimensions = [
         { key: 'model', field: 'modelOptions' },
         { key: 'apikey', field: 'apikeyOptions' },

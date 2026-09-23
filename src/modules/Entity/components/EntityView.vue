@@ -21,6 +21,10 @@
         <span class="info-value">{{ displayData.name || '-' }}</span>
       </div>
       <div class="info-row">
+        <span class="info-label">{{ $t('entity.description') }}</span>
+        <span class="info-value">{{ displayData.description || '-' }}</span>
+      </div>
+      <div class="info-row">
         <span class="info-label">{{ $t('entity.type') }}</span>
         <span class="info-value">{{ displayData.type || '-' }}</span>
       </div>

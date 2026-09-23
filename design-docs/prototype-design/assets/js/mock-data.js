@@ -4,6 +4,7 @@ window.MockData = {
     {
       id: 1,
       name: 'rd-dept',
+      description: '研发部门，负责平台与算法研发',
       type: 'dep',
       parent_id: '',
       allow_models: ['*'],
@@ -49,6 +50,7 @@ window.MockData = {
     {
       id: 2,
       name: 'algo-team',
+      description: '算法团队，负责模型调优与推理服务',
       type: 'team',
       parent_id: 1,
       allow_models: ['gpt-4o'],
@@ -82,6 +84,7 @@ window.MockData = {
     {
       id: 3,
       name: 'qa-team',
+      description: '测试团队，负责质量保障',
       type: 'team',
       parent_id: 1,
       allow_models: ['*'],
@@ -108,6 +111,7 @@ window.MockData = {
     {
       id: 4,
       name: 'alice@default',
+      description: '',
       type: 'team',
       parent_id: 1,
       allow_models: ['*'],

@@ -519,7 +519,7 @@ window.ProviderUpsert = (function () {
     var keys = Object.keys(paths);
 
     var helpTip =
-      '按协议配置上游路径前缀，BFE 转发时将标准入口 /v1/... 改写到该前缀。未配置的协议请求路径原样转发。';
+      '按协议配置上游 API 基路径；BFE 转发时将命中的标准端点改写到该基路径（openai 兼容带/不带 /v1 的客户端入口）。未配置的协议请求路径原样转发；若清空所有映射，保存时将显式提交空对象以禁用路径改写。';
 
     function pathRow(proto, path) {
       var protoDisplay = isView
@@ -534,7 +534,7 @@ window.ProviderUpsert = (function () {
       var pathInput =
         '<input type="text" class="ivu-input proto-path-value" value="' +
         IvuUI.escapeHtml(path || '') +
-        '" placeholder="/v1"' +
+        '" placeholder="例如 /v1"' +
         (isView ? ' disabled="disabled"' : '') +
         ' />';
       return (
@@ -557,7 +557,7 @@ window.ProviderUpsert = (function () {
           .join('')
       : '<tr class="proto-paths-empty-row"><td colspan="' +
         (isView ? 2 : 3) +
-        '" style="text-align:center;color:#999;">未配置协议路径映射</td></tr>';
+        '" style="text-align:center;color:#999;">未配置协议路径映射（保存后请求路径原样转发）</td></tr>';
 
     return (
       '<div class="llm-card"><div class="llm-card-title">' +
@@ -567,7 +567,7 @@ window.ProviderUpsert = (function () {
       '">?</span>' +
       '</div><div class="llm-card-body">' +
       '<table class="mapping-table">' +
-      '<thead><tr><th style="width:140px;">协议</th><th>上游路径前缀</th>' +
+      '<thead><tr><th style="width:140px;">协议</th><th>上游 API 基路径</th>' +
       headerActions +
       '</tr></thead><tbody id="proto-paths-body">' +
       bodyRows +
@@ -929,7 +929,7 @@ window.ProviderUpsert = (function () {
       var pk = protoKeys[pi];
       if (protocolSet[pk]) {
         if (!isValidProtocolPath(paths[pk])) {
-          return '协议 "' + pk + '" 的路径前缀格式不正确，须以 / 开头，不以 / 结尾，不含 ?、$、#、..';
+          return '协议 "' + pk + '" 的上游 API 基路径格式不正确，须以 / 开头，不以 / 结尾，不含 ?、$、#、..';
         }
       } else {
         return '协议 "' + pk + '" 未在模型协议中启用，请先在模型协议中选择';
