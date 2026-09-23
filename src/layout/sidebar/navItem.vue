@@ -57,9 +57,6 @@ export default {
     data() {
         return {
             navIcon: {
-                'AIGatewayInstancePool.list': 'iconfont icon-instancePool',
-                'AIGatewayInstancePoolManage': 'iconfont icon-instancePool',
-
                 'Provider.list': 'ivu-icon-ios-cloud',
                 'ProviderManage': 'ivu-icon-ios-cloud',
 
@@ -99,6 +96,8 @@ export default {
 
                 'EppPool.list': 'iconfont icon-jiqun',
                 'ModelPrice.list': 'ivu-icon-logo-yen',
+
+                'report.list': 'ivu-icon-ios-stats',
 
                 'OperationLog.list': 'ivu-icon-md-list-box',
             }
