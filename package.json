@@ -94,7 +94,7 @@
   "overrides": {
     "serialize-javascript": "^7.0.3",
     "@vue/component-compiler-utils": {
-      "postcss": "^8.4.31"
+      "postcss": "^8.5.28"
     }
   }
 }
