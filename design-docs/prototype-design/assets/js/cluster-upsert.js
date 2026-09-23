@@ -940,9 +940,9 @@ window.ClusterUpsert = (function () {
   function reviewRow(label, value) {
     return (
       '<ul class="clearFloat"><li class="title">' +
-      label +
+      IvuUI.escapeHtml(label) +
       ':</li><li class="value">' +
-      (value != null && value !== '' ? value : '-') +
+      (value != null && value !== '' ? IvuUI.escapeHtml(value) : '-') +
       '</li></ul>'
     );
   }
@@ -1150,10 +1150,21 @@ window.ClusterUpsert = (function () {
     var parts = path.split('.');
     var current = obj;
     for (var i = 0; i < parts.length - 1; i++) {
-      if (!current[parts[i]]) current[parts[i]] = {};
-      current = current[parts[i]];
+      var key = parts[i];
+      // 过滤 __proto__/constructor/prototype，避免路径写入污染 Object 原型
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype')
+        return;
+      if (!current[key]) current[key] = {};
+      current = current[key];
     }
-    current[parts[parts.length - 1]] = value;
+    var lastKey = parts[parts.length - 1];
+    if (
+      lastKey === '__proto__' ||
+      lastKey === 'constructor' ||
+      lastKey === 'prototype'
+    )
+      return;
+    current[lastKey] = value;
   }
 
   function syncFromDom(root, data) {
