@@ -116,21 +116,30 @@
 
 ## 4.6 协议路径映射
 
-当一个服务商支持多种模型协议（如同时勾选 `openai` 与 `anthropic`），且不同协议的上游访问路径前缀不同时，可通过 `protocol_paths` 为每种协议指定自定义路径前缀，覆盖协议默认路径。
+当一个服务商支持多种模型协议（如同时勾选 `openai` 与 `anthropic`），且各协议的**上游 API 基路径**不同时，可通过 `protocol_paths` 为每种协议分别指定基路径。
+
+配置值即该协议官方 SDK `base_url` 的 path 部分：`openai` 含 `/v1` 尾（OpenAI SDK 会向 base_url 拼接 `/chat/completions` 等），`anthropic` 不含 `/v1`（Anthropic SDK 自行拼接 `/v1/messages`）。
 
 | 字段 | 必填 | 默认值 | 校验规则 | 说明 |
 | --- | --- | --- | --- | --- |
 | 协议 | 是 | — | 须在已选的 `模型协议` 范围内 | 下拉选择，选项来自当前表单已勾选的模型协议 |
-| 路径 | 是 | 协议默认路径 | 以 `/` 开头，不以 `/` 结尾；不含 `?` `$` `#` `..` | 上游路径前缀，如 `/v1`、`/api/openai` |
+| 路径 | 是 | 协议默认路径 | 以 `/` 开头，不以 `/` 结尾；不含 `?` `$` `#` `..` | 上游 API 基路径，如 `/v1`、`/api/openai` |
 
 **表格操作**：
 
 | 操作 | 说明 |
 | --- | --- |
 | 「+ 添加映射」 | 在表格中新增一行：协议下拉框 + 路径输入框 + 删除按钮 |
-| 「删除」 | 移除该行映射 |
+| 「删除」 | 移除该行映射；清空全部映射后保存，将显式提交空对象以禁用路径改写 |
 
-> **使用场景**：例如 deepseek 同时支持 `openai` 协议（路径 `/v1`）与自定义协议时，可在此分别指定路径。未配置的协议使用各自默认路径（`openai` 默认 `/v1`，`anthropic` 默认 `/v1/messages`，`gemini` 默认 `/v1beta/models`）。
+**改写规则**：
+
+- `anthropic`：请求 `/v1/messages`（及其子路径）改写为 `{anthropic}/v1/messages`。
+- `openai`：请求命中标准端点（`/chat/completions`、`/completions`、`/embeddings`、`/models`、`/responses` 等）时，先剥离可选的 `/v1` 前缀再拼接到基路径——`/v1/chat/completions` 与 `/chat/completions` 均改写为 `{openai}/chat/completions`。即客户端入口带不带 `/v1` 都不影响最终上游路径，兼容 Trae 等直连 `base_url` 的 OpenAI 兼容客户端。
+- 未配置（或对应协议无条目）时请求路径**原样转发**；未命中 openai 标准端点的路径（服务商原生路径、自定义路径、`/v10/xxx`、`/v1beta/...`）永不改写，客户端以服务商原生路径访问的透传模式不受影响。
+- `gemini` 不支持路径改写（其原生路径即标准路径，透传已可用）。
+
+> **使用场景**：例如 deepseek 同时支持 `openai` 与 `anthropic` 协议，可分别配置 `{"openai": "/v1", "anthropic": "/anthropic"}`。未配置映射的协议按上述「改写规则」走默认行为。
 
 ## 4.7 服务鉴权 Keys
 

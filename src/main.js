@@ -51,7 +51,7 @@ Vue.use(requestPlugin);
 Vue.prototype.$urlFormat = urlFormat;
 Vue.prototype.$BFEProductLineId = 1;
 Vue.prototype.$store = store;
-Vue.prototype.Version = '0.0.10@20260920182438';
+Vue.prototype.Version = '_VERSION_';
 
 Vue.use(VueClipboard);
 Vue.use(JsonViewer);
