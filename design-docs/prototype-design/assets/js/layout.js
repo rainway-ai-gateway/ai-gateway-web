@@ -203,6 +203,7 @@ window.Layout = {
   render(options) {
     var pageId = options.pageId || '';
     var basePath = options.basePath || '../';
+    var safeBasePath = IvuUI.escapeHtml(basePath);
     var lang = window.Prototype ? Prototype.getLang() : 'zh';
     var user = window.Prototype ? Prototype.getUser() : { name: 'admin' };
     var breadcrumb = options.breadcrumb || findNavLabel(pageId);
@@ -221,7 +222,7 @@ window.Layout = {
     }
 
     var menuHtml = PrototypeNav.map(function (item) {
-      return renderMenuItem(item, pageId, basePath);
+      return renderMenuItem(item, pageId, safeBasePath);
     }).join('');
 
     var logoutText = window.Prototype
@@ -238,12 +239,12 @@ window.Layout = {
 
     document.body.innerHTML =
       '<div id="product-body" style="height:100%;" data-proto-base="' +
-      basePath +
+      safeBasePath +
       '">' +
       '<div class="app-layout">' +
       '<div class="bfe-sidebar">' +
       '<div class="header"><p class="text">' +
-      productTitle +
+      IvuUI.escapeHtml(productTitle) +
       '</p></div>' +
       '<div class="Menu">' +
       '<ul class="ivu-menu ivu-menu-dark ivu-menu-vertical menu_list ivu-menu-opened" style="width:auto;">' +
@@ -257,10 +258,10 @@ window.Layout = {
       '<div class="ivu-dropdown proto-header-dropdown" data-proto-dropdown="lang">' +
       '<a href="javascript:void(0)" class="proto-dropdown-trigger header_box header_name">' +
       '<img class="img proto-header-lang-icon" src="' +
-      basePath +
+      safeBasePath +
       'assets/static/img/loginBg.png" alt="" />' +
       '<span class="proto-lang-label">' +
-      langLabel +
+      IvuUI.escapeHtml(langLabel) +
       '</span>' +
       '<span class="proto-dropdown-arrow" aria-hidden="true">▾</span>' +
       '</a>' +
@@ -288,14 +289,14 @@ window.Layout = {
       '</svg>' +
       '</span>' +
       '<span class="proto-user-name">' +
-      (user.name || 'admin') +
+      IvuUI.escapeHtml(user.name || 'admin') +
       '</span>' +
       '<span class="proto-dropdown-arrow" aria-hidden="true">▾</span>' +
       '</a>' +
       '<div class="ivu-select-dropdown proto-dropdown-menu">' +
       '<ul class="ivu-dropdown-menu">' +
       '<li class="ivu-dropdown-item" data-action="logout">' +
-      logoutText +
+      IvuUI.escapeHtml(logoutText) +
       '</li>' +
       '</ul>' +
       '</div>' +
@@ -305,7 +306,7 @@ window.Layout = {
       '<div class="bfe-content">' +
       '<div class="bfe-breadcrumb ivu-breadcrumb">' +
       '<span><span class="ivu-breadcrumb-item-link">' +
-      breadcrumb +
+      IvuUI.escapeHtml(breadcrumb) +
       '</span></span>' +
       '</div>' +
       '<div class="bfe-content-view">' +
@@ -324,21 +325,21 @@ window.Layout = {
       '<div class="proto-confirm-header-inner">' +
       '<span class="proto-confirm-header-icon" aria-hidden="true">?</span>' +
       '<span class="proto-confirm-header-title" id="proto-confirm-title">' +
-      confirmTitle +
+      IvuUI.escapeHtml(confirmTitle) +
       '</span>' +
       '</div>' +
       '</div>' +
       '<div class="ivu-modal-body">' +
       '<p id="proto-confirm-content" class="proto-confirm-content">' +
-      confirmLogout +
+      IvuUI.escapeHtml(confirmLogout) +
       '</p>' +
       '</div>' +
       '<div class="ivu-modal-footer proto-confirm-footer">' +
       '<button type="button" class="ivu-btn" id="proto-confirm-cancel">' +
-      confirmCancel +
+      IvuUI.escapeHtml(confirmCancel) +
       '</button>' +
       '<button type="button" class="ivu-btn ivu-btn-primary" id="proto-confirm-ok">' +
-      confirmOk +
+      IvuUI.escapeHtml(confirmOk) +
       '</button>' +
       '</div>' +
       '</div>' +

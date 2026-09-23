@@ -175,9 +175,11 @@ window.Prototype = {
   },
 
   logout() {
-    var basePath = '';
-    var body = document.getElementById('product-body');
-    if (body) basePath = body.getAttribute('data-proto-base') || '../';
+    // 直接从 Layout 传入的基路径取值，不再从 DOM 属性读取后拼接跳转地址
+    var basePath =
+      typeof this._layoutBasePath === 'string' && this._layoutBasePath
+        ? this._layoutBasePath
+        : '../';
     this.removeUser();
     window.location.href = basePath + 'login.html';
   },
