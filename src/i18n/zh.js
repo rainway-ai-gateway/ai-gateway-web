@@ -128,11 +128,6 @@ export default {
     tipNotEmpty: '输入不能为空',
     tipNotEmptyX: '{obj}不能为空',
     tipValidateError: '请检查参数填写是否规范!',
-    rateLimitTipIntro: '启用限流后，需至少配置一项有效规则：',
-    rateLimitTipRule: '添加 TPM/RPM 规则',
-    rateLimitTipConcurrency: '最大并发设为「封禁」或「限制并发数」',
-    rateLimitTipNoLimitNote:
-      '「不限制」不设并发上限，不能单独生效，须同时配置 TPM/RPM 规则',
     tipMustStartWithX: '{obj}必须以 / 开头',
     tipCommonRule:
       '以字母或数字开头，允许数字、大小写字母、下划线、中划线组合且长度大于1',
@@ -143,11 +138,11 @@ export default {
     confirmDelete: '确认删除',
     deleteSucc: '删除成功',
     deleteFailed: '删除失败',
+    backToHome: '返回首页',
   },
   nav: {
     Backend: '后端',
     InstancePool: '实例池',
-    BFEInstancePool: 'AI网关实例池',
     SubCluster: '子集群',
     Cluster: '集群',
     BFECluster: 'AI网关集群',
@@ -1006,6 +1001,8 @@ export default {
     protocolPathNoAvailableProto: '已无可用的协议',
     deleteFailed: '删除失败，该服务商可能仍被集群引用',
     viewModelPrices: '查询模型价格',
+    modelsListRequired: '模型列表为必填项，请至少添加 1 个模型',
+    modelNameDuplicate: '模型名称重复：{name}',
     pricingTiers: '分段计价配置',
     pricingProviderName: '服务商名称',
     pricingTimeZone: '时区',
