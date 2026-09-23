@@ -50,7 +50,7 @@
 - 每个实例的 `host` 非空，类型为 [Hostname](./00-common.md#公共参数类型) 或 IP（IPv6 字面量不带括号）。
 - 每个实例的 `port` 类型为 [Port](./00-common.md#公共参数类型)。
 - `(host, port)` 组合池内全局唯一（等价于旧 host:port 唯一语义）。
-- 每组实例数：生产环境每组恰 2 实例（主备）；测试环境允许单实例组（仅主、无备）；校验强度由部署形态配置项控制。
+- 每组实例数：1 个（仅主）或 2 个（主+备）；拒绝空组与 3 个及以上实例的组。
 - 实例无 `status`/`last_heartbeat` 字段——存活感知在 BFE 侧（EPPAddr 连接滞回），api 侧不做存活标记。
 
 ## 2. 接口清单
@@ -132,7 +132,7 @@
 - 每个实例的 `host` 非空，类型为 [Hostname](./00-common.md#公共参数类型) 或 IP（IPv6 字面量不带括号）。
 - 每个实例的 `port` 类型为 [Port](./00-common.md#公共参数类型)。
 - `(host, port)` 组合池内全局唯一（等价于旧 host:port 唯一语义）。
-- 每组实例数：生产环境每组恰 2 实例（主备）；测试环境允许单实例组（仅主、无备）；校验强度由部署形态配置项控制。
+- 每组实例数：1 个（仅主）或 2 个（主+备）；拒绝空组与 3 个及以上实例的组。
 
 **HTTP BODY参数示例**
 
@@ -161,7 +161,7 @@
 1. 校验请求参数合法性（组名非空唯一、实例 id 池内全局唯一、`(host, port)` 池内全局唯一、host/port 格式、组规模）。
 2. 使用配置项 `DefaultEPPInstancePoolName` 定位 EPP 实例池。
 3. 全量替换实例池（`epp_instances` 表，实例组 + 实例列表）。
-4. 触发分配悬空自动修复：`/epp-pool` PATCH 后分配悬空（primary 实例已被移出池）时自动修复——① 组仍存在：同组剩余实例中重选 primary（不换组）；② 组已不存在（或组规模不再满足部署形态要求）：**跨组重分配**——以该 cluster 为目标对整个实例池重跑分配器选新组；池无可分配候选组时，清除该分配（cluster 进入未分配态，导出 server_data_conf 时降级为 `WRR` 并输出 error 日志，待容量恢复后自动修复路径重新分配）。
+4. 触发分配悬空自动修复：`/epp-pool` PATCH 后分配悬空（primary 实例已被移出池）时自动修复——① 组仍存在：同组剩余实例中重选 primary（不换组）；② 组已不存在：**跨组重分配**——以该 cluster 为目标对整个实例池重跑分配器选新组；池无可分配候选组时，清除该分配（cluster 进入未分配态，导出 server_data_conf 时降级为 `WRR` 并输出 error 日志，待容量恢复后自动修复路径重新分配）。
 5. 返回更新后的实例池详情。
 
 > **注意**：实例池变更不直接 bump `ConfigTopicEppData` topic（实例增减不改变 cluster→role 映射）；实例地址在生成 EPPAddr 时以 `net.JoinHostPort(host, strconv.Itoa(port))` 拼接为 `host:port`（IPv6 自动加括号），BFE 消费格式不变。

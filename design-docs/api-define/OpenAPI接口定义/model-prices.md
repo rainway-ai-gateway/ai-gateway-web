@@ -270,6 +270,8 @@ models:
 > **唯一性约束**：`(provider, model, mode)` 三元组必须唯一。
 > 
 > **币种说明**：v0.4 仅支持 `RMB`，`default_currency` 与单条 `price_currency`（若填写）均须为 `RMB`。
+> 
+> **merge 导入的字段语义**：`mode=merge` 对已存在 `(provider, model, mode)` 记录执行**整行覆盖**——条目未提供的可选字段（`capabilities` / `supported_parameters` / `limits` / `tier_prices` / `metadata` 等）会被清空，不会保留原值；merge 导入已有记录时必须携带希望保留的完整字段集。字段级合并请使用按 ID / 组合键 `PUT` 路径（省略字段保留原值）。详见 §3.1 处理逻辑第 9、10 步。
 
 ### 2.3 完整示例
 
@@ -355,7 +357,9 @@ models:
    - 所有 tier 价格字段必须为非负数。
 6. 校验 `limits` 中所有限制字段值为非负整数；
 7. `replace` 模式：先清空 `model_prices` 表，再写入新数据；
-8. `merge` 模式：对已有 `(provider, model, mode)` 记录更新，新增记录插入。
+8. `merge` 模式：对已有 `(provider, model, mode)` 记录更新，新增记录插入；
+9. **`merge` 模式的记录级语义为完全覆盖（整行替换）**：命中已有记录时，以导入条目为权威定义，条目中的全部字段（含可选字段 `capabilities` / `supported_parameters` / `limits` / `tier_prices` / `metadata` 等）整体写入；**条目未提供的可选字段会被清空为空值，不会保留原值**。调用方进行 merge 导入时必须为已有记录携带希望保留的完整字段集，仅传必填五项的最小记录等同于重置该记录的可选字段；
+10. 该语义与按 ID / 组合键 `PUT` 更新路径（`endpoints/openapi_v1/model_price/update.go` 的 `mergeModelPrice`，非空字段叠加、省略保留）**刻意不同**：`PUT` 面向单记录的局部补丁，`merge` 导入面向整表批量的声明式覆盖——如需字段级合并请使用 `PUT` 路径；如需整体重置整表请使用 `replace` 模式。
 
 **权限**
 
@@ -498,7 +502,7 @@ models:
 | provider | string | 按 Provider 过滤 | N | - | - |
 | mode | string | 按 Mode 过滤 | N | - | 须为 `mode` 枚举值 |
 | page | int | 页码 | N | 默认1 | 必须 >0 |
-| page_size | int | 每页条数 | N | 默认20，最大100 | 取值范围 1-100 |
+| page_size | int | 每页条数 | N | 默认50，最大1000 | 取值范围 1-1000 |
 
 **返回数据（Data内容）**
 
@@ -506,6 +510,8 @@ models:
 | - | - | - | - |
 | list | []ModelPrice | 模型定价记录列表 | 元素字段同 [1. 数据模型](#1-数据模型) |
 | pagination | object | 分页信息 | 包含 `page`、`page_size`、`total` |
+
+> 路由分发说明：当请求携带 `model` 参数时，本端点改按 §3.6 单记录语义处理（详见 §3.6）；不带 `model` 时，`provider`/`mode` 为本节列表过滤参数。
 
 ---
 
@@ -554,6 +560,8 @@ models:
 **返回数据（Data内容）**
 
 字段同 [1. 数据模型](#1-数据模型)。
+
+> 错误处理：三参任一缺失或 `mode` 非枚举值时返回参数错误（不回落列表语义）；组合键不存在时返回 Record Not Exist。
 
 ---
 

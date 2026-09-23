@@ -78,6 +78,110 @@
             />
           </div>
         </FormItem>
+
+        <FormItem prop="models">
+          <p slot="label" class="field-label">
+            {{ $t('provider.modelList') }}
+            <Tooltip placement="top" transfer max-width="360">
+              <div slot="content" class="field-tip-content">
+                <p>{{ $t('provider.modelsListTip') }}</p>
+              </div>
+              <Icon type="ios-help-circle-outline" class="field-help-icon" />
+            </Tooltip>
+          </p>
+          <div class="models-row">
+            <el-select
+              v-model="formData.models"
+              style="flex: 1;"
+              size="small"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              :placeholder="modelsSelectPlaceholder"
+              @paste.native="onModelsPaste"
+            >
+              <el-option
+                v-for="item in modelsList"
+                :key="item"
+                :value="item"
+                :label="item"
+              />
+            </el-select>
+            <span class="discover-btn-wrap">
+              <Button @click="showBatchModelsModal">{{
+                $t('provider.batchAddModels')
+              }}</Button>
+              <Button
+                type="primary"
+                :loading="discoverLoading"
+                :disabled="!canDiscoverModels"
+                @click="discoverModels"
+                >{{ $t('provider.syncModels') }}</Button
+              >
+            </span>
+          </div>
+        </FormItem>
+      </Card>
+
+      <Card class="llm-section-card">
+        <p slot="title" class="field-label">
+          {{ $t('provider.protocolPathMapping') }}
+          <Tooltip placement="top" transfer max-width="360">
+            <div slot="content" class="field-tip-content">
+              <p>{{ $t('provider.protocolPathHelp') }}</p>
+            </div>
+            <Icon type="ios-help-circle-outline" class="field-help-icon" />
+          </Tooltip>
+        </p>
+        <FormItem prop="protocol_paths">
+          <table class="keys-table">
+            <thead>
+              <tr>
+                <th style="width:140px;">{{ $t('provider.protocolPathProto') }}</th>
+                <th>{{ $t('provider.protocolPathPrefix') }}</th>
+                <th style="width:80px;">{{ $t('com.operation') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in formData.protocol_paths" :key="`pp-${index}`">
+                <td>
+                  <FormItem
+                    :prop="`protocol_paths.${index}.protocol`"
+                    :rules="protocolPathProtocolRules(index)"
+                    class="inline-form-item"
+                  >
+                    <Select v-model="item.protocol" size="small">
+                      <Option v-for="p in getAvailableProtocolsForRow(index)" :key="p" :value="p">{{ p }}</Option>
+                    </Select>
+                  </FormItem>
+                </td>
+                <td>
+                  <FormItem
+                    :prop="`protocol_paths.${index}.path`"
+                    :rules="protocolPathValueRules(index)"
+                    class="inline-form-item"
+                  >
+                    <Input v-model="item.path" :placeholder="$t('provider.protocolPathValuePlaceholder')" />
+                  </FormItem>
+                </td>
+                <td>
+                  <Button type="error" size="small" @click="removeProtocolPath(index)">{{ $t('com.del') }}</Button>
+                </td>
+              </tr>
+              <tr v-if="!(formData.protocol_paths || []).length" class="proto-paths-empty-row">
+                <td colspan="3" style="text-align:center;color:#999;">{{ $t('provider.protocolPathEmpty') }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <Button
+            class="mt20"
+            size="small"
+            type="primary"
+            :disabled="!hasAvailableProtocol"
+            @click="addProtocolPath"
+          >{{ $t('provider.protocolPathAdd') }}</Button>
+        </FormItem>
       </Card>
 
       <Card
@@ -142,51 +246,6 @@
         </FormItem>
       </Card>
 
-      <Card class="llm-section-card">
-        <p slot="title" class="field-label">
-          {{ $t('provider.modelList') }}
-          <Tooltip placement="top" transfer max-width="360">
-            <div slot="content" class="field-tip-content">
-              <p>{{ $t('provider.modelsListTip') }}</p>
-            </div>
-            <Icon type="ios-help-circle-outline" class="field-help-icon" />
-          </Tooltip>
-        </p>
-        <FormItem prop="models">
-          <div class="models-row">
-            <el-select
-              v-model="formData.models"
-              style="flex: 1;"
-              size="small"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              :placeholder="modelsSelectPlaceholder"
-              @paste.native="onModelsPaste"
-            >
-              <el-option
-                v-for="item in modelsList"
-                :key="item"
-                :value="item"
-                :label="item"
-              />
-            </el-select>
-            <span class="discover-btn-wrap">
-              <Button @click="showBatchModelsModal">{{
-                $t('provider.batchAddModels')
-              }}</Button>
-              <Button
-                type="primary"
-                :loading="discoverLoading"
-                :disabled="!canDiscoverModels"
-                @click="discoverModels"
-                >{{ $t('provider.syncModels') }}</Button
-              >
-            </span>
-          </div>
-        </FormItem>
-      </Card>
     </Form>
 
     <Modal
@@ -353,6 +412,52 @@ export default {
             }
             callback();
         };
+        var validateModels = function(rule, value, callback) {
+            var models = (value || []).filter(function(m) {
+                return String(m || '').trim() !== '';
+            });
+            if (!models.length) {
+                callback(new Error(that.$t('provider.modelsListRequired')));
+                return;
+            }
+            var seen = {};
+            for (var mi = 0; mi < models.length; mi++) {
+                if (seen[models[mi]]) {
+                    callback(new Error(that.$t('provider.modelNameDuplicate', { name: models[mi] })));
+                    return;
+                }
+                seen[models[mi]] = true;
+            }
+            callback();
+        };
+        var validateProtocolPaths = function(rule, value, callback) {
+            var paths = value || [];
+            var protocols = that.formData.model_protocols || [];
+            for (var i = 0; i < paths.length; i++) {
+                var proto = String(paths[i].protocol || '').trim();
+                var path = String(paths[i].path || '').trim();
+                if (!proto && !path) {
+                    continue;
+                }
+                if (protocols.indexOf(proto) === -1) {
+                    callback(new Error(that.$t('provider.protocolPathProtoInvalid', { proto: proto })));
+                    return;
+                }
+                if (path.charAt(0) !== '/') {
+                    callback(new Error(that.$t('provider.protocolPathPrefixInvalid')));
+                    return;
+                }
+                if (path.length > 1 && path.charAt(path.length - 1) === '/') {
+                    callback(new Error(that.$t('provider.protocolPathPrefixTrailingSlash')));
+                    return;
+                }
+                if (/[?$#]|\.\./.test(path)) {
+                    callback(new Error(that.$t('provider.protocolPathPrefixInvalidChars')));
+                    return;
+                }
+            }
+            callback();
+        };
 
         return {
             protocolOptions: PROTOCOL_OPTIONS,
@@ -371,14 +476,17 @@ export default {
                     uri: '/v1/models'
                 },
                 models: [],
-                keys: [{ name: '', key: '', originalKey: '', keyModified: false }]
+                keys: [{ name: '', key: '', originalKey: '', keyModified: false }],
+                protocol_paths: []
             },
             ruleValidate: {
                 name: [{ required: true, validator: validateName, trigger: 'blur' }],
                 description: [{ validator: validateDescription, trigger: 'blur' }],
                 model_protocols: [{ validator: validateProtocols, trigger: 'change', required: true }],
                 model_endpoint: [{ validator: validateEndpoint, trigger: 'blur' }],
-                keys: [{ validator: validateKeys, trigger: 'change' }]
+                keys: [{ validator: validateKeys, trigger: 'change' }],
+                protocol_paths: [{ validator: validateProtocolPaths, trigger: 'change' }],
+                models: [{ validator: validateModels, trigger: 'change', required: true }]
             }
         };
     },
@@ -411,6 +519,16 @@ export default {
         },
         hasExistingKey() {
             return (this.formData.keys || []).some(item => String(item.originalKey || '').trim());
+        },
+        hasAvailableProtocol() {
+            var protocols = this.formData.model_protocols || [];
+            var used = {};
+            (this.formData.protocol_paths || []).forEach(function(item) {
+                used[item.protocol] = true;
+            });
+            return protocols.some(function(p) {
+                return !used[p];
+            });
         }
     },
 
@@ -421,6 +539,16 @@ export default {
             },
             immediate: true,
             deep: true
+        },
+        'formData.model_protocols': {
+            handler(protocols) {
+                if (!protocols || !protocols.length) return;
+                var valid = {};
+                protocols.forEach(function(p) { valid[p] = true; });
+                this.formData.protocol_paths = (this.formData.protocol_paths || []).filter(function(item) {
+                    return valid[item.protocol];
+                });
+            }
         }
     },
 
@@ -440,7 +568,12 @@ export default {
                 models: (data.models || []).slice(),
                 keys: data.keys && data.keys.length
                     ? data.keys.map(item => this.decorateKey(item))
-                    : [this.emptyKey()]
+                    : [this.emptyKey()],
+                protocol_paths: data.protocol_paths
+                    ? Object.keys(data.protocol_paths).map(function(proto) {
+                        return { protocol: proto, path: data.protocol_paths[proto] || '' };
+                      })
+                    : []
             };
             this.modelsList = (data.models || []).slice();
             this.instancePoolData = data.instance_pool && data.instance_pool.length
@@ -552,6 +685,77 @@ export default {
             if (!this.formData.keys.length) {
                 this.formData.keys.push(this.emptyKey());
             }
+        },
+        protocolPathProtocolRules(index) {
+            var that = this;
+            return [
+                {
+                    validator: function(rule, value, callback) {
+                        var proto = String(value || '').trim();
+                        if (!proto) {
+                            callback(new Error(that.$t('provider.protocolPathProtoInvalid', { proto: '' })));
+                            return;
+                        }
+                        callback();
+                    },
+                    trigger: 'change'
+                }
+            ];
+        },
+        protocolPathValueRules(index) {
+            var that = this;
+            return [
+                {
+                    validator: function(rule, value, callback) {
+                        var path = String(value || '').trim();
+                        if (!path) {
+                            callback();
+                            return;
+                        }
+                        if (path.charAt(0) !== '/') {
+                            callback(new Error(that.$t('provider.protocolPathPrefixInvalid')));
+                            return;
+                        }
+                        if (path.length > 1 && path.charAt(path.length - 1) === '/') {
+                            callback(new Error(that.$t('provider.protocolPathPrefixTrailingSlash')));
+                            return;
+                        }
+                        if (/[?$#]|\.\./.test(path)) {
+                            callback(new Error(that.$t('provider.protocolPathPrefixInvalidChars')));
+                            return;
+                        }
+                        callback();
+                    },
+                    trigger: 'blur'
+                }
+            ];
+        },
+        getAvailableProtocolsForRow(index) {
+            var used = {};
+            (this.formData.protocol_paths || []).forEach(function(item, i) {
+                if (i !== index) {
+                    used[item.protocol] = true;
+                }
+            });
+            return (this.protocolOptions || []).filter(function(p) {
+                return !used[p];
+            });
+        },
+        addProtocolPath() {
+            var protocols = this.formData.model_protocols || [];
+            var used = {};
+            (this.formData.protocol_paths || []).forEach(function(item) {
+                used[item.protocol] = true;
+            });
+            var available = protocols.filter(function(p) {
+                return !used[p];
+            });
+            if (available.length) {
+                this.formData.protocol_paths.push({ protocol: available[0], path: '' });
+            }
+        },
+        removeProtocolPath(index) {
+            this.formData.protocol_paths.splice(index, 1);
         },
         buildDiscoverPayload() {
             const pool = this.livePool.length ? this.livePool : this.instancePoolData;
@@ -679,6 +883,15 @@ export default {
                 keys,
                 instance_pool: formatInstancePoolForApi(instances, schema)
             };
+            var protocolPaths = {};
+            (this.formData.protocol_paths || []).forEach(function(item) {
+                var proto = String(item.protocol || '').trim();
+                var path = String(item.path || '').trim();
+                if (proto && path) {
+                    protocolPaths[proto] = path;
+                }
+            });
+            payload.protocol_paths = protocolPaths;
             // 创建模式需要传 name，编辑模式 name 通过 URL 路径传递，请求体不传 name
             if (this.isAdd) {
                 payload.name = String(this.formData.name || '').trim();

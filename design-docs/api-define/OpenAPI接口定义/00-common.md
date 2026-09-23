@@ -56,7 +56,7 @@
 
 3. **外部系统强制要求的字段可为例外，但须显式说明**
    - 若字段名由下游系统（如 BFE）强制规定，可在特定场景下使用非 snake_case 命名，但必须在文档中标注为例外并说明原因。
-   - 例如：`alb-pool.md` 中 `ports` 的 `Default` 键为 BFE 实例池端口名称；InnerAPI 导出给 BFE 的路由配置保持 `Cond`、`ClusterName`、`Model`、`Weight` 不变。
+   - 例如：InnerAPI 导出给 BFE 的路由配置保持 `Cond`、`ClusterName`、`Model`、`Weight` 不变。
 
 4. **新增字段须先行核对本规范**
    - 新增公共类型、请求体或响应体字段时，须先检查是否与本规范冲突；若冲突，应采用 snake_case 命名。
@@ -261,6 +261,8 @@
 - 同一 `RateLimitPolicy` 内，多条 `TPMConfig` 之间，`(model, window_minutes, max_tokens, step_minutes)` 组合不能重复；
 - 同一 `RateLimitPolicy` 内，多条 `RPMConfig` 之间，`(model, window_minutes, max_requests)` 组合不能重复。
 
+更新（PATCH/PUT）语义：`rate_limit_policy` 为整对象替换，**不提供单独"改名"操作**。提交的规则 `name` 与既有规则全部不一致时，视为"删除旧规则 + 新增新规则"——被删规则的限流计数不保留，其 Redis Key 由控制面清理；仅调整既有规则的 `model`/`window_*`/`max_*` 参数（`name` 不变）时计数连续。
+
 示例：
 
 ```json
@@ -284,7 +286,7 @@ Token 每分钟限制配置。
 
 | 字段 | 类型 | 必填 | 说明 | 合法性条件 |
 |------|------|------|------|------------|
-| `name` | string | Y | 规则名称 | 必填、非空；长度 1-128 字符；字符集限制为 `[a-zA-Z0-9_-]`；同一 `RateLimitPolicy` 内不能重复；创建后不可修改 |
+| `name` | string | Y | 规则名称 | 必填、非空；长度 1-128 字符；字符集限制为 `[a-zA-Z0-9_-]`；同一 `RateLimitPolicy` 内不能重复；更新语义见 [RateLimitPolicy](#9-限流规则配置ratelimitpolicy) |
 | `model` | string | N | 适用模型 | 默认 `"*"`；类型为 [AIModel](#5-ai-模型名称aimodel) |
 | `window_minutes` | int | Y | 统计时间窗口（分钟） | 取值范围 1-360 |
 | `max_tokens` | int | Y | 最大 Token 数 | 非负整数（>=0） |
@@ -308,7 +310,7 @@ Token 每分钟限制配置。
 
 | 字段 | 类型 | 必填 | 说明 | 合法性条件 |
 |------|------|------|------|------------|
-| `name` | string | Y | 规则名称 | 必填、非空；长度 1-128 字符；字符集限制为 `[a-zA-Z0-9_-]`；同一 `RateLimitPolicy` 内不能重复；创建后不可修改 |
+| `name` | string | Y | 规则名称 | 必填、非空；长度 1-128 字符；字符集限制为 `[a-zA-Z0-9_-]`；同一 `RateLimitPolicy` 内不能重复；更新语义见 [RateLimitPolicy](#9-限流规则配置ratelimitpolicy) |
 | `model` | string | N | 适用模型 | 默认 `"*"`；类型为 [AIModel](#5-ai-模型名称aimodel) |
 | `window_minutes` | int | Y | 统计时间窗口（分钟） | 取值范围 1-360 |
 | `max_requests` | int | Y | 最大请求数 | 非负整数（>=0） |

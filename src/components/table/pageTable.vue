@@ -29,7 +29,7 @@
 * limitations under the License.
 */
 <template>
-  <div class="page-table">
+  <div class="page-table" @scroll.capture="onTableScroll">
     <div class="searchTable">
       <Table
         v-if="needSerarchInput"
@@ -566,6 +566,37 @@ export default {
         },
         handleRowClick(row, index) {
             this.$emit('on-row-click', row, index);
+        },
+        // 筛选行与数据表是两个独立的 iView Table，各自带横向滚动条，这里让它们同步滚动
+        onTableScroll(event) {
+            const target = event.target;
+            if (!target || target.scrollWidth <= target.clientWidth) {
+                return;
+            }
+            const searchRoot = this.$el.querySelector('.searchTable');
+            const tableRoot = this.$el.querySelector('.show-iView-Table');
+            if (!searchRoot || !tableRoot) {
+                return;
+            }
+            const fromSearch = searchRoot.contains(target);
+            if (!fromSearch && !tableRoot.contains(target)) {
+                return;
+            }
+            const peer = this.findHorizontalScroller(fromSearch ? tableRoot : searchRoot);
+            if (peer && peer.scrollLeft !== target.scrollLeft) {
+                peer.scrollLeft = target.scrollLeft;
+            }
+        },
+        findHorizontalScroller(root) {
+            const list = root.querySelectorAll('.ivu-table-body, .ivu-table-tip');
+            for (let i = 0; i < list.length; i++) {
+                const el = list[i];
+                // 仅取可见且确实存在横向溢出的一层，排除固定列等内部滚动容器
+                if (el.offsetParent !== null && el.scrollWidth > el.clientWidth) {
+                    return el;
+                }
+            }
+            return null;
         }
     }
 };

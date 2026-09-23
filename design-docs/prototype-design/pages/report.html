@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>数据报表 - AI网关</title>
+    <link rel="stylesheet" href="../assets/static/css/app.css" />
+    <link rel="stylesheet" href="../assets/font/iconfont.css" />
+    <link rel="stylesheet" href="../assets/css/prototype-overrides.css" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+      /* ===== Filter Bar ===== */
+      .report-filter-bar {
+        background: #fff;
+        padding: 16px;
+        border-radius: 4px;
+        margin-bottom: 16px;
+      }
+      .filter-section {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .filter-section:last-of-type {
+        margin-bottom: 0;
+      }
+      .filter-section-label {
+        font-size: 12px;
+        color: #808695;
+        white-space: nowrap;
+        line-height: 32px;
+        min-width: 56px;
+      }
+      .filter-section-body {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+      }
+      .time-shortcuts {
+        display: flex;
+        gap: 4px;
+      }
+      .time-shortcuts span {
+        padding: 2px 10px;
+        font-size: 12px;
+        border: 1px solid #dcdee2;
+        border-radius: 3px;
+        cursor: pointer;
+        color: #515a6e;
+        background: #fff;
+      }
+      .time-shortcuts span.active {
+        background: #2d8cf0;
+        color: #fff;
+        border-color: #2d8cf0;
+      }
+      .report-filter-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .report-filter-item label {
+        font-size: 12px;
+        color: #808695;
+        white-space: nowrap;
+        min-width: 52px;
+        text-align: right;
+      }
+      .report-filter-item input,
+      .report-filter-item select {
+        height: 32px;
+        border: 1px solid #dcdee2;
+        border-radius: 4px;
+        padding: 0 8px;
+        font-size: 13px;
+        min-width: 140px;
+        background: #fff;
+      }
+      .report-filter-item select.multi {
+        min-width: 160px;
+      }
+      .filter-separator {
+        color: #c5c8ce;
+        font-size: 14px;
+      }
+      .report-filter-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .report-filter-actions button {
+        height: 32px;
+        padding: 0 16px;
+        border: 1px solid #dcdee2;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .report-filter-actions button.primary {
+        background: #2d8cf0;
+        color: #fff;
+        border-color: #2d8cf0;
+      }
+
+      /* ===== Tabs ===== */
+      .report-tabs {
+        background: #fff;
+        border-radius: 4px;
+      }
+      .report-tab-headers {
+        display: flex;
+        border-bottom: 1px solid #e8eaec;
+      }
+      .report-tab-header {
+        padding: 10px 24px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #515a6e;
+        border-bottom: 2px solid transparent;
+        transition: all .2s;
+      }
+      .report-tab-header:hover {
+        color: #2d8cf0;
+      }
+      .report-tab-header.active {
+        color: #2d8cf0;
+        border-bottom-color: #2d8cf0;
+        font-weight: 500;
+      }
+      .report-tab-content {
+        padding: 16px;
+        display: none;
+      }
+      .report-tab-content.active {
+        display: block;
+      }
+
+      /* ===== Metric Cards ===== */
+      .metric-cards {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .metric-card {
+        background: #f8f8f9;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+      }
+      .metric-card .metric-label {
+        font-size: 13px;
+        color: #808695;
+        margin-bottom: 8px;
+      }
+      .metric-card .metric-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: #17233d;
+      }
+      .metric-card .metric-sub {
+        font-size: 12px;
+        color: #808695;
+        margin-top: 4px;
+      }
+      .metric-card.error .metric-value { color: #ed4014; }
+      .metric-card.warn .metric-value { color: #ff9900; }
+
+      /* ===== Chart Grid ===== */
+      .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      .chart-grid .chart-full {
+        grid-column: span 2;
+      }
+      .chart-card {
+        background: #fff;
+        border: 1px solid #e8eaec;
+        border-radius: 6px;
+        padding: 12px;
+      }
+      .chart-card h4 {
+        font-size: 14px;
+        color: #17233d;
+        margin: 0 0 8px 0;
+      }
+      .chart-box {
+        width: 100%;
+        height: 280px;
+      }
+      .chart-box.tall {
+        height: 320px;
+      }
+
+      /* ===== Detail Logs ===== */
+      .logs-toolbar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+      }
+      .logs-toolbar label {
+        font-size: 12px;
+        color: #808695;
+      }
+      .logs-toolbar input,
+      .logs-toolbar select {
+        height: 32px;
+        border: 1px solid #dcdee2;
+        border-radius: 4px;
+        padding: 0 8px;
+        font-size: 13px;
+      }
+      .log-view-btn {
+        cursor: pointer;
+        color: #2d8cf0;
+        font-size: 13px;
+      }
+      .log-view-btn:hover {
+        color: #57a3f3;
+      }
+
+      /* Drawer */
+      .drawer-mask {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 1000;
+      }
+      .drawer-panel {
+        position: fixed;
+        top: 0; right: -480px;
+        width: 480px;
+        height: 100%;
+        background: #fff;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.12);
+        z-index: 1001;
+        transition: right 0.3s ease;
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer-panel.open {
+        right: 0;
+      }
+      .drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid #e8eaec;
+        font-size: 15px;
+        font-weight: 500;
+        color: #17233d;
+      }
+      .drawer-close {
+        font-size: 22px;
+        cursor: pointer;
+        color: #999;
+        line-height: 1;
+      }
+      .drawer-close:hover {
+        color: #333;
+      }
+      .drawer-body {
+        flex: 1;
+        overflow: auto;
+        padding: 16px 20px;
+      }
+      .drawer-body .log-detail-grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 8px 12px;
+      }
+      .drawer-body .log-detail-grid dt {
+        font-size: 12px;
+        color: #808695;
+        white-space: nowrap;
+        padding-top: 2px;
+      }
+      .drawer-body .log-detail-grid dd {
+        font-size: 13px;
+        color: #17233d;
+        margin: 0;
+        word-break: break-all;
+      }
+      .log-json-expand {
+        cursor: pointer;
+        color: #2d8cf0;
+        font-size: 12px;
+      }
+      .log-json-full {
+        display: none;
+        background: #f0f0f0;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-height: 200px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin-top: 4px;
+      }
+      .log-json-full.open {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="../assets/static/js/vendors.js"></script>
+    <script src="../assets/static/js/app.js"></script>
+    <script src="../assets/js/mock-data.js"></script>
+    <script src="../assets/js/prototype.js"></script>
+    <script src="../assets/js/ivu-ui.js"></script>
+    <script src="../assets/js/layout.js"></script>
+    <script>
+      var root = Layout.render({ pageId: 'Report.list', breadcrumb: '数据报表', basePath: '../' });
+
+      // ==================== State ====================
+      var state = {
+        activeTab: 'overview',
+        start: Math.floor(Date.now() / 1000) - 3600,
+        end: Math.floor(Date.now() / 1000),
+        shortcut: '1h',
+        filters: {
+          models: [],
+          apikey_ids: [],
+          providers: [],
+          hosts: [],
+          stream: '',
+          status_codes: ''
+        },
+        overviewData: null,
+        timeseriesData: null,
+        rankingData: null,
+        distData: {},
+        logPage: 1,
+        logPageSize: 20,
+        logRequestedModels: '',
+        logErrOnly: false,
+        logKeyword: '',
+        logData: null,
+        drawerLog: null,
+        charts: {}
+      };
+
+      // ==================== Helpers ====================
+      function now() { return Math.floor(Date.now() / 1000); }
+
+      function fmtTs(ts) {
+        var d = new Date(ts * 1000);
+        function p(n) { return n < 10 ? '0' + n : '' + n; }
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+          ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+      }
+
+      function fmtDate(ts) {
+        var d = new Date(ts * 1000);
+        function p(n) { return n < 10 ? '0' + n : '' + n; }
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+          'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+      }
+
+      function fmtNum(n) {
+        if (n == null) return '-';
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+        return String(n);
+      }
+
+      function fmtPercent(ratio) {
+        if (ratio == null) return '-';
+        return (ratio * 100).toFixed(1) + '%';
+      }
+
+      function fmtMs(ms) {
+        if (ms == null) return '-';
+        return Number(ms).toFixed(1) + ' ms';
+      }
+
+      function fmtUs(us) {
+        if (us == null) return '-';
+        return (us / 1000).toFixed(1) + ' ms';
+      }
+
+      // ==================== Filter Bar ====================
+      function setTimeShortcut(hours) {
+        state.shortcut = hours;
+        state.end = now();
+        state.start = state.end - parseInt(hours) * 3600;
+        document.getElementById('filter-start').value = fmtDate(state.start);
+        document.getElementById('filter-end').value = fmtDate(state.end);
+        renderTimeShortcuts();
+      }
+
+      function renderTimeShortcuts() {
+        var shortcuts = document.querySelectorAll('.time-shortcuts span');
+        shortcuts.forEach(function (s) {
+          s.classList.toggle('active', s.getAttribute('data-h') === state.shortcut);
+        });
+      }
+
+      function buildFilterBar() {
+        return '<div class="report-filter-bar">' +
+          '<div class="filter-section">' +
+          '<div class="filter-section-label">时间范围</div>' +
+          '<div class="filter-section-body">' +
+          '<div class="time-shortcuts">' +
+          '<span data-h="1" onclick="setTimeShortcut(\'1\')">1 小时</span>' +
+          '<span data-h="6" onclick="setTimeShortcut(\'6\')">6 小时</span>' +
+          '<span data-h="24" onclick="setTimeShortcut(\'24\')">24 小时</span>' +
+          '<span data-h="168" onclick="setTimeShortcut(\'168\')">7 天</span>' +
+          '<span data-h="custom" onclick="setTimeShortcut(\'custom\')">自定义</span>' +
+          '</div>' +
+          '<div class="report-filter-item"><label>起始</label>' +
+          '<input type="datetime-local" id="filter-start" value="' + fmtDate(state.start) + '" style="min-width:185px">' +
+          '</div>' +
+          '<span class="filter-separator">—</span>' +
+          '<div class="report-filter-item"><label>结束</label>' +
+          '<input type="datetime-local" id="filter-end" value="' + fmtDate(state.end) + '" style="min-width:185px">' +
+          '</div>' +
+          '</div>' +
+          '</div>' +
+          '<div class="filter-section">' +
+          '<div class="filter-section-label">维度筛选</div>' +
+          '<div class="filter-section-body">' +
+          '<div class="report-filter-item"><label>路由模型</label>' +
+          '<select id="filter-models" class="multi" multiple size="1" title="按住Ctrl多选"><option value="">全部</option></select>' +
+          '</div>' +
+          '<div class="report-filter-item"><label>API Key</label>' +
+          '<select id="filter-apikey_ids" class="multi" multiple size="1" title="按住Ctrl多选"><option value="">全部</option></select>' +
+          '</div>' +
+          '<div class="report-filter-item"><label>提供商</label>' +
+          '<select id="filter-providers" class="multi" multiple size="1" title="按住Ctrl多选"><option value="">全部</option></select>' +
+          '</div>' +
+          '<div class="report-filter-item"><label>主机</label>' +
+          '<select id="filter-hosts" class="multi" multiple size="1" title="按住Ctrl多选"><option value="">全部</option></select>' +
+          '</div>' +
+          '<div class="report-filter-item"><label>流式</label>' +
+          '<select id="filter-stream"><option value="">全部</option><option value="1">是</option><option value="0">否</option></select>' +
+          '</div>' +
+          '<div class="report-filter-item"><label>状态码</label>' +
+          '<input id="filter-status_codes" value="' + state.filters.status_codes + '" placeholder="逗号分隔" style="min-width:100px">' +
+          '</div>' +
+          '<div class="report-filter-actions">' +
+          '<button class="primary" onclick="applyFilters()">查询</button>' +
+          '<button onclick="resetFilters()">重置</button>' +
+          '<button onclick="refreshTab()" title="刷新">&#x21bb;</button>' +
+          '</div>' +
+          '</div>' +
+          '</div></div>';
+      }
+
+      function readFilters() {
+        state.start = Math.floor(new Date(document.getElementById('filter-start').value).getTime() / 1000);
+        state.end = Math.floor(new Date(document.getElementById('filter-end').value).getTime() / 1000);
+        if (isNaN(state.start)) state.start = now() - 3600;
+        if (isNaN(state.end)) state.end = now();
+
+        state.filters.models = getSelectValues('filter-models');
+        state.filters.apikey_ids = getSelectValues('filter-apikey_ids');
+        state.filters.providers = getSelectValues('filter-providers');
+        state.filters.hosts = getSelectValues('filter-hosts');
+        state.filters.stream = document.getElementById('filter-stream').value;
+        state.filters.status_codes = document.getElementById('filter-status_codes').value;
+      }
+
+      function getSelectValues(id) {
+        var sel = document.getElementById(id);
+        var vals = [];
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].selected && sel.options[i].value !== '') vals.push(sel.options[i].value);
+        }
+        return vals;
+      }
+
+      function applyFilters() {
+        readFilters();
+        loadTabData();
+      }
+
+      function resetFilters() {
+        state.start = now() - 3600;
+        state.end = now();
+        state.shortcut = '1h';
+        state.filters = { models: [], apikey_ids: [], providers: [], hosts: [], stream: '', status_codes: '' };
+        document.getElementById('filter-start').value = fmtDate(state.start);
+        document.getElementById('filter-end').value = fmtDate(state.end);
+        document.getElementById('filter-stream').value = '';
+        document.getElementById('filter-status_codes').value = '';
+        renderTimeShortcuts();
+        loadTabData();
+      }
+
+      function populateSelectOptions() {
+        var dims = { 'filter-models': 'model', 'filter-apikey_ids': 'apikey', 'filter-providers': 'provider', 'filter-hosts': 'host' };
+        Object.keys(dims).forEach(function (id) {
+          var rankingKey = dims[id];
+          var items = (MockData.reportRankings[rankingKey] || {}).items || [];
+          var sel = document.getElementById(id);
+          if (!sel) return;
+          // keep "全部" option
+          sel.innerHTML = '<option value="">全部</option>';
+          items.forEach(function (item) {
+            sel.innerHTML += '<option value="' + item.name + '">' + item.name + '</option>';
+          });
+        });
+      }
+
+      // ==================== Tabs ====================
+      function switchTab(tab) {
+        state.activeTab = tab;
+        document.querySelectorAll('.report-tab-header').forEach(function (el) {
+          el.classList.toggle('active', el.getAttribute('data-tab') === tab);
+        });
+        document.querySelectorAll('.report-tab-content').forEach(function (el) {
+          el.classList.toggle('active', el.getAttribute('data-tab') === tab);
+        });
+        loadTabData();
+      }
+
+      function refreshTab() {
+        readFilters();
+        loadTabData();
+      }
+
+      function loadTabData() {
+        disposeAllCharts();
+        if (state.activeTab === 'overview') {
+          loadAllOverviewData();
+        } else {
+          loadLogs();
+        }
+      }
+
+      // ==================== Chart Utils ====================
+      function initChart(domId) {
+        var dom = document.getElementById(domId);
+        if (!dom) return null;
+        if (state.charts[domId]) state.charts[domId].dispose();
+        var chart = echarts.init(dom);
+        state.charts[domId] = chart;
+        return chart;
+      }
+
+      function disposeAllCharts() {
+        Object.keys(state.charts).forEach(function (k) {
+          if (state.charts[k]) state.charts[k].dispose();
+        });
+        state.charts = {};
+      }
+
+      function chartOptionsLine(xData, seriesArr, yLabel) {
+        return {
+          tooltip: { trigger: 'axis' },
+          legend: { data: seriesArr.map(function (s) { return s.name; }), bottom: 0 },
+          grid: { left: 60, right: 20, top: 20, bottom: 40 },
+          xAxis: { type: 'category', data: xData, axisLabel: { fontSize: 11 } },
+          yAxis: { type: 'value', name: yLabel || '', nameTextStyle: { fontSize: 11 } },
+          series: seriesArr.map(function (s) {
+            return { name: s.name, type: 'line', data: s.data, smooth: true, symbol: 'none' };
+          })
+        };
+      }
+
+      function chartOptionsBar(xData, seriesArr, horizontal) {
+        var opt = {
+          tooltip: { trigger: 'axis' },
+          grid: { left: 120, right: 30, top: 10, bottom: 30 },
+          series: seriesArr.map(function (s) {
+            return { name: s.name, type: 'bar', data: s.data, barMaxWidth: 30 };
+          })
+        };
+        if (horizontal) {
+          opt.xAxis = { type: 'value' };
+          opt.yAxis = { type: 'category', data: xData, axisLabel: { fontSize: 11 }, inverse: true };
+        } else {
+          opt.xAxis = { type: 'category', data: xData, axisLabel: { fontSize: 11 } };
+          opt.yAxis = { type: 'value' };
+        }
+        return opt;
+      }
+
+      function chartOptionsPie(data) {
+        return {
+          tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+          legend: { orient: 'vertical', right: 10, top: 'center', itemWidth: 10, itemHeight: 10 },
+          series: [{
+            type: 'pie', radius: ['40%', '70%'], center: ['40%', '50%'],
+            label: { show: false }, emphasis: { label: { show: true } },
+            data: data
+          }]
+        };
+      }
+
+      // ==================== Overview Tab ====================
+      function loadAllOverviewData() {
+        state.overviewData = JSON.parse(JSON.stringify(MockData.reportOverview));
+        state.timeseriesData = JSON.parse(JSON.stringify(MockData.reportTimeseries));
+        state.rankingData = JSON.parse(JSON.stringify(MockData.reportRankings));
+        state.distData = JSON.parse(JSON.stringify(MockData.reportDistribution));
+        document.getElementById('overview-content').innerHTML = renderOverview();
+        renderOverviewCharts();
+      }
+
+      function renderOverview() {
+        var d = state.overviewData;
+
+        var costSub = (d.cost || []).map(function (c) {
+          return '<div class="metric-sub">' + c.currency + ': ' + fmtNum(c.value) + '</div>';
+        }).join('');
+
+        return '' +
+          '<div class="metric-cards">' +
+          '<div class="metric-card"><div class="metric-label">请求总量</div><div class="metric-value">' + fmtNum(d.request_total) + '</div></div>' +
+          '<div class="metric-card error"><div class="metric-label">错误总量</div><div class="metric-value">' + fmtNum(d.error_total) + '</div><div class="metric-sub">错误率: ' + fmtPercent(d.error_rate) + '</div></div>' +
+          '<div class="metric-card"><div class="metric-label">Token 消耗</div><div class="metric-value">' + fmtNum(d.total_tokens) + '</div><div class="metric-sub">入: ' + fmtNum(d.input_tokens) + ' | 出: ' + fmtNum(d.output_tokens) + '</div></div>' +
+          '<div class="metric-card"><div class="metric-label">平均延迟</div><div class="metric-value">' + fmtMs(d.latency_avg_ms) + '</div></div>' +
+          '<div class="metric-card"><div class="metric-label">成本</div><div class="metric-value">-</div>' + costSub + '</div>' +
+          '</div>' +
+
+          '<div class="chart-grid">' +
+          '<div class="chart-card chart-full"><h4>QPS 时序</h4><div class="chart-box tall" id="chart-qps"></div></div>' +
+          '<div class="chart-card"><h4>Token 吞吐时序</h4><div class="chart-box" id="chart-tokens"></div></div>' +
+          '<div class="chart-card"><h4>延迟时序</h4><div class="chart-box" id="chart-latency"></div></div>' +
+          '<div class="chart-card"><h4>模型 Top10 排行</h4><div class="chart-box tall" id="chart-model-ranking"></div></div>' +
+          '<div class="chart-card"><h4>提供商占比</h4><div class="chart-box" id="chart-provider-pie"></div></div>' +
+          '<div class="chart-card"><h4>状态码分布</h4><div class="chart-box" id="chart-status-pie"></div></div>' +
+          '</div>';
+      }
+
+      function renderOverviewCharts() {
+        // QPS Line
+        var qpsSeries = (state.timeseriesData.qps || {}).series || [];
+        var qpsX = qpsSeries.map(function (p) { return fmtTs(p.time); });
+        var qpsData = qpsSeries.map(function (p) { return p.value; });
+        var chartQps = initChart('chart-qps');
+        if (chartQps) chartQps.setOption(chartOptionsLine(qpsX, [{ name: 'QPS', data: qpsData }], 'req/s'));
+
+        // Token Line
+        var tokenSeries = (state.timeseriesData.tokens || {}).series || [];
+        var tokenX = tokenSeries.map(function (p) { return fmtTs(p.time); });
+        var chartTokens = initChart('chart-tokens');
+        if (chartTokens) {
+          chartTokens.setOption(chartOptionsLine(tokenX, [
+            { name: '输入', data: tokenSeries.map(function (p) { return p.input; }) },
+            { name: '输出', data: tokenSeries.map(function (p) { return p.output; }) },
+            { name: '总量', data: tokenSeries.map(function (p) { return p.total; }) }
+          ], 'tokens/s'));
+        }
+
+        // Latency Line
+        var latencySeries = (state.timeseriesData.latency || {}).series || [];
+        var latencyX = latencySeries.map(function (p) { return fmtTs(p.time); });
+        var chartLatency = initChart('chart-latency');
+        if (chartLatency) {
+          var seriesArr = [
+            { name: '平均', data: latencySeries.map(function (p) { return p.avg; }) },
+            { name: '最大', data: latencySeries.map(function (p) { return p.max; }) }
+          ];
+          chartLatency.setOption(chartOptionsLine(latencyX, seriesArr, 'ms'));
+        }
+
+        // Model Top10 Horizontal Bar
+        var modelItems = ((state.rankingData.model || {}).items || []).slice(0, 10);
+        var chartMRank = initChart('chart-model-ranking');
+        if (chartMRank) {
+          chartMRank.setOption(chartOptionsBar(
+            modelItems.map(function (i) { return i.name; }),
+            [{ name: '请求数', data: modelItems.map(function (i) { return i.request_count; }) }],
+            true
+          ));
+        }
+
+        // Provider Pie
+        var provItems = ((state.distData.protocol || { items: [] }).items);
+        var chartProv = initChart('chart-provider-pie');
+        if (chartProv) {
+          chartProv.setOption(chartOptionsPie(provItems.map(function (i) {
+            return { name: i.name, value: i.request_count };
+          })));
+        }
+
+        // Status Pie
+        var statusItems = ((state.distData.status || { items: [] }).items);
+        var chartStatus = initChart('chart-status-pie');
+        if (chartStatus) {
+          chartStatus.setOption(chartOptionsPie(statusItems.map(function (i) {
+            return { name: i.name, value: i.request_count };
+          })));
+        }
+
+        // Resize all
+        setTimeout(function () {
+          Object.keys(state.charts).forEach(function (k) {
+            if (state.charts[k]) state.charts[k].resize();
+          });
+        }, 100);
+      }
+
+      // ==================== Detail / Logs Tab ====================
+      function loadLogs() {
+        state.logData = JSON.parse(JSON.stringify(MockData.reportLogs));
+        document.getElementById('logs-content').innerHTML = renderLogs();
+        document.getElementById('logs-req-models').value = state.logRequestedModels;
+        document.getElementById('logs-err-only').value = state.logErrOnly ? '1' : '0';
+        document.getElementById('logs-keyword').value = state.logKeyword;
+      }
+
+      function changeLogPage(dir) {
+        state.logPage = Math.max(1, state.logPage + dir);
+        loadLogs();
+      }
+
+      function openLogDrawer(log) {
+        state.drawerLog = log;
+        var body = document.getElementById('log-drawer-body');
+        if (body) body.innerHTML = renderLogDetail(log);
+        var el = document.getElementById('log-drawer-mask');
+        if (el) el.style.display = 'block';
+        setTimeout(function () {
+          var drawer = document.getElementById('log-drawer');
+          if (drawer) drawer.classList.add('open');
+        }, 10);
+      }
+
+      function closeLogDrawer() {
+        var drawer = document.getElementById('log-drawer');
+        if (drawer) drawer.classList.remove('open');
+        var mask = document.getElementById('log-drawer-mask');
+        if (mask) setTimeout(function () { mask.style.display = 'none'; }, 300);
+        state.drawerLog = null;
+      }
+
+      function toggleJsonExpand(elId) {
+        var el = document.getElementById(elId);
+        if (el) el.classList.toggle('open');
+      }
+
+      function refreshLogs() {
+        state.logRequestedModels = document.getElementById('logs-req-models').value;
+        state.logErrOnly = document.getElementById('logs-err-only').value === '1';
+        state.logKeyword = document.getElementById('logs-keyword').value;
+        state.logPage = 1;
+        loadLogs();
+      }
+
+      function renderLogs() {
+        var ld = state.logData || { total: 0, page: 1, page_size: 20, items: [] };
+        var totalPages = Math.ceil(ld.total / ld.page_size);
+
+        var html = '<div class="logs-toolbar">' +
+          '<div><label>请求模型</label><br><input id="logs-req-models" placeholder="逗号分隔"></div>' +
+          '<div><label>只看错误</label><br><select id="logs-err-only"><option value="0">否</option><option value="1">是</option></select></div>' +
+          '<div><label>错误消息关键字</label><br><input id="logs-keyword" placeholder="模糊匹配 err_msg"></div>' +
+          '<div style="display:flex;align-items:flex-end"><button onclick="refreshLogs()">搜索</button></div>' +
+          '</div>' +
+
+          '<div style="margin-bottom:8px;font-size:13px;color:#808695">共 ' + ld.total + ' 条，第 ' + ld.page + '/' + totalPages + ' 页，每页 ' + ld.page_size + ' 条</div>' +
+
+          '<table class="ivu-table" style="width:100%"><thead><tr>' +
+          '<th>Log ID</th><th>时间</th><th>API Key</th><th>请求模型</th><th>目标模型</th><th>提供商</th>' +
+          '<th>状态码</th><th>耗时</th><th>Token</th><th>TTFT</th><th>成本</th><th>错误</th>' +
+          '<th style="width:80px">操作</th>' +
+          '</tr></thead><tbody>';
+
+        (ld.items || []).forEach(function (log) {
+          var hasErr = log.res_status_code >= 400;
+          html += '<tr' + (hasErr ? ' style="background:#fff7f0"' : '') + '>' +
+            '<td>' + log.logid + '</td>' +
+            '<td>' + fmtTs(log.log_time) + '</td>' +
+            '<td>' + (log.ai_apikey_id || '-') + '</td>' +
+            '<td>' + (log.ai_requested_model || '-') + '</td>' +
+            '<td>' + (log.ai_target_model || '-') + '</td>' +
+            '<td>' + (log.ai_provider || '-') + '</td>' +
+            '<td>' + (log.res_status_code != null ? log.res_status_code : '-') + '</td>' +
+            '<td>' + (log.all_time != null ? log.all_time + 'ms' : '-') + '</td>' +
+            '<td>' + fmtNum(log.ai_total_tokens) + '</td>' +
+            '<td>' + fmtUs(log.ai_ttft_us) + '</td>' +
+            '<td>' + (log.ai_cost_value != null ? log.ai_cost_value + ' ' + (log.ai_cost_currency || '') : '-') + '</td>' +
+            '<td>' + (log.err_msg ? '<span style="color:#ed4014">' + (log.err_msg.length > 20 ? log.err_msg.substring(0, 20) + '…' : log.err_msg) + '</span>' : '-') + '</td>' +
+            '<td><span class="log-view-btn" onclick="openLogDrawer(state.logData.items.find(function(i){return i.logid===' + log.logid + '}))">查看</span></td>' +
+            '</tr>';
+        });
+
+        html += '</tbody></table>';
+
+        html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:12px">' +
+          '<button onclick="changeLogPage(-1)"' + (ld.page <= 1 ? ' disabled' : '') + '>上一页</button>' +
+          '<span style="line-height:32px">' + ld.page + ' / ' + totalPages + '</span>' +
+          '<button onclick="changeLogPage(1)"' + (ld.page >= totalPages ? ' disabled' : '') + '>下一页</button>' +
+          '</div>';
+
+        // Drawer
+        html += renderLogDrawer();
+
+        return html;
+      }
+
+      function renderLogDetail(log) {
+        var jsonFields = ['ai_rate_limit_hits', 'ai_auth_reject_quota_plans', 'req_headers', 'res_headers'];
+        var jsonHtml = '';
+        jsonFields.forEach(function (f) {
+          if (log[f] != null) {
+            var elId = 'json-' + log.logid + '-' + f;
+            jsonHtml += '<dt>' + f + '</dt><dd>' +
+              '<span class="log-json-expand" onclick="toggleJsonExpand(\'' + elId + '\')">展开</span>' +
+              '<div id="' + elId + '" class="log-json-full">' + (typeof log[f] === 'string' ? log[f] : JSON.stringify(log[f], null, 2)) + '</div>' +
+              '</dd>';
+          }
+        });
+
+        return '<dl class="log-detail-grid">' +
+          '<dt>hostid</dt><dd>' + (log.hostid || '-') + '</dd>' +
+          '<dt>product</dt><dd>' + (log.product || '-') + '</dd>' +
+          '<dt>协议</dt><dd>' + (log.ai_protocol || '-') + '</dd>' +
+          '<dt>模式</dt><dd>' + (log.ai_mode || '-') + '</dd>' +
+          '<dt>流式</dt><dd>' + (log.ai_stream === 1 ? '是' : '否') + '</dd>' +
+          '<dt>err_code</dt><dd>' + (log.err_code || '-') + '</dd>' +
+          '<dt>输入 Token</dt><dd>' + fmtNum(log.ai_input_tokens) + '</dd>' +
+          '<dt>输出 Token</dt><dd>' + fmtNum(log.ai_output_tokens) + '</dd>' +
+          '<dt>TPOT</dt><dd>' + fmtUs(log.ai_tpot_us) + '</dd>' +
+          '<dt>Level1</dt><dd>' + (log.level1Name || '-') + ' = ' + (log.level1 || '-') + '</dd>' +
+          '<dt>client_ip</dt><dd>' + (log.client_ip || '-') + '</dd>' +
+          '<dt>header_host</dt><dd>' + (log.header_host || '-') + '</dd>' +
+          '<dt>origin_uri</dt><dd>' + (log.origin_uri || '-') + '</dd>' +
+          jsonHtml +
+          '</dl>';
+      }
+
+      function renderLogDrawer() {
+        return '' +
+          '<div id="log-drawer-mask" class="drawer-mask" onclick="closeLogDrawer()"></div>' +
+          '<div id="log-drawer" class="drawer-panel">' +
+          '<div class="drawer-header">' +
+          '<span>日志详情</span>' +
+          '<span class="drawer-close" onclick="closeLogDrawer()">&times;</span>' +
+          '</div>' +
+          '<div class="drawer-body" id="log-drawer-body">' +
+          '</div>' +
+          '</div>';
+      }
+
+      // ==================== Init ====================
+      function buildUI() {
+        root.innerHTML =
+          buildFilterBar() +
+          '<div class="report-tabs">' +
+          '<div class="report-tab-headers">' +
+          '<div class="report-tab-header active" data-tab="overview" onclick="switchTab(\'overview\')">总览</div>' +
+          '<div class="report-tab-header" data-tab="logs" onclick="switchTab(\'logs\')">明细</div>' +
+          '</div>' +
+          '<div class="report-tab-content active" data-tab="overview" id="overview-content"></div>' +
+          '<div class="report-tab-content" data-tab="logs" id="logs-content"></div>' +
+          '</div>';
+
+        populateSelectOptions();
+        renderTimeShortcuts();
+        loadAllOverviewData();
+      }
+
+      buildUI();
+
+      // Resize on window resize
+      window.addEventListener('resize', function () {
+        Object.keys(state.charts).forEach(function (k) {
+          if (state.charts[k]) state.charts[k].resize();
+        });
+      });
+    </script>
+  </body>
+</html>

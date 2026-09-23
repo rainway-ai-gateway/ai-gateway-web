@@ -101,6 +101,16 @@ export default {
                     searchable: true
                 },
                 {
+                    title: that.$t('entity.description'),
+                    key: 'description',
+                    minWidth: 180,
+                    sortable: 'custom',
+                    searchable: true,
+                    render(h, params) {
+                        return h('span', params.row.description || '-');
+                    }
+                },
+                {
                     title: that.$t('entity.type'),
                     key: 'type',
                     minWidth: 100,
