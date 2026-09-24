@@ -45,7 +45,7 @@
   "all_time": 1200,
   "ai_ttft_us": 500000,
   "ai_tpot_us": 25000,
-  "ai_cost_value": 5000,
+  "ai_cost_value": 0.00005,
   "ai_cost_currency": "USD",
   "ai_rate_limit_hits": null,
   "ai_auth_reject_quota_plans": null,
@@ -75,7 +75,7 @@
 | `ai_input_tokens` / `ai_output_tokens` / `ai_total_tokens` | int64 | Token 计数 |
 | `all_time` | int | 请求总耗时（毫秒） |
 | `ai_ttft_us` / `ai_tpot_us` | int64 | TTFT / TPOT（微秒） |
-| `ai_cost_value` / `ai_cost_currency` | int64 / string | 成本固定点整数值 / 币种 |
+| `ai_cost_value` / `ai_cost_currency` | number / string | 成本金额（元/美元，服务端已完成 ÷1e8 换算）/ 币种；无成本为 null |
 | `ai_rate_limit_hits` / `ai_auth_reject_quota_plans` | string | JSON 原文（限流命中列表 / 被拒绝配额计划），未命中为 null |
 | `level1Name` ~ `level5` | string | API Key 标签按层级打平（name/value 成对），未设置为 null |
 | `client_ip` / `header_host` / `origin_uri` | string | 客户端 IP / 请求 Host / 原始 URI |
@@ -109,7 +109,7 @@
 **约束**
 
 - 时序类指标（QPS/Token/延迟/成本/限流）读聚合表合计；`logs_total` 走明细表 `COUNT(*)`。
-- 成本按币种分组返回定点整数原值，前端按 `currency` 格式化。
+- 成本按币种分组返回换算后的金额（定点值 ÷ 1e8，元/美元），换算由服务端完成，调用方直接展示。
 
 **返回数据（Data 内容）**
 
@@ -128,7 +128,7 @@
   "latency_p99_ms": 4500,
   "ttft_avg_ms": 320.4,
   "tpot_avg_ms": 25.1,
-  "cost": [{"currency": "USD", "value": 15230000}, {"currency": "RMB", "value": 98000}],
+  "cost": [{"currency": "USD", "value": 0.1523}, {"currency": "RMB", "value": 0.00098}],
   "rate_limit_hits": 320,
   "auth_rejects": 45,
   "logs_total": 152300
@@ -163,7 +163,7 @@
 | `tokens` | Token 吞吐（个/秒） | `input`、`output`、`total` |
 | `latency` | 延迟（毫秒） | `avg`、`max`（Doris 后端另有 `p50`、`p90`、`p99`） |
 | `ttft` / `tpot` | 首 Token / 每 Token 延迟（毫秒，聚合于 stream 请求） | `avg` |
-| `cost` | 成本增速（定点整数/秒） | 按币种多条序列，`currency` 字段区分 |
+| `cost` | 成本增速（金额/秒，元/秒、美元/秒） | 按币种多条序列，`currency` 字段区分 |
 
 **约束**
 
