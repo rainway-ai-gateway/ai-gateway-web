@@ -45,7 +45,7 @@
 | `resource_parent_id` | string | 资源父级业务 ID | 如 entity 层级中的父节点 |
 | `status` | int8 | 操作结果 | `1` success，`2` failed |
 | `error_msg` | string | 失败时的简要错误信息 | 成功时为空 |
-| `change_summary` | object | 变更摘要 | 包含 `before` / `after` / `diff_keys`，敏感字段已脱敏 |
+| `change_summary` | object | 变更摘要 | 包含 `before` / `after` / `diff_keys`，敏感字段已脱敏；部分更新省略的字段不出现在 `after` / `diff_keys`（partial updates omit unchanged fields，显式置零如 `enabled=false` 除外） |
 | `request_path` | string | 请求路径 | - |
 | `request_method` | string | 请求方法 | - |
 | `client_ip` | string | 客户端 IP | - |

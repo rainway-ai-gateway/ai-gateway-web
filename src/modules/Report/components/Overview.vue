@@ -44,7 +44,7 @@
         <div class="metric-label">{{ $t('report.cost') }}</div>
         <div class="metric-value" v-if="overviewData.cost && overviewData.cost.length">{{ fmtNum(overviewData.cost[0].value) }}<span class="metric-currency">{{ overviewData.cost[0].currency }}</span></div>
         <div class="metric-value" v-else>-</div>
-        <div class="metric-sub" v-for="c in (overviewData.cost || [])" :key="c.currency">
+        <div class="metric-sub" v-for="c in (overviewData.cost || []).slice(1)" :key="c.currency">
           {{ c.currency }}: {{ fmtNum(c.value) }}
         </div>
       </div>
