@@ -54,6 +54,13 @@ window.EntityUpsert = {
     }
     return null;
   },
+  validateEntityDescription(value) {
+    var val = String(value == null ? '' : value);
+    if (val === '') return null;
+    if (val.length > 255) return '描述不能超过255个字符';
+    if (/[\x00-\x1F\x7F]/.test(val)) return '描述不能包含控制字符';
+    return null;
+  },
   formatQuota(row) {
     var plan = row.quota_plan || {};
     if (plan.unlimited === true || plan.unlimited === 'true') return '-';
@@ -255,6 +262,14 @@ window.EntityUpsert = {
             '<p class="form-tip">1–64 字符；仅小写字母、数字、_、-、@（支持 用户名@项目名）；不能以 _、- 或 @ 开头/结尾</p>',
           true,
         ) +
+          IvuUI.formTopItem(
+            '描述',
+            '<div class="ivu-input-wrapper ivu-input-type-text">' +
+              '<input type="text" id="entity-description" class="ivu-input" maxlength="255" value="' +
+              IvuUI.escapeHtml(data.description || '') +
+              '" placeholder="请输入Entity描述" />' +
+              '</div>',
+          ) +
           EntityUpsert.rowSpan2(
             EntityUpsert.col(
               IvuUI.formTopItem(
@@ -472,6 +487,7 @@ window.EntityUpsert = {
       IvuUI.card(
         '基本信息',
         infoRow('名称', IvuUI.escapeHtml(data.name || '-')) +
+          infoRow('描述', IvuUI.escapeHtml(data.description || '-')) +
           infoRow('类型', IvuUI.escapeHtml(data.type || '-')) +
           infoRow(
             '父Entity',
@@ -668,6 +684,24 @@ window.EntityUpsert = {
       });
     }
 
+    // 描述校验
+    var descInput = document.getElementById('entity-description');
+    if (descInput) {
+      var validateDesc = function () {
+        var err = EntityUpsert.validateEntityDescription(descInput.value);
+        if (err) {
+          setFieldError(descInput, err);
+          return false;
+        }
+        setFieldError(descInput, null);
+        return true;
+      };
+      descInput.addEventListener('blur', validateDesc);
+      descInput.addEventListener('input', function () {
+        if (descInput.classList.contains('ivu-input-error')) validateDesc();
+      });
+    }
+
     ApiKeyUpsert.initModelsMultiSelect('entity-allow-models');
     ApiKeyUpsert.initModelsMultiSelect('entity-block-models');
   },
@@ -675,6 +709,7 @@ window.EntityUpsert = {
   validateEntityForm() {
     var nameInput = document.getElementById('entity-name');
     var typeSelect = document.getElementById('entity-type');
+    var descInput = document.getElementById('entity-description');
     var valid = true;
 
     function setFieldError(inputEl, error) {
@@ -705,6 +740,17 @@ window.EntityUpsert = {
         valid = false;
       } else {
         setFieldError(nameInput, null);
+      }
+    }
+
+    // 描述校验
+    if (descInput) {
+      var descErr = EntityUpsert.validateEntityDescription(descInput.value);
+      if (descErr) {
+        setFieldError(descInput, descErr);
+        valid = false;
+      } else {
+        setFieldError(descInput, null);
       }
     }
 

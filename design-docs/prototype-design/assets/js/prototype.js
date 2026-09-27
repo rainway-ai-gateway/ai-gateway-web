@@ -31,6 +31,8 @@ window.Prototype = {
       'nav.UserManage': '用户管理',
       'nav.OperationLogManage': '操作日志',
       'nav.EppPoolManage': 'EPP调度',
+      'nav.CertsManage': '证书管理',
+      'nav.ReportManage': '数据报表',
     },
     en: {
       'login.gateway': 'Rainway AI Gateway',
@@ -59,6 +61,7 @@ window.Prototype = {
       'nav.UserManage': 'User Manage',
       'nav.OperationLogManage': 'Operation Logs',
       'nav.EppPoolManage': 'EPP Scheduling',
+      'nav.ReportManage': 'Data Report',
     },
   },
 
@@ -172,9 +175,11 @@ window.Prototype = {
   },
 
   logout() {
-    var basePath = '';
-    var body = document.getElementById('product-body');
-    if (body) basePath = body.getAttribute('data-proto-base') || '../';
+    // 直接从 Layout 传入的基路径取值，不再从 DOM 属性读取后拼接跳转地址
+    var basePath =
+      typeof this._layoutBasePath === 'string' && this._layoutBasePath
+        ? this._layoutBasePath
+        : '../';
     this.removeUser();
     window.location.href = basePath + 'login.html';
   },

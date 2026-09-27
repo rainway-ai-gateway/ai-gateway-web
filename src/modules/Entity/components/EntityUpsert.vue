@@ -32,6 +32,14 @@
         <p v-if="isAdd" class="form-tip">{{ $t('entity.nameRule') }}</p>
       </FormItem>
 
+      <FormItem :label="$t('entity.description')" prop="description">
+        <Input
+          v-model="formData.description"
+          :maxlength="255"
+          :placeholder="$t('entity.entityDescriptionPlaceholder')"
+        ></Input>
+      </FormItem>
+
       <Row :gutter="24">
         <Col span="12">
           <FormItem :label="$t('entity.type')" prop="type">
@@ -561,6 +569,24 @@ export default {
             callback();
         };
 
+        // Validate description (optional; 0-255 chars; no control chars)
+        const validateDescription = (rule, value, callback) => {
+            const val = value === null || value === undefined ? '' : String(value);
+            if (val === '') {
+                callback();
+                return;
+            }
+            if (val.length > 255) {
+                callback(new Error(this.$t('entity.descriptionLengthError')));
+                return;
+            }
+            if (/[\x00-\x1F\x7F]/.test(val)) {
+                callback(new Error(this.$t('entity.descriptionControlCharsError')));
+                return;
+            }
+            callback();
+        };
+
         // Validate type
         const validateType = (rule, value, callback) => {
             if (!value || value.trim() === '') {
@@ -652,6 +678,7 @@ export default {
             modelServices: [],
             formData: {
                 name: '',
+                description: '',
                 type: '',
                 parent_id: '',
                 allow_models: ['*'],
@@ -677,6 +704,12 @@ export default {
                     {
                         required: true,
                         validator: validateName,
+                        trigger: 'blur'
+                    }
+                ],
+                description: [
+                    {
+                        validator: validateDescription,
                         trigger: 'blur'
                     }
                 ],
@@ -789,6 +822,11 @@ export default {
         },
         initFormData(data) {
             this.formData = cloneDeep(data);
+
+            // Ensure description is a string (PATCH: '' explicitly clears, omitted keeps original)
+            if (this.formData.description === undefined || this.formData.description === null) {
+                this.formData.description = '';
+            }
 
             // Convert parent_id to string (for Select component)
             if (this.formData.parent_id !== undefined && this.formData.parent_id !== null) {

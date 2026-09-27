@@ -344,7 +344,8 @@
 **约束**
 
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
-- 若将 `entity_id` 修改为非空（挂载到新Entity），且 `unlimited_quota` 为 `false` 且 `quota_plan.unlimited` 为 `false`，则要求新Entity或其祖先链上至少存在一个有效的Quota Plan。
+- 若将 `entity_id` 修改为非空（挂载到新Entity），该Entity必须存在。
+- 注：配额扣减遵循 [workflows.md](./workflows.md) §5——当 `unlimited_quota=false` 且 `quota_plan.unlimited=false` 时，Key 自身的 QuotaPlan 已计入扣减列表并扣减其自身 QuotaBalance，因此不要求新Entity或其祖先链上存在有效的Quota Plan。若 Key 自身余额不足，请求按 §5 step 6/8 拒绝（429002），与挂载目标的配额类型无关。
 
 **执行逻辑**
 
@@ -396,7 +397,7 @@
 **约束**
 
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
-- 若将 `entity_id` 修改为非空（挂载到新Entity），且 `unlimited_quota` 为 `false` 且 `quota_plan.unlimited` 为 `false`，则要求新Entity或其祖先链上至少存在一个有效的Quota Plan。
+- 若将 `entity_id` 修改为非空（挂载到新Entity），该Entity必须存在。不要求新Entity或其祖先链上存在有效的Quota Plan（依据 [workflows.md](./workflows.md) §5，Key 自身的 QuotaPlan 始终计入扣减列表）。
 - 修改 `quota_plan.quota`（单位不变）时，保留 `balance.used`，按 `新quota - used` 重新计算 `balance.remaining`；修改 `quota_plan.unit` 或 `quota_plan.unlimited` 时，会重置 `balance.used = 0`；仅修改 `quota_plan` 其他字段不会调整 balance。
 - 若修改 `route_rules`，视为全量替换该路由规则配置。
 
@@ -539,11 +540,18 @@ Data为null。
 
 **执行逻辑**
 
-1. 找到该API-Key的quota_plan（如果不存在或unlimited=true，返回404）
-2. 若传入quota，更新quota_plan.quota为新的值
-3. 触发balance的reset：
+1. 若 API-Key 不存在，返回 404；找到该 API-Key 的 quota_plan：若未关联 quota plan 或 `unlimited=true`，返回 422（Param Illegal；不产生配额变更，并记录 `status=2` 的操作日志）；若传入 quota，更新 quota_plan.quota 为新的值
+2. 触发balance的reset：
    - balance.remaining = 当前quota（或新的quota）
    - balance.used = 0
+
+**失败响应说明**
+
+| HTTP status | ErrNum | ErrMsg | 触发条件 |
+|------|------|------|------|
+| 404 | 404 | `API-Key Record Not Exist` | 路径中的 API-Key 不存在 |
+| 422 | 422 | `Param Illegal: <原因>` | 未关联 quota plan；unlimited 配额计划（`cannot reset balance for unlimited quota`）；quota 参数非法 |
+| 500 | 500 | `Unknown Exception: <原因>` | 内部故障 |
 
 **返回数据（Data内容）**
 

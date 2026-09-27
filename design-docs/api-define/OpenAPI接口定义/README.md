@@ -16,7 +16,6 @@
 | /entities | [entities.md](./entities.md) |
 | /global-route-rules | [global-route-rules.md](./global-route-rules.md) |
 | /route-tables | [route-tables.md](./route-tables.md) |
-| /alb-pool | [alb-pool.md](./alb-pool.md) |
 | /auth | [auth.md](./auth.md) |
 | /certificates | [certificates.md](./certificates.md) |
 | /providers | [providers.md](./providers.md) |
@@ -25,6 +24,7 @@
 | /epp-pool | [epp-pool.md](./epp-pool.md) |
 | /model-prices | [model-prices.md](./model-prices.md) |
 | /operation-logs | [operation-logs.md](./operation-logs.md) |
+| /report | [report.md](./report.md) |
 | /expression/verify | [expression-verify.md](./expression-verify.md) |
 | 关键业务流程 | [workflows.md](./workflows.md) |
 | 对象关系图 | [object-relations.md](./object-relations.md) |

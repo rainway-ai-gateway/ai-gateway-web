@@ -60,16 +60,6 @@ export default [
       },
       {
         component: (r) =>
-          require.ensure(
-            [],
-            () => r(require('../modules/AIInstancePool')),
-            'instance-pool-ai',
-          ),
-        path: 'instance-pool-ai',
-        name: 'AIGatewayInstancePool.list',
-      },
-      {
-        component: (r) =>
           require.ensure([], () => r(require('../modules/User')), 'user'),
         path: 'user',
         name: 'user.list',
@@ -154,6 +144,16 @@ export default [
         component: r => require.ensure([], () => r(require('../modules/Cert')), 'certs.list'),
         path: 'cert',
         name: 'certs.list'
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/Report')),
+            'report.list',
+          ),
+        path: 'report',
+        name: 'report.list',
       }
     ],
   },

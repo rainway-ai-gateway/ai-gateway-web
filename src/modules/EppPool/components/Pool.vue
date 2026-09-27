@@ -589,6 +589,11 @@ export default {
     },
     addInstance(groupIndex) {
       const group = this.getGroup(groupIndex);
+      const insts = group.instances || [];
+      if (insts.length >= 2) {
+        this.$Message.warning(this.$t('eppPool.instanceCountMax'));
+        return;
+      }
       if (!group.instances) {
         this.$set(group, 'instances', []);
       }

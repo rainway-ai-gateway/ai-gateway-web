@@ -154,7 +154,7 @@
                 tableHtml += '<strong>' + IvuUI.escapeHtml(g.name) + '</strong>';
               }
               tableHtml += '</div></td>' +
-                '<td><div class="ivu-table-cell">' + (g.instances || []).length + '</div></td>' +
+                '<td><div class="ivu-table-cell">' + (g.instances || []).length + ' / 2</div></td>' +
                 '<td><div class="ivu-table-cell" style="font-size:12px;color:#808695;">' + (instSummary || '-') + '</div></td>';
               if (editingPool) {
                 tableHtml += '<td><div class="ivu-table-cell">' +
@@ -221,9 +221,12 @@
                 }
 
                 if (editingPool) {
-                  tableHtml += '<div style="margin-top:8px;">' +
-                    IvuUI.btn('+添加实例', 'primary', 'small', '', 'data-action="add-inst" data-group-index="' + gi + '"') +
-                    '</div>';
+                  var instCount = (g.instances || []).length;
+                  var addBtnHtml = instCount >= 2
+                    ? IvuUI.btn('+添加实例', 'default', 'small', 'disabled', 'data-action="add-inst" data-group-index="' + gi + '"') +
+                      '<span style="color:#c5c8ce;font-size:12px;margin-left:8px;">每组最多 2 个（主+备）</span>'
+                    : IvuUI.btn('+添加实例', 'primary', 'small', '', 'data-action="add-inst" data-group-index="' + gi + '"');
+                  tableHtml += '<div style="margin-top:8px;">' + addBtnHtml + '</div>';
                 }
               }
 
@@ -269,11 +272,65 @@
         }
 
         function bindPoolEditEvents(container) {
-          // 保存
+          // 保存（含完整校验）
           document.getElementById('btn-save-pool').addEventListener('click', function () {
-            if (!poolData.groups || !poolData.groups.length) {
+            var groups = poolData.groups || [];
+            if (!groups.length) {
               Prototype.toast('至少需要一个实例组', 'error');
               return;
+            }
+            var groupNames = {};
+            var allIds = {};
+            var allHostPorts = {};
+            for (var gi = 0; gi < groups.length; gi++) {
+              var g = groups[gi];
+              if (!g.name || !g.name.trim()) {
+                Prototype.toast('第 ' + (gi + 1) + ' 个实例组名不能为空', 'error');
+                return;
+              }
+              var gName = g.name.trim();
+              if (groupNames[gName]) {
+                Prototype.toast('实例组名 "' + gName + '" 重复', 'error');
+                return;
+              }
+              groupNames[gName] = true;
+              var insts = g.instances || [];
+              if (insts.length < 1) {
+                Prototype.toast('实例组 "' + gName + '" 为空，至少需要 1 个实例', 'error');
+                return;
+              }
+              if (insts.length > 2) {
+                Prototype.toast('实例组 "' + gName + '" 实例数超过上限（每组仅主+备，最多 2 个）', 'error');
+                return;
+              }
+              for (var ii = 0; ii < insts.length; ii++) {
+                var inst = insts[ii];
+                if (!inst.id || !inst.id.trim()) {
+                  Prototype.toast('实例组 "' + gName + '" 第 ' + (ii + 1) + ' 个实例 ID 不能为空', 'error');
+                  return;
+                }
+                var instId = inst.id.trim();
+                if (allIds[instId]) {
+                  Prototype.toast('实例 ID "' + instId + '" 在池内重复', 'error');
+                  return;
+                }
+                allIds[instId] = true;
+                if (!inst.host || !inst.host.trim()) {
+                  Prototype.toast('实例组 "' + gName + '" 实例 "' + instId + '" 主机不能为空', 'error');
+                  return;
+                }
+                var port = Number(inst.port);
+                if (!Number.isFinite(port) || port < 1 || port > 65535) {
+                  Prototype.toast('实例组 "' + gName + '" 实例 "' + instId + '" 端口须为 1–65535', 'error');
+                  return;
+                }
+                var hpKey = inst.host.trim() + ':' + port;
+                if (allHostPorts[hpKey]) {
+                  Prototype.toast('(host, port) 组合 "' + hpKey + '" 在池内重复', 'error');
+                  return;
+                }
+                allHostPorts[hpKey] = true;
+              }
             }
             editingPool = false;
             Prototype.toast('EPP 实例池已保存！(PATCH /epp-pool 全量替换)');

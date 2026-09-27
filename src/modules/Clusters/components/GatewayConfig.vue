@@ -478,19 +478,6 @@
               </FormItem>
             </Col>
           </Row>
-          <Row :gutter="24" v-if="formData.epp_config.session_affinity_enabled">
-            <Col span="12">
-              <FormItem
-                :label="$t('gatewayConfig.sessionAffinityHeader')"
-                prop="epp_config.session_affinity_header"
-              >
-                <Input
-                  v-model="formData.epp_config.session_affinity_header"
-                  :placeholder="$t('gatewayConfig.sessionAffinityHeaderPlaceholder')"
-                />
-              </FormItem>
-            </Col>
-          </Row>
           <Row :gutter="24">
             <Col span="12">
               <FormItem
@@ -503,6 +490,17 @@
                   :max="1"
                   :step="0.05"
                   style="width: 100%;"
+                />
+              </FormItem>
+            </Col>
+            <Col span="12" v-if="formData.epp_config.session_affinity_enabled">
+              <FormItem
+                :label="$t('gatewayConfig.sessionAffinityHeader')"
+                prop="epp_config.session_affinity_header"
+              >
+                <Input
+                  v-model="formData.epp_config.session_affinity_header"
+                  :placeholder="$t('gatewayConfig.sessionAffinityHeaderPlaceholder')"
                 />
               </FormItem>
             </Col>

@@ -38,6 +38,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.0.10] - 2026-09-23
+
+### Added
+
+- Data Report module: new `/report` resource with a shared global filter bar (time range, model, API key, provider, host, streaming, status code, plus quick ranges) and two tabs — **Overview** (5 metric cards and 6 ECharts charts) and **Detail** (server-side paginated log table with expandable rows and its own request-model / errors-only / error-keyword filters)
+- `Echarts` wrapper component backing the Data Report charts; charts resize with the window and are destroyed and rebuilt on tab switch
+- Model Provider protocol path mapping (`protocol_paths`): key/value table in the create/edit drawer (protocol + upstream base path) with per-row add/remove and validation (protocol must be one of the provider's model protocols; path must start with `/`, must not end with `/`, and must not contain `?`, `$`, `#` or `..`), plus a read-only mapping card in the provider detail view
+- Model Provider model list is now required; empty lists and duplicate model names are rejected on submit
+- Entity organization `description`: searchable and sortable list column, optional create/edit field (max 255 characters, control characters rejected), and a row in the detail view
+- EPP scheduling: at most 2 instances per group (primary + backup); instance rows expand on click to show key details
+- User manual (zh-cn): new Data Report chapter; provider protocol path mapping rules rewritten; Entity description documented
+
+### Changed
+
+- Model Prices list defaults to 50 rows per page, with page size options 20/50/100/200/500/1000
+- `pageTable` keeps the filter row table and the data table horizontally in sync while scrolling
+- Cluster gateway config: session-affinity header simplified to a single column (no visual change)
+- User manual chapters renumbered after the AI gateway instance pool chapter was removed (now 03–14); navigation tree, overview and `develop.md` synced
+- Refreshed provider screenshots (list, upsert, detail, pricing tiers) for protocol path mapping and the required model list
+- Expanded i18n for `report`, protocol path mapping, Entity description and EPP pool limits (en/zh)
+
+### Removed
+
+- AI gateway instance pool module: `AIInstancePool` page, `instance-pool-ai` route, sidebar icons, prototype page and design docs
+- User manual: AI gateway instance pool chapter and certificate management chapter (the certificate module itself is unchanged)
+
+### Dependencies
+
+- Upgraded `axios` ^1.6.0 → ^1.20.0, `lodash` ^4.17.21 → ^4.18.1 and `uuid` ^8.2.0 → ^11.1.1
+- Added `echarts` ^5.6.0 for the Data Report charts
+- Regenerated `package-lock.json`
+
 ## [v0.0.9] - 2026-09-10
 
 ### Added
@@ -246,6 +278,7 @@ AI Gateway Web v0.0.2 — Instance pool & build refresh. Focuses on EPP instance
 - Consumer management: API Key lifecycle with model allowlist, token quota, expiry, IP whitelist
 - User & access: system/tenant views, user management, token management
 
+[v0.0.10]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.10
 [v0.0.9]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.9
 [v0.0.8]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.8
 [v0.0.7]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.7

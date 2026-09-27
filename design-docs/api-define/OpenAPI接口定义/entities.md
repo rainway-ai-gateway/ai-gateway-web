@@ -6,6 +6,7 @@
 {
   "id": "ent-001",
   "name": "op",
+  "description": "运营部，负责线上业务",
   "type": "dep",
   "parent_id": null,
   "allow_models": ["*"],
@@ -44,6 +45,7 @@
 |------|------|------|----------|
 | `id` | string | Entity唯一标识 | 系统生成，如`ent-001` |
 | `name` | string | Entity名称 | 在全局范围内唯一 | 必填；类型为 [EntityName](./00-common.md#17-entity-名称entityname)；全局唯一 |
+| `description` | string | Entity描述 | 自定义 | 非必填；若传入，长度 0-255 字符；不能包含控制字符 |
 | `type` | string | Entity类型 | 必须引用已定义的Entity-Type | 必填；类型为 [EntityTypeName](./00-common.md#16-entity-type-名称entitytypename)；必须引用已存在的 Entity-Type |
 | `parent_id` | string | 父Entity ID | 为空表示根节点 |
 | `allow_models` | []string | 允许访问的模型白名单 | 包含"*"表示允许访问所有模型，**默认值为允许访问所有模型** |
@@ -76,6 +78,7 @@
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
 | name | string | Entity名称 | Y | 全局唯一 | 必填；类型为 [EntityName](./00-common.md#17-entity-名称entityname)；全局唯一 |
+| description | string | Entity描述 | N | - | 非必填；若传入，长度 0-255 字符；不能包含控制字符 |
 | type | string | Entity类型 | Y | 必须引用已定义的Entity-Type | 必填；类型为 [EntityTypeName](./00-common.md#16-entity-type-名称entitytypename)；必须引用已存在的 Entity-Type |
 | parent_id | string | 父Entity ID | N | 为空表示根节点 | 若传入非空值，父 Entity 必须存在，且父 Entity 对应 Entity-Type 的 level 必须小于本 Entity 对应 Entity-Type 的 level |
 | allow_models | []string | 允许访问的模型白名单 | N | 包含"*"表示允许访问所有模型，**默认值为允许访问所有模型** | 每个元素类型为 [AIModel](./00-common.md#5-ai-模型名称aimodel)；包含 `"*"` 时表示允许访问所有模型 |
@@ -89,6 +92,7 @@
 - `type` 必须引用系统中已存在的Entity-Type
 - `parent_id` 若不为空，该父Entity对应的Entity-Type的 `level` 必须**小于**本Entity对应的Entity-Type的 `level`（数字越小级别越高，父节点级别必须更高）
 - `name` 必填；类型为 [EntityName](./00-common.md#17-entity-名称entityname)；全局唯一
+- `description` 非必填；若传入，长度 0-255 字符；不能包含控制字符。
 - `allow_models` 每个元素类型为 [AIModel](./00-common.md#5-ai-模型名称aimodel)；包含 `"*"` 时表示允许访问所有模型。
 - `block_models` 每个元素为非空字符串；包含 `"*"` 时表示禁止访问所有模型；元素无需为已配置的 `AIModel`（不必出现在 `/clusters` 的 `llm_config.models` 中）。
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
@@ -98,6 +102,7 @@
 ```json
 {
     "name": "op",
+    "description": "运营部，负责线上业务",
     "type": "dep",
     "parent_id": null,
     "allow_models": ["*"],
@@ -166,6 +171,7 @@
     "Data": {
         "id": "ent-001",
         "name": "op",
+        "description": "运营部，负责线上业务",
         "type": "dep",
         "parent_id": null,
         "allow_models": ["*"],
@@ -251,6 +257,7 @@
 | - | - | - | - |
 | id | string | Entity唯一标识 | - |
 | name | string | Entity名称 | - |
+| description | string | Entity描述 | - |
 | type | string | Entity类型 | - |
 | parent_id | string | 父Entity ID | - |
 | allow_models | []string | 允许访问的模型白名单 | - |
@@ -272,6 +279,7 @@
             {
                 "id": "ent-001",
                 "name": "op",
+                "description": "运营部，负责线上业务",
                 "type": "dep",
                 "parent_id": null,
                 "allow_models": ["*"],
@@ -313,6 +321,7 @@
             {
                 "id": "ent-bfe-001",
                 "name": "bfe",
+                "description": "BFE 网关团队",
                 "type": "team",
                 "parent_id": "ent-001",
                 "allow_models": ["*"],
@@ -391,6 +400,7 @@
 - `type` 不可修改（创建后固定）。
 - 若修改 `parent_id`，新父Entity对应的Entity-Type的 `level` 必须**小于**本Entity对应的Entity-Type的 `level`。
 - `name` 必填；类型为 [EntityName](./00-common.md#17-entity-名称entityname)；全局唯一，不可与其他Entity冲突。
+- `description` 非必填；若传入，长度 0-255 字符；不能包含控制字符。**全量语义下省略 `description` 将清空已有描述（重置为空字符串）**。
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
 
 **执行逻辑**
@@ -443,6 +453,7 @@
 - `type` 不可修改。
 - 若修改 `parent_id`，新父Entity对应的Entity-Type的 `level` 必须**小于**本Entity对应的Entity-Type的 `level`。
 - `name` 必填；类型为 [EntityName](./00-common.md#17-entity-名称entityname)；全局唯一，不可与其他Entity冲突。
+- `description` 非必填；若传入，长度 0-255 字符；不能包含控制字符。省略时保持原值；显式传入空字符串 `""` 表示清空描述。
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
 - 修改 `quota_plan.quota`（单位不变）时，保留 `balance.used`，按 `新quota - used` 重新计算 `balance.remaining`；修改 `quota_plan.unit` 或 `quota_plan.unlimited` 时，会重置 `balance.used = 0`；仅修改 `quota_plan` 其他字段不会调整 balance。
 - 若修改 `route_rules`，视为全量替换该路由规则配置。
@@ -567,11 +578,18 @@ Data为null。
 
 **执行逻辑**
 
-1. 找到该Entity的quota_plan（如果不存在或unlimited=true，返回404）
-2. 若传入quota，更新quota_plan.quota为新的值
-3. 触发balance的reset：
+1. 若 Entity 不存在，返回 404；找到该 Entity 的 quota_plan：若未关联 quota plan 或 `unlimited=true`，返回 422（Param Illegal；不产生配额变更，并记录 `status=2` 的操作日志）；若传入 quota，更新 quota_plan.quota 为新的值
+2. 触发balance的reset：
    - balance.remaining = 当前quota（或新的quota）
    - balance.used = 0
+
+**失败响应说明**
+
+| HTTP status | ErrNum | ErrMsg | 触发条件 |
+|------|------|------|------|
+| 404 | 404 | `Entity Record Not Exist` | 路径中的 Entity 不存在 |
+| 422 | 422 | `Param Illegal: <原因>` | 未关联 quota plan；unlimited 配额计划（`cannot reset balance for unlimited quota`）；quota 参数非法 |
+| 500 | 500 | `Unknown Exception: <原因>` | 内部故障 |
 
 **返回数据（Data内容）**
 

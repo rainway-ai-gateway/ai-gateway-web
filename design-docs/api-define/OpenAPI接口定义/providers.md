@@ -29,6 +29,7 @@
         }
     ],
     "model_protocols": ["openai"],
+    "protocol_paths": {"openai": "/v1"},
     "time_zone": "Asia/Shanghai",
     "tiers": [
         {
@@ -51,10 +52,11 @@
 | `name` | string | Provider 唯一标识 | 全局唯一 | 必填；类型为 [ProviderName](./00-common.md#17-provider-名称providername)；合法命名参考 [ClusterName](./00-common.md#15-集群名称clustername) |
 | `description` | string | Provider 描述信息 | - | 非必填；若传入，长度 0-256 字符；不能包含控制字符 |
 | `model_endpoint` | object | 模型发现端点 | 用于调用第三方 AI 模型提供商的模型列表接口 | 非必填；未设置时默认 `schema=https`、`uri=/v1/models`；具体字段见下方 表：Endpoint |
-| `models` | []string | 该 provider 支持的模型列表 | - | 非必填；元素非空且不可重复；可通过模型发现接口自动填充 |
+| `models` | []string | 该 provider 支持的模型列表 | - | 必填；至少 1 个元素；元素非空且不可重复 |
 | `keys` | []ProviderKey | 该 provider 可用的 API Key 明文 | - | 非必填；默认空数组 `[]`；元素须满足 表：ProviderKey 结构 |
 | `instance_pool` | []Instance | Provider 对应的后端实例池 | 系统自动据此创建实例池和子集群 | 必填；至少 1 个元素；同一 provider 内 `(addr, port)` 组合不能重复；至少有一个实例 `weight > 0` |
 | `model_protocols` | []string | 支持的模型访问协议 | 枚举：`openai`、`anthropic`、`gemini` | 必填；至少 1 个元素；元素不可重复；枚举值见下方 |
+| `protocol_paths` | map[string]string | 按协议的上游 API 基路径（该协议 SDK `base_url` 的 path 部分）；BFE 转发时将命中的标准端点改写到该基路径（openai 兼容带/不带 `/v1` 的客户端入口） | 键：`openai`、`anthropic` | 非必填；缺省 = 不改写（请求路径原样转发）；键必须是 `model_protocols` 已声明协议的子集；值须以 `/` 开头、不以 `/` 结尾、不含 `..`/`?`/`#`、长度 ≤ 128；语义与参考值见下方 |
 | `time_zone` | string | 计算时段所使用的时区 | 用于 tier 价格匹配 | 非必填；默认 `Asia/Shanghai`；须为合法 IANA 时区名 |
 | `tiers` | []PricingTier | 时段 tier 定义列表 | 描述该 provider 在什么时段属于哪个 tier | 非必填；元素须满足 表：PricingTier 结构；**初期 `name` 只支持 `peak`** |
 | `create_time` | int64 | 创建时间 | - | 系统生成 |
@@ -114,6 +116,21 @@
 
 > 一个 provider 可同时支持多种协议（如聚合平台），但 `model_protocols` 至少包含一个。
 
+**`protocol_paths` 语义与常见 provider 参考值**
+
+- 配置值 = 该协议官方 SDK `base_url` 的 path 部分：`openai` 含 `/v1` 尾（OpenAI SDK 向 base_url 拼 `/chat/completions` 等）；`anthropic` 不含 `/v1`（Anthropic SDK 自行拼接 `/v1/messages`）。
+- 改写规则：anthropic 请求 `/v1/messages`（及子路径）被改写为 `{anthropic}/v1/messages`；openai 请求命中标准端点（`/chat/completions`、`/completions`、`/embeddings`、`/models`、`/responses` 等）时，先剥离可选的 `/v1` 前缀再拼接到 base——`/v1/chat/completions` 与 `/chat/completions` 均改写为 `{openai}/chat/completions`，即客户端入口带不带 `/v1` 不影响最终上游路径（兼容 Trae 等直连 base_url 的 OpenAI 兼容客户端）。
+- 未配置（或对应协议无条目）时请求路径原样转发；未命中 openai 标准端点的路径（provider 原生路径、自定义路径、`/v10/xxx`、`/v1beta/...`）永不改写——客户端以 provider 原生路径访问的透传模式不受影响。`gemini` 协议不支持路径改写（其原生路径即标准路径，透传已可用）。
+
+| provider | `protocol_paths` 参考值 |
+|----------|-------------------------|
+| 百炼 DashScope | `{"openai": "/compatible-mode/v1", "anthropic": "/apps/anthropic"}` |
+| Kimi 开放平台（api.moonshot.cn） | `{"openai": "/v1", "anthropic": "/anthropic"}` |
+| Kimi Code 会员（api.kimi.com） | `{"openai": "/coding/v1", "anthropic": "/coding"}` |
+| DeepSeek | `{"openai": "/v1", "anthropic": "/anthropic"}` |
+| 火山方舟·按量 | `{"openai": "/api/v3", "anthropic": "/api/compatible"}` |
+| 火山方舟·Coding Plan | `{"openai": "/api/coding/v3", "anthropic": "/api/coding"}` |
+
 ## 2. 接口清单
 
 ### 2.1 创建 Provider
@@ -159,18 +176,19 @@
             "port": 443
         }
     ],
-    "model_protocols": ["openai"]
+    "model_protocols": ["openai"],
+    "protocol_paths": {"openai": "/v1"}
 }
 ```
 
 **执行逻辑**
 
-1. 校验 `name` 全局唯一、`instance_pool` 合法、`model_protocols` 合法。
+1. 校验 `name` 全局唯一、`instance_pool` 合法、`model_protocols` 合法、`protocol_paths` 合法（键 ⊆ `model_protocols` 且取值 ∈ {openai, anthropic}，值符合路径格式）。
 2. 若未传 `model_endpoint`，使用默认值 `{schema: "https", uri: "/v1/models"}`。
 3. 若未传 `keys`，默认空数组。
 4. 若未传 `time_zone`，默认 `Asia/Shanghai`。
 5. 若请求中携带 `tiers`，按 表：PricingTier 结构 校验；**初期只支持 `name="peak"`**。
-6. 若请求中携带 `models` 且非空，直接保存；否则可在创建后调用 `/providers/tools/discover-models` 接口探测模型列表，再回填到 provider。
+6. 校验 `models` 必填：至少 1 个元素，元素非空且不可重复，通过后直接保存。如需借助模型发现工具（`/providers/tools/discover-models`，无状态接口）确定模型列表，调用方需先调用该工具，再在创建请求中携带其结果。
 7. 写入 provider 记录，返回完整对象。
 
 **返回数据（Data内容）**
@@ -199,6 +217,7 @@
             {"addr": "api.deepseek.com", "weight": 100, "port": 443}
         ],
         "model_protocols": ["openai"],
+        "protocol_paths": {"openai": "/v1"},
         "time_zone": "Asia/Shanghai",
         "tiers": [
             {
@@ -292,6 +311,7 @@
         "keys": [...],
         "instance_pool": [...],
         "model_protocols": ["openai"],
+        "protocol_paths": {"openai": "/v1"},
         "time_zone": "Asia/Shanghai",
         "tiers": [
             {
@@ -332,9 +352,11 @@
 可修改字段含义同创建接口，但**输入参数不包括 `name`，即不能修改 provider 的 name**（名称由 URI 中的 `provider_name` 指定）。若请求体中仍包含 `name`，返回 422。若传入 `instance_pool` 字段，系统会自动同步更新被引用该 provider 的所有 cluster 所生成的实例池。
 
 > **注意**：本接口为**部分更新**语义——请求体中未提供的字段（`description`、`model_endpoint`、`models`、`keys`、`time_zone`、`tiers` 等）保持原值不变。
+> - 通用约定：对可选的 map / 数组字段（`keys`、`tiers`、`protocol_paths` 等），省略与传 `null` 等价，均保留原值；显式传入空集合（`[]` / `{}`）按全量替换处理，即清空该字段（仍须通过对应字段校验）。
 > - `keys` 作为数组，**显式提供时按全量替换**处理，即调用方需传入完整的最新 Key 列表；省略时保留原值。Key 的 `name` 删除/重命名会校验无 cluster 仍引用旧 name；若被引用，返回 `409 Conflict`。
 > - `models` 作为数组，**显式提供时按全量替换**处理；省略时保留原值。删除 model 会校验无 cluster 仍引用该 model；若被引用，返回 `409 Conflict`。
 > - `tiers`、`time_zone`、`model_endpoint`：提供即更新，省略保留原值。`time_zone` 取值须为合法时区名（如 `Asia/Shanghai`、`UTC`）。
+> - `protocol_paths`：提供即全量替换，**省略或传 `null` 保留原值；清空（禁用路径改写）须显式传入 `"protocol_paths": {}`**。键必须是**更新后** `model_protocols` 已声明协议的子集——同时调整 `model_protocols` 与 `protocol_paths` 时，须在同一个请求中给出合法组合。
 
 **HTTP BODY 参数示例**
 
@@ -350,9 +372,20 @@
     "instance_pool": [
         {"name": "backend-1", "addr": "api.deepseek.com", "weight": 100, "port": 443}
     ],
-    "model_protocols": ["openai"]
+    "model_protocols": ["openai"],
+    "protocol_paths": {"openai": "/v1"}
 }
 ```
+
+清空 `protocol_paths`（禁用路径改写，恢复为请求路径原样转发）的请求体示例——注意须显式传空对象 `{}`，省略该字段或传 `null` 均保留原值、不清空：
+
+```json
+{
+    "protocol_paths": {}
+}
+```
+
+> 提示：部分客户端/序列化库会把空 map 归一化为 `null`，导致"传了空对象却没清空"且接口返回 200 无报错；如遇此情况，请先抓取实际请求体确认发出的是 `{}` 而非 `null`。
 
 **返回数据（Data内容）**
 
@@ -557,6 +590,7 @@ tiers:
         "keys": [...],
         "instance_pool": [...],
         "model_protocols": ["openai"],
+        "protocol_paths": {"openai": "/v1"},
         "time_zone": "Asia/Shanghai",
         "tiers": [
             {
@@ -580,18 +614,22 @@ tiers:
 3. `instance_pool` 必填，至少包含 1 个实例；同一 provider 内 `(addr, port)` 组合不能重复；至少有一个实例 `weight > 0`。
 4. 每个实例包含 `addr`、`weight`、`port`；`addr` 必填且类型为 [Hostname](./00-common.md#1-主机名hostname)；`weight` 取值范围 [0,100]；`port` 必填且类型为 [Port](./00-common.md#3-网络端口port)。
 5. `model_endpoint.schema` 有效值为 `http`、`https`，未设置时默认 `https`；`uri` 非空且须以 `/` 开头。
-6. `models` 元素非空且不可重复。
+6. `models` 必填，至少 1 个元素；元素非空且不可重复。（PATCH 部分更新时省略 `models` 表示保留原值，不视为违反必填；显式提供时必须满足本条款。）
 7. `keys` 非必填，默认空数组 `[]`；若非空：
    - 每个元素 `name` 必填，长度 1-128，同一 provider 内唯一；
    - 每个元素 `key` 必填且非空，长度 1-512。
 8. `model_protocols` 必填，至少 1 个元素，元素不可重复，取值须为枚举值：`openai`、`anthropic`、`gemini`。
-9. `time_zone` 非必填，为空时默认 `Asia/Shanghai`；若传入，须为合法 IANA 时区名。
-10. `tiers` 非必填；若传入：
+9. `protocol_paths` 非必填，缺省 = 不改写（请求路径原样转发）；传入 `{}` 清空（恢复为原样转发），传 `null` 与省略等价、均保留原值；若传入非空对象：
+   - 键必须是 `model_protocols` 已声明协议的子集，取值仅支持 `openai`、`anthropic`（`gemini` 不支持路径改写）；
+   - 值须以 `/` 开头、不以 `/` 结尾、不含 `..`/`?`/`#`、长度 ≤ 128；
+   - PATCH 更新时键还须是**更新后** `model_protocols` 的子集（与 `model_protocols` 同时调整须在同一个请求中给出合法组合）。
+10. `time_zone` 非必填，为空时默认 `Asia/Shanghai`；若传入，须为合法 IANA 时区名。
+11. `tiers` 非必填；若传入：
     - 每个 tier 必须包含非空 `name` 和至少一个 `time_range`；
     - **初期 `name` 只支持 `peak`**；
     - `time_ranges` 中 `weekdays` 元素须在 0-6 之间，为空表示每天；
     - `start` / `end` 格式为 `HH:MM`，且 `end` 必须大于 `start`；
     - 同一 tier 内部 `time_ranges` 不得重叠。
-11. `PUT /providers/{provider_name}/pricing-tiers` 中，`time_zone` / `tiers` 的校验规则同上；YAML 文件格式须能正确解析为相同结构。
-12. 删除 provider 前，须校验无 cluster 引用，否则返回 `409 Conflict`；`/model-prices` 记录不再作为阻塞条件。
-13. 触发模型发现时，`model_protocol`、`schema`、`addr`、`port` 为必填，`uri` 和 `apikey` 为选填；各参数须满足对应合法性条件；`model_protocol` 不在枚举值范围内时返回 `422`。
+12. `PUT /providers/{provider_name}/pricing-tiers` 中，`time_zone` / `tiers` 的校验规则同上；YAML 文件格式须能正确解析为相同结构。
+13. 删除 provider 前，须校验无 cluster 引用，否则返回 `409 Conflict`；`/model-prices` 记录不再作为阻塞条件。
+14. 触发模型发现时，`model_protocol`、`schema`、`addr`、`port` 为必填，`uri` 和 `apikey` 为选填；各参数须满足对应合法性条件；`model_protocol` 不在枚举值范围内时返回 `422`。
