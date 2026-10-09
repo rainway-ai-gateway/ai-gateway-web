@@ -102,6 +102,8 @@ export default {
                 'TrafficMirrorRuleManage': 'ivu-icon-ios-copy',
                 'IntentConfig.list': 'ivu-icon-ios-chatbubbles',
                 'IntentConfigManage': 'ivu-icon-ios-chatbubbles',
+                'AIContextRule.list': 'ivu-icon-ios-crop',
+                'AIContextRuleManage': 'ivu-icon-ios-crop',
 
                 'EppPool.list': 'iconfont icon-jiqun',
                 'ModelPrice.list': 'ivu-icon-logo-yen',

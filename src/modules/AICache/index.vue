@@ -15,48 +15,142 @@
 */
 <template>
   <div class="ai-cache">
-    <div class="route-editor-header">
-      <div class="route-owner-label">
-        {{ $t('aiCache.pageTitle') }}
-      </div>
-      <div class="route-header-actions">
-        <Button
-          v-show="mode === 'edit'"
-          size="small"
-          type="primary"
-          @click="onAddRule"
-        >
-          {{ $t('aiCache.addRule') }}
-        </Button>
-      </div>
-      <div class="route-header-submit">
-        <template v-if="mode === 'view'">
-          <Button size="small" type="primary" @click="enterEditMode">
-            {{ $t('route.enterEditMode') }}
-          </Button>
-        </template>
-        <template v-else>
-          <Button size="small" @click="exitEditMode">
-            {{ $t('route.exitEditMode') }}
-          </Button>
-          <Button
-            size="small"
-            type="success"
-            :loading="submitting"
-            @click="submitRules"
-          >
-            {{ $t('com.submitAndEffect') }}
-          </Button>
-        </template>
-      </div>
-    </div>
+    <Tabs v-model="activeTab" :animated="false">
+      <TabPane :label="$t('aiCache.tabRules')" name="rules">
+        <div class="route-editor-header">
+          <div class="route-owner-label">
+            {{ $t('aiCache.pageTitle') }}
+          </div>
+          <div class="route-header-actions">
+            <Button
+              v-show="mode === 'edit'"
+              size="small"
+              type="primary"
+              @click="onAddRule"
+            >
+              {{ $t('aiCache.addRule') }}
+            </Button>
+          </div>
+          <div class="route-header-submit">
+            <template v-if="mode === 'view'">
+              <Button size="small" type="primary" @click="enterEditMode">
+                {{ $t('route.enterEditMode') }}
+              </Button>
+            </template>
+            <template v-else>
+              <Button size="small" @click="exitEditMode">
+                {{ $t('route.exitEditMode') }}
+              </Button>
+              <Button
+                size="small"
+                type="success"
+                :loading="submitting"
+                @click="submitRules"
+              >
+                {{ $t('com.submitAndEffect') }}
+              </Button>
+            </template>
+          </div>
+        </div>
 
-    <pageTable
-      ref="ruleTable"
-      :columns="ruleColumns"
-      :tableData="rules"
-      :loading="loading"
-    />
+        <pageTable
+          ref="ruleTable"
+          :columns="ruleColumns"
+          :tableData="rules"
+          :loading="loading"
+        />
+      </TabPane>
+
+      <TabPane :label="$t('aiCache.tabSemantic')" name="semantic">
+        <div class="route-editor-header">
+          <div class="route-owner-label">
+            {{ $t('aiCache.semanticSubtitle') }}
+          </div>
+          <div class="route-header-submit">
+            <template v-if="semanticMode === 'view'">
+              <Button size="small" type="primary" @click="enterSemanticEditMode">
+                {{ $t('com.edit') }}
+              </Button>
+            </template>
+            <template v-else>
+              <Button size="small" @click="cancelSemanticEditMode">
+                {{ $t('com.cancel') }}
+              </Button>
+              <Button
+                size="small"
+                type="success"
+                :loading="submittingSemantic"
+                @click="saveSemantic"
+              >
+                {{ $t('com.save') }}
+              </Button>
+            </template>
+          </div>
+        </div>
+
+        <Card :title="$t('aiCache.semanticCardTitle')" class="form-card">
+          <div v-if="semanticMode === 'view'" class="semantic-view">
+            <div class="info-row">
+              <span class="info-label">{{ $t('aiCache.viewTopK') }}</span>
+              <span class="info-value">{{ semantic.top_k }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">{{ $t('aiCache.viewThreshold') }}</span>
+              <span class="info-value">{{ semantic.threshold }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">{{ $t('aiCache.viewThresholdRelation') }}</span>
+              <span class="info-value">{{ relationLabel(semantic.threshold_relation) }}</span>
+            </div>
+          </div>
+
+          <Form
+            v-else
+            ref="semanticForm"
+            :model="semanticForm"
+            :rules="semanticRules"
+            label-position="top"
+          >
+            <FormItem :label="$t('aiCache.topKLabel')" prop="top_k">
+              <InputNumber
+                v-model="semanticForm.top_k"
+                :min="1"
+                :max="10"
+                :step="1"
+                style="width: 220px;"
+              />
+            </FormItem>
+
+            <FormItem :label="$t('aiCache.thresholdLabel')" prop="threshold">
+              <InputNumber
+                v-model="semanticForm.threshold"
+                :min="0"
+                :max="2"
+                :step="0.01"
+                style="width: 220px;"
+              />
+            </FormItem>
+
+            <FormItem :label="$t('aiCache.thresholdRelationLabel')" prop="threshold_relation">
+              <Select v-model="semanticForm.threshold_relation" transfer style="width: 220px;">
+                <Option value="lt">
+                  {{ $t('aiCache.relationLt') }}
+                </Option>
+                <Option value="lte">
+                  {{ $t('aiCache.relationLte') }}
+                </Option>
+                <Option value="gt">
+                  {{ $t('aiCache.relationGt') }}
+                </Option>
+                <Option value="gte">
+                  {{ $t('aiCache.relationGte') }}
+                </Option>
+              </Select>
+            </FormItem>
+          </Form>
+        </Card>
+      </TabPane>
+    </Tabs>
 
     <Drawer
       v-model="viewVisible"
@@ -92,6 +186,14 @@ import RuleForm from './components/RuleForm.vue';
 import RuleView from './components/RuleView.vue';
 import { cloneDeep } from 'lodash';
 
+const RELATIONS = ['lt', 'lte', 'gt', 'gte'];
+
+const DEFAULT_SEMANTIC = {
+  top_k: 1,
+  threshold: 0.15,
+  threshold_relation: 'lt'
+};
+
 export default {
   name: 'AICache',
 
@@ -103,7 +205,32 @@ export default {
 
   data() {
     const that = this;
+    const validInt = (min, max, tipKey) => (rule, value, callback) => {
+      const v = Number(value);
+      if (
+        value === '' ||
+        value === null ||
+        value === undefined ||
+        isNaN(v) ||
+        !Number.isInteger(v) ||
+        v < min ||
+        v > max
+      ) {
+        callback(new Error(this.$t(tipKey)));
+        return;
+      }
+      callback();
+    };
+    const validFloat = (min, max, tipKey) => (rule, value, callback) => {
+      const v = Number(value);
+      if (value === '' || value === null || value === undefined || isNaN(v) || v < min || v > max) {
+        callback(new Error(this.$t(tipKey)));
+        return;
+      }
+      callback();
+    };
     return {
+      activeTab: 'rules',
       loading: false,
       submitting: false,
       rules: [],
@@ -114,7 +241,40 @@ export default {
       formMode: 'add',
       currentRule: null,
       currentRuleIndex: -1,
-      ruleColumns: that.buildRuleColumns()
+      ruleColumns: that.buildRuleColumns(),
+      submittingSemantic: false,
+      semantic: cloneDeep(DEFAULT_SEMANTIC),
+      semanticForm: cloneDeep(DEFAULT_SEMANTIC),
+      semanticMode: 'view',
+      semanticRules: {
+        top_k: [
+          {
+            required: true,
+            validator: validInt(1, 10, 'aiCache.tipTopKRange'),
+            trigger: 'change'
+          }
+        ],
+        threshold: [
+          {
+            required: true,
+            validator: validFloat(0, 2, 'aiCache.tipThresholdRange'),
+            trigger: 'change'
+          }
+        ],
+        threshold_relation: [
+          {
+            required: true,
+            validator: (rule, value, callback) => {
+              if (RELATIONS.indexOf(value) === -1) {
+                callback(new Error(this.$t('aiCache.tipRelationInvalid')));
+                return;
+              }
+              callback();
+            },
+            trigger: 'change'
+          }
+        ]
+      }
     };
   },
 
@@ -213,6 +373,19 @@ export default {
           }
         },
         {
+          title: that.$t('aiCache.colSemantic'),
+          key: 'enable_semantic_cache',
+          minWidth: 110,
+          render(h, params) {
+            const enabled = !!params.row.enable_semantic_cache;
+            return h(
+              'Tag',
+              { props: { color: enabled ? 'success' : 'default' } },
+              enabled ? that.$t('aiCache.semanticOn') : that.$t('aiCache.semanticOff')
+            );
+          }
+        },
+        {
           title: that.$t('com.operation'),
           key: 'action',
           width: 220,
@@ -261,6 +434,16 @@ export default {
       return map[strategy] || strategy || '-';
     },
 
+    relationLabel(relation) {
+      const map = {
+        lt: this.$t('aiCache.relationLt'),
+        lte: this.$t('aiCache.relationLte'),
+        gt: this.$t('aiCache.relationGt'),
+        gte: this.$t('aiCache.relationGte')
+      };
+      return map[relation] || relation || '-';
+    },
+
     formatTtl(value) {
       if (value === null || value === undefined) {
         return '-';
@@ -298,6 +481,34 @@ export default {
         })
         .finally(() => {
           this.loading = false;
+        });
+    },
+
+    fetchSemantic() {
+      this.$request({
+        url: 'ai-cache-semantic-settings',
+        method: 'get',
+        openapi: true,
+        unneedTips: true
+      })
+        .then(res => {
+          if (res && res.status === 200) {
+            const data = res.data.Data || {};
+            this.semantic = {
+              ...cloneDeep(DEFAULT_SEMANTIC),
+              top_k: data.top_k !== undefined && data.top_k !== null ? data.top_k : DEFAULT_SEMANTIC.top_k,
+              threshold:
+                data.threshold !== undefined && data.threshold !== null
+                  ? data.threshold
+                  : DEFAULT_SEMANTIC.threshold,
+              threshold_relation: data.threshold_relation || DEFAULT_SEMANTIC.threshold_relation
+            };
+          } else {
+            this.$Message.error(this.$t('aiCache.semanticLoadFailed'));
+          }
+        })
+        .catch(() => {
+          this.$Message.error(this.$t('aiCache.semanticLoadFailed'));
         });
     },
 
@@ -450,11 +661,64 @@ export default {
         delete clean.updated_at;
         return clean;
       });
+    },
+
+    enterSemanticEditMode() {
+      this.semanticForm = cloneDeep(this.semantic);
+      this.semanticMode = 'edit';
+    },
+
+    cancelSemanticEditMode() {
+      this.semanticForm = cloneDeep(this.semantic);
+      this.semanticMode = 'view';
+    },
+
+    saveSemantic() {
+      if (!this.$refs.semanticForm) {
+        return;
+      }
+      this.$refs.semanticForm.validate(valid => {
+        if (!valid) {
+          this.$Message.error(this.$t('com.tipValidateError'));
+          return;
+        }
+        this.submitSemantic();
+      });
+    },
+
+    submitSemantic() {
+      this.submittingSemantic = true;
+      this.$request({
+        url: 'ai-cache-semantic-settings',
+        method: 'put',
+        data: {
+          top_k: Number(this.semanticForm.top_k),
+          threshold: Number(this.semanticForm.threshold),
+          threshold_relation: this.semanticForm.threshold_relation
+        },
+        openapi: true
+      })
+        .then(res => {
+          if (res && res.status === 200) {
+            this.$Message.success(this.$t('aiCache.semanticSaveSuccess'));
+            this.semanticMode = 'view';
+            this.fetchSemantic();
+          } else {
+            this.$Message.error(this.$t('com.tipSubmitFailed'));
+          }
+        })
+        .catch(() => {
+          this.$Message.error(this.$t('com.tipSubmitFailed'));
+        })
+        .finally(() => {
+          this.submittingSemantic = false;
+        });
     }
   },
 
   mounted() {
     this.fetchRules();
+    this.fetchSemantic();
   }
 };
 </script>
@@ -485,6 +749,24 @@ export default {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .info-row {
+    display: flex;
+    padding: 8px 0;
+    line-height: 24px;
+  }
+
+  .info-label {
+    width: 300px;
+    flex-shrink: 0;
+    color: #808695;
+  }
+
+  .info-value {
+    flex: 1;
+    color: #17233d;
+    word-break: break-all;
   }
 }
 </style>

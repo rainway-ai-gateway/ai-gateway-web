@@ -39,6 +39,10 @@
       <span class="info-label">{{ $t('aiCache.colMaxValue') }}</span>
       <span class="info-value">{{ valueText }}</span>
     </div>
+    <div class="info-row">
+      <span class="info-label">{{ $t('aiCache.colSemantic') }}</span>
+      <span class="info-value">{{ semanticText }}</span>
+    </div>
   </div>
 </template>
 
@@ -80,6 +84,15 @@ export default {
 
     valueText() {
       return this.formatBytes(this.rule.max_value_bytes);
+    },
+
+    semanticText() {
+      const enabled = this.rule.enable_semantic_cache
+        ? this.$t('aiCache.semanticOn')
+        : this.$t('aiCache.semanticOff');
+      return this.rule.cache_key_strategy === 'disabled'
+        ? enabled + this.$t('aiCache.semanticIgnoreSuffix')
+        : enabled;
     }
   },
 

@@ -142,6 +142,15 @@ export default {
       callback();
     };
 
+    const validateInstructions = (rule, value, callback) => {
+      const instructions = String(value || '').trim();
+      if (!instructions) {
+        callback(new Error(this.$t('intentConfig.tipInstructionsRequired')));
+        return;
+      }
+      callback();
+    };
+
     return {
       formData: this.buildFormData(this.question),
       ruleValidate: {
@@ -155,7 +164,7 @@ export default {
         instructions: [
           {
             required: true,
-            message: this.$t('intentConfig.tipInstructionsRequired'),
+            validator: validateInstructions,
             trigger: 'blur'
           }
         ]

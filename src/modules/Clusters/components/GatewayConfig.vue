@@ -398,43 +398,70 @@
         <template v-if="formData.balance_mode === 'EPP'">
           <Row :gutter="24">
             <Col span="12">
-              <FormItem
-                :label="$t('gatewayConfig.schedulingProfile')"
-                prop="epp_config.scheduling_profile"
-              >
-                <Select v-model="formData.epp_config.scheduling_profile">
+              <FormItem prop="epp_config.load_profile">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.loadProfile') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.loadProfileTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <Select v-model="formData.epp_config.load_profile">
                   <Option
-                    value="latency-first"
-                    >{{ $t('gatewayConfig.schedulingProfileLatencyFirst') }}</Option
+                    value="queue-first"
+                    >{{ $t('gatewayConfig.loadProfileQueueFirst') }}</Option
                   >
                   <Option
                     value="balanced"
-                    >{{ $t('gatewayConfig.schedulingProfileBalanced') }}</Option
+                    >{{ $t('gatewayConfig.loadProfileBalanced') }}</Option
                   >
                   <Option
-                    value="throughput-first"
-                    >{{ $t('gatewayConfig.schedulingProfileThroughputFirst') }}</Option
+                    value="kv-first"
+                    >{{ $t('gatewayConfig.loadProfileKvFirst') }}</Option
                   >
                 </Select>
               </FormItem>
             </Col>
             <Col span="12">
-              <FormItem
-                :label="$t('gatewayConfig.cacheAffinity')"
-                prop="epp_config.cache_affinity"
-              >
-                <Select v-model="formData.epp_config.cache_affinity">
+              <FormItem prop="epp_config.affinity">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.affinity') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.affinityTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                  <span
+                    v-if="formData.epp_config.affinity === 'off'"
+                    class="epp-off-hint"
+                    >{{ $t('gatewayConfig.affinityOffHint') }}</span
+                  >
+                </span>
+                <Select v-model="formData.epp_config.affinity">
+                  <Option
+                    value="off"
+                    >{{ $t('gatewayConfig.affinityOff') }}</Option
+                  >
                   <Option
                     value="low"
-                    >{{ $t('gatewayConfig.cacheAffinityLow') }}</Option
+                    >{{ $t('gatewayConfig.affinityLow') }}</Option
                   >
                   <Option
                     value="medium"
-                    >{{ $t('gatewayConfig.cacheAffinityMedium') }}</Option
+                    >{{ $t('gatewayConfig.affinityMedium') }}</Option
                   >
                   <Option
                     value="high"
-                    >{{ $t('gatewayConfig.cacheAffinityHigh') }}</Option
+                    >{{ $t('gatewayConfig.affinityHigh') }}</Option
                   >
                 </Select>
               </FormItem>
@@ -444,7 +471,10 @@
             <Col span="12">
               <FormItem prop="epp_config.prefix_cache_affinity">
                 <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.prefixCacheAffinity') }}
+                  {{ $t('gatewayConfig.prefixCacheAffinity')
+                  }}<span v-if="formData.epp_config.affinity === 'off'">{{
+                    $t('gatewayConfig.affinityOffSuffix')
+                  }}</span>
                   <Tooltip placement="top" transfer max-width="320">
                     <div slot="content" class="provider-tip-content">
                       {{ $t('gatewayConfig.prefixCacheAffinityTip') }}
@@ -461,7 +491,10 @@
             <Col span="12">
               <FormItem prop="epp_config.session_affinity_enabled">
                 <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.sessionAffinity') }}
+                  {{ $t('gatewayConfig.sessionAffinity')
+                  }}<span v-if="formData.epp_config.affinity === 'off'">{{
+                    $t('gatewayConfig.affinityOffSuffix')
+                  }}</span>
                   <Tooltip placement="top" transfer max-width="320">
                     <div slot="content" class="provider-tip-content">
                       {{ $t('gatewayConfig.sessionAffinityTip') }}
@@ -501,6 +534,93 @@
                 <Input
                   v-model="formData.epp_config.session_affinity_header"
                   :placeholder="$t('gatewayConfig.sessionAffinityHeaderPlaceholder')"
+                />
+              </FormItem>
+            </Col>
+          </Row>
+          <Row :gutter="24">
+            <Col span="12">
+              <FormItem prop="epp_config.waiting_queue_max">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.waitingQueueMax') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.waitingQueueMaxTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <InputNumber
+                  v-model="formData.epp_config.waiting_queue_max"
+                  :min="0"
+                  :precision="0"
+                  style="width: 100%;"
+                />
+              </FormItem>
+            </Col>
+            <Col span="12">
+              <FormItem prop="epp_config.running_requests_max">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.runningRequestsMax') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.runningRequestsMaxTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <InputNumber
+                  v-model="formData.epp_config.running_requests_max"
+                  :min="0"
+                  :precision="0"
+                  style="width: 100%;"
+                />
+              </FormItem>
+            </Col>
+          </Row>
+          <Row :gutter="24">
+            <Col span="12">
+              <FormItem prop="epp_config.fallback_on_empty">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.fallbackOnEmpty') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.fallbackOnEmptyTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <i-switch v-model="formData.epp_config.fallback_on_empty" />
+              </FormItem>
+            </Col>
+            <Col span="12">
+              <FormItem prop="epp_config.metrics_staleness_threshold_ms">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.metricsStalenessThresholdMs') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.metricsStalenessThresholdMsTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <InputNumber
+                  v-model="formData.epp_config.metrics_staleness_threshold_ms"
+                  :min="1"
+                  :precision="0"
+                  style="width: 100%;"
                 />
               </FormItem>
             </Col>
@@ -568,19 +688,11 @@
                 <FormItem prop="epp_config.flow_control.enable_eviction">
                   <span slot="label" class="provider-label">
                     {{ $t('gatewayConfig.enableEviction') }}
-                    <Tooltip placement="top" transfer max-width="320">
-                      <div slot="content" class="provider-tip-content">
-                        {{ $t('gatewayConfig.enableEvictionTip') }}
-                      </div>
-                      <Icon
-                        type="ios-help-circle-outline"
-                        class="provider-help-icon"
-                      />
-                    </Tooltip>
                   </span>
-                  <i-switch
-                    v-model="formData.epp_config.flow_control.enable_eviction"
-                  />
+                  <i-switch :disabled="true" :value="false" />
+                  <span class="epp-off-hint">{{
+                    $t('gatewayConfig.enableEvictionDisabledHint')
+                  }}</span>
                 </FormItem>
               </Col>
             </Row>
@@ -616,12 +728,16 @@ function defaultKeyAffinity() {
 
 function defaultEppConfig() {
     return {
-        scheduling_profile: 'balanced',
-        cache_affinity: 'medium',
+        load_profile: 'balanced',
+        affinity: 'medium',
         prefix_cache_affinity: true,
         session_affinity_enabled: false,
         session_affinity_header: '',
         kv_cache_utilization_max: 0.9,
+        waiting_queue_max: 0,
+        running_requests_max: 0,
+        fallback_on_empty: false,
+        metrics_staleness_threshold_ms: 200,
         flow_control: {
             max_requests: -1,
             queue_ttl: 60,
@@ -874,6 +990,53 @@ export default {
             callback();
         };
 
+        const validateWaitingQueueMax = (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            const n = Number(value);
+            if (!Number.isFinite(n) || n < 0) {
+                callback(new Error(that.$t('gatewayConfig.waitingQueueMaxInvalid')));
+                return;
+            }
+            callback();
+        };
+
+        const validateRunningRequestsMax = (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            const n = Number(value);
+            if (!Number.isFinite(n) || n < 0) {
+                callback(new Error(that.$t('gatewayConfig.runningRequestsMaxInvalid')));
+                return;
+            }
+            callback();
+        };
+
+        const validateMetricsStalenessThresholdMs = (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            const n = Number(value);
+            if (!Number.isInteger(n) || n <= 0) {
+                callback(new Error(that.$t('gatewayConfig.metricsStalenessThresholdMsInvalid')));
+                return;
+            }
+            callback();
+        };
+
+        const validateEnableEviction = (rule, value, callback) => {
+            if (value === true || value === 'true' || value === 1 || value === '1') {
+                callback(new Error(that.$t('gatewayConfig.enableEvictionInvalid')));
+                return;
+            }
+            callback();
+        };
+
         return {
             selectAllModelsMarker: SELECT_ALL_MODELS_VALUE,
             providerNames: [],
@@ -908,6 +1071,15 @@ export default {
                 'epp_config.kv_cache_utilization_max': [
                     { validator: validateKvCacheUtilizationMax, trigger: 'change' }
                 ],
+                'epp_config.waiting_queue_max': [
+                    { validator: validateWaitingQueueMax, trigger: 'change' }
+                ],
+                'epp_config.running_requests_max': [
+                    { validator: validateRunningRequestsMax, trigger: 'change' }
+                ],
+                'epp_config.metrics_staleness_threshold_ms': [
+                    { validator: validateMetricsStalenessThresholdMs, trigger: 'change' }
+                ],
                 'epp_config.flow_control.max_requests': [
                     { validator: validateMaxRequests, trigger: 'change' }
                 ],
@@ -916,6 +1088,9 @@ export default {
                 ],
                 'epp_config.flow_control.no_endpoint_queue_ttl': [
                     { validator: validateNoEndpointQueueTtl, trigger: 'change' }
+                ],
+                'epp_config.flow_control.enable_eviction': [
+                    { validator: validateEnableEviction, trigger: 'change' }
                 ]
             }
         };
@@ -1087,6 +1262,7 @@ export default {
         applyBalanceModeData(val) {
             const src = val || {};
             this.$set(this.formData, 'balance_mode', src.balance_mode || 'WRR');
+            this.sourceHasEppConfig = !!src.epp_config;
             const eppSrc = src.epp_config || {};
             const maxRequests = (eppSrc.flow_control || {}).max_requests != null
                 ? Number((eppSrc.flow_control || {}).max_requests)
@@ -1096,10 +1272,16 @@ export default {
             this.formData.epp_config = {
                 ...defaultEppConfig(),
                 ...eppSrc,
+                load_profile: eppSrc.load_profile || 'balanced',
+                affinity: eppSrc.affinity || 'medium',
                 prefix_cache_affinity: toBoolean(eppSrc.prefix_cache_affinity, true),
                 session_affinity_enabled: toBoolean(eppSrc.session_affinity_enabled, false),
                 session_affinity_header: eppSrc.session_affinity_header || '',
                 kv_cache_utilization_max: eppSrc.kv_cache_utilization_max != null ? Number(eppSrc.kv_cache_utilization_max) : 0.9,
+                waiting_queue_max: eppSrc.waiting_queue_max != null ? Number(eppSrc.waiting_queue_max) : 0,
+                running_requests_max: eppSrc.running_requests_max != null ? Number(eppSrc.running_requests_max) : 0,
+                fallback_on_empty: toBoolean(eppSrc.fallback_on_empty, false),
+                metrics_staleness_threshold_ms: eppSrc.metrics_staleness_threshold_ms != null ? Number(eppSrc.metrics_staleness_threshold_ms) : 200,
                 flow_control: {
                     ...defaultEppConfig().flow_control,
                     ...(eppSrc.flow_control || {}),
@@ -1110,7 +1292,7 @@ export default {
                     no_endpoint_queue_ttl: (eppSrc.flow_control || {}).no_endpoint_queue_ttl != null
                         ? Number((eppSrc.flow_control || {}).no_endpoint_queue_ttl)
                         : 60,
-                    enable_eviction: toBoolean((eppSrc.flow_control || {}).enable_eviction, false)
+                    enable_eviction: false
                 }
             };
         },
@@ -1232,6 +1414,118 @@ export default {
                 this.$refs.formData.validateField('keys');
             }
         },
+        buildEppConfig(epp) {
+            const src = epp || {};
+            const fc = src.flow_control || {};
+            const maxRequests =
+                fc.max_requests == null || fc.max_requests === '' || fc.max_requests === -1
+                    ? -1
+                    : Number(fc.max_requests);
+            const sessionAffinityEnabled = !!src.session_affinity_enabled;
+            return {
+                load_profile: src.load_profile || 'balanced',
+                affinity: src.affinity || 'medium',
+                prefix_cache_affinity: !!src.prefix_cache_affinity,
+                session_affinity_enabled: sessionAffinityEnabled,
+                // 会话亲和性关闭时不下发 header（后端对存在的 key 一律校验合法性，空串会 422）
+                ...(sessionAffinityEnabled
+                    ? { session_affinity_header: src.session_affinity_header || '' }
+                    : {}),
+                kv_cache_utilization_max:
+                    src.kv_cache_utilization_max != null ? Number(src.kv_cache_utilization_max) : 0.9,
+                waiting_queue_max: src.waiting_queue_max != null ? Number(src.waiting_queue_max) : 0,
+                running_requests_max:
+                    src.running_requests_max != null ? Number(src.running_requests_max) : 0,
+                fallback_on_empty: !!src.fallback_on_empty,
+                metrics_staleness_threshold_ms:
+                    src.metrics_staleness_threshold_ms != null
+                        ? Number(src.metrics_staleness_threshold_ms)
+                        : 200,
+                flow_control: {
+                    max_requests: maxRequests,
+                    queue_ttl: fc.queue_ttl != null && fc.queue_ttl !== '' ? Number(fc.queue_ttl) : 60,
+                    no_endpoint_queue_ttl:
+                        fc.no_endpoint_queue_ttl != null && fc.no_endpoint_queue_ttl !== ''
+                            ? Number(fc.no_endpoint_queue_ttl)
+                            : 60,
+                    enable_eviction: false
+                }
+            };
+        },
+        validateEppConfig(epp) {
+            if (!epp) {
+                return null;
+            }
+            if (
+                epp.load_profile != null &&
+                ['queue-first', 'balanced', 'kv-first'].indexOf(epp.load_profile) === -1
+            ) {
+                return this.$t('gatewayConfig.loadProfileInvalid');
+            }
+            if (
+                epp.affinity != null &&
+                ['off', 'low', 'medium', 'high'].indexOf(epp.affinity) === -1
+            ) {
+                return this.$t('gatewayConfig.affinityInvalid');
+            }
+            if (
+                epp.session_affinity_enabled &&
+                !String(epp.session_affinity_header || '').trim()
+            ) {
+                return this.$t('gatewayConfig.sessionAffinityHeaderRequired');
+            }
+            if (epp.kv_cache_utilization_max != null) {
+                const kv = Number(epp.kv_cache_utilization_max);
+                if (!Number.isFinite(kv) || kv <= 0 || kv > 1) {
+                    return this.$t('gatewayConfig.kvCacheUtilizationMaxInvalid');
+                }
+            }
+            if (epp.waiting_queue_max != null) {
+                const waiting = Number(epp.waiting_queue_max);
+                if (!Number.isFinite(waiting) || waiting < 0) {
+                    return this.$t('gatewayConfig.waitingQueueMaxInvalid');
+                }
+            }
+            if (epp.running_requests_max != null) {
+                const running = Number(epp.running_requests_max);
+                if (!Number.isFinite(running) || running < 0) {
+                    return this.$t('gatewayConfig.runningRequestsMaxInvalid');
+                }
+            }
+            if (epp.metrics_staleness_threshold_ms != null) {
+                const staleness = Number(epp.metrics_staleness_threshold_ms);
+                if (!Number.isInteger(staleness) || staleness <= 0) {
+                    return this.$t('gatewayConfig.metricsStalenessThresholdMsInvalid');
+                }
+            }
+            const fc = epp.flow_control || {};
+            if (
+                fc.max_requests != null &&
+                fc.max_requests !== '' &&
+                !(Number(fc.max_requests) === -1 || Number(fc.max_requests) > 0)
+            ) {
+                return this.$t('gatewayConfig.flowMaxRequestsInvalid');
+            }
+            if (
+                fc.queue_ttl != null &&
+                fc.queue_ttl !== '' &&
+                (!Number.isInteger(Number(fc.queue_ttl)) || Number(fc.queue_ttl) < 0)
+            ) {
+                return this.$t('gatewayConfig.queueTtlInvalid');
+            }
+            if (
+                fc.no_endpoint_queue_ttl != null &&
+                fc.no_endpoint_queue_ttl !== '' &&
+                (!Number.isInteger(Number(fc.no_endpoint_queue_ttl)) ||
+                    Number(fc.no_endpoint_queue_ttl) < 0)
+            ) {
+                return this.$t('gatewayConfig.noEndpointQueueTtlInvalid');
+            }
+            if (fc.enable_eviction) {
+                return this.$t('gatewayConfig.enableEvictionInvalid');
+            }
+            return null;
+        },
         handleSubmit() {
             this.validateKeysState();
             this.$refs.formData.validate(valid => {
@@ -1261,29 +1555,15 @@ export default {
                     penalty_enable: toBoolean(affinity.penalty_enable, true)
                 };
                 tmpData.balance_mode = tmpData.balance_mode || 'WRR';
-                if (tmpData.balance_mode === 'EPP') {
-                    const epp = tmpData.epp_config || {};
-                    const eppConfig = {
-                        scheduling_profile: epp.scheduling_profile || 'balanced',
-                        cache_affinity: epp.cache_affinity || 'medium',
-                        prefix_cache_affinity: !!epp.prefix_cache_affinity,
-                        session_affinity_enabled: !!epp.session_affinity_enabled,
-                        kv_cache_utilization_max: Number(epp.kv_cache_utilization_max) || 0.9,
-                        flow_control: {
-                            max_requests: (() => {
-                                const mr = epp.flow_control && epp.flow_control.max_requests;
-                                if (mr == null || mr === -1) return -1;
-                                return Number(mr);
-                            })(),
-                            queue_ttl: Number(epp.flow_control.queue_ttl),
-                            no_endpoint_queue_ttl: Number(epp.flow_control.no_endpoint_queue_ttl),
-                            enable_eviction: !!((epp.flow_control || {}).enable_eviction)
-                        }
-                    };
-                    if (epp.session_affinity_enabled) {
-                        eppConfig.session_affinity_header = epp.session_affinity_header || '';
+                // epp_config 非空即校验（含 WRR 时休眠保留的配置）；纯 WRR 新集群不提交 epp_config
+                const hasEppConfig = tmpData.balance_mode === 'EPP' || this.sourceHasEppConfig;
+                if (hasEppConfig) {
+                    const eppError = this.validateEppConfig(tmpData.epp_config);
+                    if (eppError) {
+                        this.$Message.error(eppError);
+                        return;
                     }
-                    tmpData.epp_config = eppConfig;
+                    tmpData.epp_config = this.buildEppConfig(tmpData.epp_config);
                 } else {
                     delete tmpData.epp_config;
                 }
@@ -1379,6 +1659,12 @@ table {
     max-width: 320px;
     white-space: normal;
     line-height: 1.5;
+}
+
+.epp-off-hint {
+    margin-left: 6px;
+    font-size: 12px;
+    color: #ff9900;
 }
 
 .mt20 {

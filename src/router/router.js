@@ -108,6 +108,16 @@ export default [
         component: (r) =>
           require.ensure(
             [],
+            () => r(require('../modules/AIContext')),
+            'ai-context-rule',
+          ),
+        path: 'ai-context-rules',
+        name: 'AIContextRule.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
             () => r(require('../modules/TrafficMirror')),
             'traffic-mirror-rule',
           ),

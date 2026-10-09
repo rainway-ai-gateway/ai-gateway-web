@@ -25,7 +25,6 @@
 | AI 缓存规则（`AICacheRule.list`） | 集合级列表页：规则名称/生效条件/缓存键策略/TTL/请求体上限/缓存值上限 + 新增·编辑·查看·删除抽屉；整体替换写回 `/ai-cache-rules`；**参照路由规则页的视图/编辑双模式**——视图模式右上角仅「进入编辑模式」、行操作仅「查看」，编辑模式左侧「添加规则」+ 右上「退出编辑模式」「提交并生效」、行操作「编辑/删除」 | ✅ 原型 · ⬜ UI |
 | 流量镜像规则（`TrafficMirrorRule.list`） | 集合级列表页：规则名称/生效条件/镜像集群/采样比例/头部剔除/路径改写 + 抽屉（KV 注入、body 改写、头部黑名单三态）；整体替换写回 `/traffic-mirror-rules`；**视图/编辑双模式同 AI 缓存规则**（进入/退出编辑模式 + 右上角提交并生效） | ✅ 原型 · ⬜ UI |
 | 意图配置（`IntentConfig.list`） | 单例编辑页：全局置信度阈值 + **问题表格**（列：问题名称/类型/判定说明，操作：查看/编辑/删除）+ 保存并发布；问题的新增/编辑/查看走抽屉（choice/score 双类型、选项/档位 1-10）；**视图/编辑双模式**——视图模式右上角仅「进入编辑模式」、阈值以纯文案展示、行操作仅「查看」、隐藏「添加问题」；编辑模式右上「退出编辑模式」+「保存并发布」、可编辑并增删改；未发布过（404）直接展示默认配置并自动进入编辑模式（顶部提示未发布） | ✅ 原型 · ⬜ UI |
-| Provider · 实例来源列 | 列表新增「实例来源」列（K8s 池：`pool 名（镜像 N 实例）` / 人工维护（N 实例）） | ✅ 原型 · ⬜ UI |
 | Provider · 编辑/详情 | 实例来源单选（人工维护 / K8s 池）；K8s 池模式**新增/编辑表单仅填 `k8s_pool_name`，不展示镜像实例池**（保存后由系统从 `/k8s_pools` 同步）；只读镜像实例列表**仅在详情页展示** | ✅ 原型 · ✅ UI |
 | 报表 · 总览 | 新增 3 张指标卡（缓存命中率 / 镜像命中 / 意图分类），指标网格 5→4 列 | ✅ 原型 · ⬜ UI |
 | 报表 · 时序 | 新指标 `cache_tokens`（`cache_read` / `cache_write` 双序列折线） | ✅ 原型 · ⬜ UI |
@@ -159,7 +158,7 @@
 | `assets/js/layout.js` | `NAV_ICONS` 新增 `FeatureEnhance.list`(ios-color-wand) / `AICacheRule.list`(ios-flash) / `TrafficMirrorRule.list`(ios-copy) / `IntentConfig.list`(ios-chatbubbles)；`route.admin.list` 下在 `AdvanceRouteRule.list` 后新增二级分组 `FeatureEnhance.list`（功能增强），3 个新模块作为其 children；`renderMenuItem` 支持递归（`renderSubmenu` 抽出），`findNavLabel` 改为递归 `walk` |
 | `assets/js/prototype.js` | i18n 新增 `nav.FeatureEnhanceManage` / `nav.AICacheRuleManage` / `nav.TrafficMirrorRuleManage` / `nav.IntentConfigManage`（zh + en） |
 | `assets/js/mock-data.js` | anthropic 改为 `k8s_pool` 示例（`instance_source`/`k8s_pool_name`/`k8s_instance_pool`）；新增 `aiCacheRules`(3 条)、`trafficMirrorRules`(2 条)、`intentConfig`(0.6 + choice/score 两问题)、`k8sPoolNames`；`reportOverview.cache/mirror/intent`、`reportTimeseries.cache_tokens`、`reportRankings` / `reportDistribution` 新维度、`reportLogs` logid 12348 含全部 10 个新字段 |
-| `pages/providers.html` | 新增「实例来源」列（K8s 池：`xxx（镜像 N 实例）` / 人工维护（N 实例））；脚本版本号 `provider-upsert.js?v=2026092702` |
+| `pages/providers.html` | 脚本版本号增量（`provider-upsert.js?v=2026092702`） |
 | `pages/report.html` | 指标网格 5→4 列 + 3 新卡；3 新维度筛选 + Doris 橙色提示；5 个新明细过滤项；日志表头新增 `<th>缓存</th><th>镜像</th><th>意图答案</th>`；详情抽屉 9 新字段；`#chart-cache-tokens` 折线图 |
 | `assets/js/provider-upsert.js` | 修复 6 处缺陷（见 §3.3）；`renderK8sPoolBody` 移除镜像实例块，新增/编辑表单仅保留「K8s 池名称」，只读镜像实例仅由 `renderDetail` 展示 |
 
@@ -235,7 +234,6 @@
 | ---- | ---- |
 | `src/modules/Providers/components/ProviderUpsert.vue` | 新增实例来源单选（人工维护 / K8s 池）；K8s 池模式**仅展示 `k8s_pool_name` 输入**（校验对齐 §2.4），**不展示 `k8s_instance_pool` 镜像实例列表**（请求体同样剔除该字段，避免 422） |
 | `src/modules/Providers/components/ProviderView.vue` | 详情展示实例来源；K8s 池模式展示 `k8s_pool_name` + 只读镜像实例列表 |
-| `src/modules/Providers/index.vue` | 列表新增「实例来源」列 |
 | `src/utils/const.js` | 新增 `K8sPoolNameRegCheck`（1-64、`[A-Za-z0-9_.-]`、不以 `.`/`-`/`_` 起止）；复用 `ClustersNameRegCheck` 供镜像集群名校验 |
 | `src/modules/Report/index.vue` | 总览新增 3 卡（缓存命中率 / 镜像命中 / 意图分类）；metric 网格 5→4 列；时序新增 `cache_tokens`（read/write 双序列）；排行/分布新增 3 维度；明细新增 5 个过滤项；Doris 后端下 3 维度禁用并提示 |
 | `src/modules/Report/components/Logs.vue` | 日志表新增「缓存 / 镜像 / 意图答案」3 列；详情抽屉新增 9 个意图/缓存/镜像字段 |
@@ -280,7 +278,6 @@
 
 **Provider 实例来源（#4）**
 
-- [ ] 列表「实例来源」列：K8s 池显示 `pool 名（镜像 N 实例）`，人工维护显示 `（N 实例）`
 - [ ] 编辑切到 K8s 池：**新增/编辑表单仅展示 `k8s_pool_name` 输入，不展示镜像实例列表**（镜像实例仅在详情页可见）
 - [ ] 切回人工维护：`instance_pool` 恢复可编辑且原值保留
 - [ ] `k8s_pool_name` 校验对齐 §2.4；请求体**不含** `k8s_instance_pool`
@@ -337,7 +334,7 @@
 | `prototype-design/pages/ai-cache.html` | 新建 | AI 缓存规则列表 + 抽屉 + 视图/编辑双模式 |
 | `prototype-design/pages/traffic-mirror.html` | 新建 | 流量镜像规则列表 + 抽屉 + 视图/编辑双模式 |
 | `prototype-design/pages/intent-config.html` | 新建 | 意图配置单例页（问题表格 + 问题抽屉；「添加问题」在列表上方左侧） |
-| `prototype-design/pages/providers.html` | 已修改 | 新增「实例来源」列 + 脚本版本号 |
+| `prototype-design/pages/providers.html` | 已修改 | 脚本版本号 |
 | `prototype-design/pages/report.html` | 已修改 | 3 卡 + cache_tokens 图 + 3 维度 + 5 过滤 + 3 列 + 9 字段 |
 | `prototype-design/assets/js/layout.js` | 已修改 | 4 个 NAV_ICONS + 「功能增强」二级分组（递归菜单渲染） |
 | `prototype-design/assets/js/prototype.js` | 已修改 | 4 个 nav i18n key（zh/en，含 FeatureEnhanceManage） |
@@ -370,7 +367,6 @@
 | `src/i18n/zh.js` / `src/i18n/en.js` | 修改 | nav + 3 模块文案 |
 | `src/modules/Providers/components/ProviderUpsert.vue` | 修改 | 实例来源单选 + K8s 池只读镜像 |
 | `src/modules/Providers/components/ProviderView.vue` | 修改 | 详情 K8s 分支 |
-| `src/modules/Providers/index.vue` | 修改 | 「实例来源」列 |
 | `src/utils/const.js` | 修改 | `K8sPoolNameRegCheck` |
 | `src/modules/Report/index.vue` | 修改 | 3 卡 + cache_tokens + 3 维度 + 5 过滤 |
 | `src/modules/Report/components/Logs.vue` | 修改 | 3 列 + 9 详情字段 |

@@ -79,6 +79,11 @@
         />
       </FormItem>
 
+      <FormItem :label="$t('aiCache.semanticLabel')" prop="enable_semantic_cache">
+        <i-switch v-model="formData.enable_semantic_cache" />
+        <span class="semantic-hint">{{ $t('aiCache.semanticSwitchHint') }}</span>
+      </FormItem>
+
       <FormItem class="com-btn-box drawer-footer">
         <Button type="primary" size="small" @click="handleSubmit">
           {{ $t('com.localSave') }}
@@ -105,7 +110,8 @@ function buildDefaultRule() {
     cache_key_strategy: DEFAULT_STRATEGY,
     cache_ttl: 0,
     max_body_bytes: DEFAULT_BYTES,
-    max_value_bytes: DEFAULT_BYTES
+    max_value_bytes: DEFAULT_BYTES,
+    enable_semantic_cache: false
   };
 }
 
@@ -231,7 +237,8 @@ export default {
           cache_key_strategy: this.formData.cache_key_strategy || DEFAULT_STRATEGY,
           cache_ttl: Number(this.formData.cache_ttl) || 0,
           max_body_bytes: Number(this.formData.max_body_bytes),
-          max_value_bytes: Number(this.formData.max_value_bytes)
+          max_value_bytes: Number(this.formData.max_value_bytes),
+          enable_semantic_cache: !!this.formData.enable_semantic_cache
         });
       });
     },
@@ -254,5 +261,11 @@ export default {
   font-size: 12px;
   line-height: 1.6;
   margin-top: 6px;
+}
+
+.semantic-hint {
+  color: #999;
+  font-size: 12px;
+  margin-left: 8px;
 }
 </style>

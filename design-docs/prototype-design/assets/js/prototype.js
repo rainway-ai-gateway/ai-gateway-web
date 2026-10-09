@@ -25,6 +25,7 @@ window.Prototype = {
       'nav.AICacheRuleManage': 'AI缓存规则',
       'nav.TrafficMirrorRuleManage': '流量镜像规则',
       'nav.IntentConfigManage': '意图配置',
+      'nav.AIContextRuleManage': 'AI上下文压缩',
       'nav.DefaultRouteRuleManage': '默认转发规则',
       'nav.AdvanceRouteRuleManage': '路由规则',
       'nav.ConsumerManage': '消费者管理',
@@ -59,6 +60,7 @@ window.Prototype = {
       'nav.AICacheRuleManage': 'AI Cache Rules',
       'nav.TrafficMirrorRuleManage': 'Traffic Mirror Rules',
       'nav.IntentConfigManage': 'Intent Config',
+      'nav.AIContextRuleManage': 'AI Context Compress',
       'nav.DefaultRouteRuleManage': 'Default Route Rule Manage',
       'nav.AdvanceRouteRuleManage': 'Advance Route Rule Manage',
       'nav.ConsumerManage': 'Consumer Manage',
@@ -318,14 +320,13 @@ window.Prototype = {
       tab.addEventListener('click', function () {
         var name = tab.getAttribute('data-tab');
         container.querySelectorAll('.ivu-tabs-tab').forEach(function (t) {
-          t.classList.remove('ivu-tabs-tab-active');
+          t.classList.toggle('ivu-tabs-tab-active', t === tab);
         });
         container.querySelectorAll('[data-tab-pane]').forEach(function (p) {
-          p.classList.remove('ivu-tabs-tabpane-active');
+          var isTarget = p.getAttribute('data-tab-pane') === name;
+          p.classList.toggle('ivu-tabs-tabpane-active', isTarget);
+          p.classList.toggle('ivu-tabs-tabpane-inactive', !isTarget);
         });
-        tab.classList.add('ivu-tabs-tab-active');
-        var pane = container.querySelector('[data-tab-pane="' + name + '"]');
-        if (pane) pane.classList.add('ivu-tabs-tabpane-active');
       });
     });
   },

@@ -221,6 +221,13 @@ export default {
         },
 
         fetchData() {
+            const byModel = (this.searchParams.model || '').toString().trim();
+            // 契约：查询携带 model 时后端按 (provider, model, mode) 单记录语义处理，
+            // 三参缺一即参数错误；单填模型名时前端提示，不发请求
+            if (byModel && (!this.searchParams.provider || !this.searchParams.mode)) {
+                this.$Message.warning(this.$t('modelPrices.modelSearchNeedsProviderMode'));
+                return Promise.resolve();
+            }
             this.loading = true;
             return this.$request({
                 url: 'model-prices',
@@ -233,9 +240,16 @@ export default {
                 openapi: true
             }).then(res => {
                 if (res.status === 200) {
-                    const data = res.data.Data || {};
-                    this.tableData = data.list || [];
-                    this.total = (data.pagination && data.pagination.total) || 0;
+                    if (byModel) {
+                        // 单记录语义：Data 为记录本身，包装为单行列表展示
+                        const rec = res.data.Data;
+                        this.tableData = rec && rec.id ? [rec] : [];
+                        this.total = this.tableData.length;
+                    } else {
+                        const data = res.data.Data || {};
+                        this.tableData = data.list || [];
+                        this.total = (data.pagination && data.pagination.total) || 0;
+                    }
                     this.handleEmptyProviderHint();
                 } else {
                     this.$Message.error(this.$t('modelPrices.loadFailed'));

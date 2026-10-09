@@ -35,6 +35,13 @@
           disabled: '缓存豁免（disabled）'
         };
 
+        var RELATION_LABELS = {
+          lt: '小于（lt，<）',
+          lte: '小于等于（lte，≤）',
+          gt: '大于（gt，>）',
+          gte: '大于等于（gte，≥）'
+        };
+
         var state = {
           rows: cloneRows((MockData.aiCacheRules && MockData.aiCacheRules.rules) || []),
           filteredRows: [],
@@ -46,7 +53,13 @@
           mode: 'view',
           originalRows: null,
           drawerMode: 'add',
-          editIndex: -1
+          editIndex: -1,
+          drawerSemanticEnabled: false,
+          activeTab: 'rules',
+          semantic: cloneRows(
+            MockData.aiCacheSemanticSettings || { top_k: 1, threshold: 0.15, threshold_relation: 'lt' }
+          ),
+          originalSemantic: null
         };
 
         function cloneRows(list) {
@@ -115,32 +128,60 @@
         }
 
         // ======= Header =======
-        function renderHeader() {
+        function renderHeader(tab) {
           var editing = state.mode === 'edit';
-          var addHtml = editing
-            ? IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-ai-cache-add"')
+          var prefix = tab === 'rules' ? 'rules' : 'semantic';
+          var addHtml = editing && tab === 'rules'
+            ? IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-cache-' + prefix + '-add"')
             : '';
+          var editingLabels = tab === 'rules'
+            ? { enter: '进入编辑模式', exit: '退出编辑模式', submit: '提交并生效' }
+            : { enter: '编辑', exit: '取消', submit: '保存' };
           var submitHtml = editing
-            ? IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-ai-cache-exit"') +
-              IvuUI.btn('提交并生效', 'success', 'small', '', 'id="btn-ai-cache-submit"')
-            : IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-ai-cache-enter"');
+            ? IvuUI.btn(editingLabels.exit, 'default', 'small', '', 'id="btn-cache-' + prefix + '-exit"') +
+              IvuUI.btn(editingLabels.submit, 'success', 'small', '', 'id="btn-cache-' + prefix + '-submit"')
+            : IvuUI.btn(editingLabels.enter, 'primary', 'small', '', 'id="btn-cache-' + prefix + '-enter"');
+          var subtitle = tab === 'rules'
+            ? 'AI 缓存规则（集合级，按优先级顺序匹配，首条命中生效）'
+            : '语义缓存全局设置（单例，全局生效）';
           return '<div class="route-editor-header">' +
-            '<div class="route-owner-label">AI 缓存规则（集合级，按优先级顺序匹配，首条命中生效）</div>' +
+            '<div class="route-owner-label">' + subtitle + '</div>' +
             '<div class="route-header-actions">' + addHtml + '</div>' +
             '<div class="route-header-submit">' + submitHtml + '</div>' +
             '</div>';
         }
 
-        // ======= Table =======
-        function renderTable() {
+        // ======= Page (with tabs) =======
+        function renderPage() {
           filterRows();
           var totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
           if (state.currentPage > totalPages) state.currentPage = totalPages;
 
           document.getElementById('ai-cache-page').innerHTML =
-            renderHeader() +
-            '<div id="ai-cache-table"></div>' +
-            drawerAICache();
+            IvuUI.tabs(
+              [
+                { name: 'rules', label: '缓存规则' },
+                { name: 'semantic', label: '语义设置' }
+              ],
+              IvuUI.tabPane('rules', '<div id="rules-pane"></div>', state.activeTab === 'rules') +
+                IvuUI.tabPane('semantic', '<div id="semantic-pane"></div>', state.activeTab === 'semantic')
+            ) + drawerAICache();
+
+          renderRulesPane();
+          renderSemanticPane();
+
+          Prototype.initTabs(document.getElementById('ai-cache-page'));
+          document.getElementById('ai-cache-page').querySelectorAll('.ivu-tabs-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+              state.activeTab = tab.getAttribute('data-tab');
+            });
+          });
+        }
+
+        function renderRulesPane() {
+          var pane = document.getElementById('rules-pane');
+          if (!pane) return;
+          pane.innerHTML = renderHeader('rules') + '<div id="ai-cache-table"></div>';
 
           document.getElementById('ai-cache-table').innerHTML = IvuUI.pageTable({
             tableId: 'ai-cache-page-table',
@@ -163,6 +204,12 @@
               { title: '缓存 TTL', key: 'cache_ttl', minWidth: 130, sortable: true, render: function (row) { return formatTtl(row.cache_ttl); } },
               { title: '最大请求体', key: 'max_body_bytes', minWidth: 130, sortable: true, render: function (row) { return formatBytes(row.max_body_bytes); } },
               { title: '最大缓存值', key: 'max_value_bytes', minWidth: 130, sortable: true, render: function (row) { return formatBytes(row.max_value_bytes); } },
+              {
+                title: '语义缓存', key: 'enable_semantic_cache', minWidth: 110,
+                render: function (row) {
+                  return row.enable_semantic_cache ? IvuUI.tag('开启', 'success') : IvuUI.tag('关闭', 'default');
+                }
+              },
               {
                 title: '操作', key: 'action', width: 220,
                 render: function (row, rowIndex) {
@@ -187,10 +234,58 @@
           highlightSortIcons();
         }
 
+        function renderSemanticPane() {
+          var pane = document.getElementById('semantic-pane');
+          if (!pane) return;
+          pane.innerHTML = renderHeader('semantic') + renderSemanticCard();
+          bindSemanticActions(pane);
+        }
+
+        function renderSemanticCard() {
+          var editing = state.mode === 'edit';
+          var s = state.semantic || {};
+          var body;
+          if (editing) {
+            var relationOpts = ['lt', 'lte', 'gt', 'gte'].map(function (value) {
+              return '<option value="' + value + '"' + (s.threshold_relation === value ? ' selected' : '') + '>' +
+                RELATION_LABELS[value] + '</option>';
+            }).join('');
+            body = IvuUI.formTop(
+              IvuUI.formTopItem('Top K（1-10，默认 1）',
+                IvuUI.inputNumber(s.top_k != null ? s.top_k : 1, 'id="semantic-top-k" min="1" max="10" step="1"'), true) +
+              IvuUI.formTopItem('相似度阈值（0-2，默认 0.15）',
+                IvuUI.inputNumber(s.threshold != null ? s.threshold : 0.15, 'id="semantic-threshold" min="0" max="2" step="0.01"'), true) +
+              IvuUI.formTopItem('阈值比较关系（命中条件：相似度 <关系> 阈值）',
+                '<div class="ivu-select ivu-select-single" style="width:100%;"><div class="ivu-select-selection">' +
+                  '<select id="semantic-relation" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    relationOpts +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div></div>', true)
+            );
+          } else {
+            body = '<ul class="ai-cache-view-list">' +
+              '<li class="ai-cache-view-item">Top K：' + IvuUI.escapeHtml(s.top_k) + '</li>' +
+              '<li class="ai-cache-view-item">相似度阈值：' + IvuUI.escapeHtml(s.threshold) + '</li>' +
+              '<li class="ai-cache-view-item">阈值比较关系：' + (RELATION_LABELS[s.threshold_relation] || IvuUI.escapeHtml(s.threshold_relation)) + '</li>' +
+              '</ul>';
+          }
+          return '<div class="llm-card" style="margin-top:16px;"><div class="llm-card-title">语义缓存全局设置</div><div class="llm-card-body">' + body + '</div></div>';
+        }
+
+        function bindSemanticActions(pane) {
+          var enterBtn = pane.querySelector('#btn-cache-semantic-enter');
+          if (enterBtn) enterBtn.onclick = enterEditMode;
+          var exitBtn = pane.querySelector('#btn-cache-semantic-exit');
+          if (exitBtn) exitBtn.onclick = exitEditMode;
+          var submitBtn = pane.querySelector('#btn-cache-semantic-submit');
+          if (submitBtn) submitBtn.onclick = submitSemantic;
+        }
+
         function highlightSortIcons() {
           var tableRoot = document.getElementById('ai-cache-page-table');
           if (!tableRoot) return;
-          var sortKeys = ['name', 'cond', 'strategyText', 'cache_ttl', 'max_body_bytes', 'max_value_bytes'];
+          var sortKeys = ['name', 'cond', 'strategyText', 'cache_ttl', 'max_body_bytes', 'max_value_bytes', null, null];
           tableRoot.querySelectorAll('th').forEach(function (th, idx) {
             var sortIcons = th.querySelectorAll('.ivu-table-sort i');
             if (sortIcons.length < 2) return;
@@ -206,14 +301,15 @@
         function bindTableEvents() {
           var tableRoot = document.getElementById('ai-cache-page-table');
           if (!tableRoot) return;
+          var pane = document.getElementById('rules-pane');
 
           Prototype.bindPageTableSearch(tableRoot, function (key, value) {
             state.search[key] = value;
             state.currentPage = 1;
-            renderTable();
+            renderPage();
           });
 
-          var sortKeys = ['name', 'cond', 'strategyText', 'cache_ttl', 'max_body_bytes', 'max_value_bytes'];
+          var sortKeys = ['name', 'cond', 'strategyText', 'cache_ttl', 'max_body_bytes', 'max_value_bytes', null, null];
           tableRoot.querySelectorAll('th').forEach(function (th, idx) {
             if (sortKeys[idx] != null) {
               th.style.cursor = 'pointer';
@@ -228,7 +324,7 @@
                   state.sortOrder = 'asc';
                 }
                 state.currentPage = 1;
-                renderTable();
+                renderPage();
               };
             }
           });
@@ -236,7 +332,7 @@
           tableRoot.querySelectorAll('[data-page]').forEach(function (item) {
             item.onclick = function () {
               state.currentPage = parseInt(item.getAttribute('data-page'), 10);
-              renderTable();
+              renderPage();
             };
           });
 
@@ -245,14 +341,14 @@
             sizeSelect.onchange = function () {
               state.pageSize = parseInt(sizeSelect.value, 10);
               state.currentPage = 1;
-              renderTable();
+              renderPage();
             };
           }
 
           var prevBtn = tableRoot.querySelector('.proto-page-prev');
           if (prevBtn) {
             prevBtn.onclick = function () {
-              if (state.currentPage > 1) { state.currentPage -= 1; renderTable(); }
+              if (state.currentPage > 1) { state.currentPage -= 1; renderPage(); }
             };
           }
 
@@ -260,7 +356,7 @@
           if (nextBtn) {
             nextBtn.onclick = function () {
               var totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
-              if (state.currentPage < totalPages) { state.currentPage += 1; renderTable(); }
+              if (state.currentPage < totalPages) { state.currentPage += 1; renderPage(); }
             };
           }
 
@@ -283,7 +379,7 @@
                 onOk: function () {
                   var rowIndex = findRowIndex(row);
                   if (rowIndex >= 0) state.rows.splice(rowIndex, 1);
-                  renderTable();
+                  renderPage();
                   Prototype.toast('删除成功!');
                 },
                 onCancel: function () { Prototype.toast('取消删除', 'info'); }
@@ -291,40 +387,44 @@
             };
           });
 
-          var addBtn = document.getElementById('btn-ai-cache-add');
+          var addBtn = pane.querySelector('#btn-cache-rules-add');
           if (addBtn) addBtn.onclick = function () { openDrawer('add'); };
 
-          var submitBtn = document.getElementById('btn-ai-cache-submit');
-          if (submitBtn) submitBtn.onclick = submitAll;
+          var submitBtn = pane.querySelector('#btn-cache-rules-submit');
+          if (submitBtn) submitBtn.onclick = submitRules;
 
-          var enterBtn = document.getElementById('btn-ai-cache-enter');
+          var enterBtn = pane.querySelector('#btn-cache-rules-enter');
           if (enterBtn) enterBtn.onclick = enterEditMode;
 
-          var exitBtn = document.getElementById('btn-ai-cache-exit');
+          var exitBtn = pane.querySelector('#btn-cache-rules-exit');
           if (exitBtn) exitBtn.onclick = exitEditMode;
         }
 
         function hasUnsavedChanges() {
-          return JSON.stringify(state.originalRows) !== JSON.stringify(state.rows);
+          return JSON.stringify(state.originalRows) !== JSON.stringify(state.rows) ||
+            JSON.stringify(state.originalSemantic) !== JSON.stringify(state.semantic);
         }
 
         function enterEditMode() {
           state.originalRows = cloneRows(state.rows);
+          state.originalSemantic = cloneRows(state.semantic);
           state.mode = 'edit';
-          renderTable();
+          renderPage();
         }
 
         function exitEditMode() {
           if (hasUnsavedChanges()) {
             Prototype.confirm({
               title: '提示',
-              content: '当前有未提交的改动，退出编辑模式将丢弃这些改动，确认退出？',
+              content: '当前有未提交的改动，取消将丢弃这些改动，确认取消？',
               onOk: function () {
                 state.rows = cloneRows(state.originalRows || []);
+                state.semantic = cloneRows(state.originalSemantic || {});
                 state.mode = 'view';
                 state.originalRows = null;
-                renderTable();
-                Prototype.toast('已退出编辑模式', 'info');
+                state.originalSemantic = null;
+                renderPage();
+                Prototype.toast('已放弃未保存的改动', 'info');
               },
               onCancel: function () { Prototype.toast('已取消', 'info'); }
             });
@@ -332,16 +432,34 @@
           }
           state.mode = 'view';
           state.originalRows = null;
-          renderTable();
+          state.originalSemantic = null;
+          renderPage();
         }
 
-        function submitAll() {
+        function commitAll() {
           MockData.aiCacheRules = MockData.aiCacheRules || {};
           MockData.aiCacheRules.rules = cloneRows(state.rows);
+          MockData.aiCacheSemanticSettings = cloneRows(state.semantic);
           state.mode = 'view';
           state.originalRows = null;
-          renderTable();
+          state.originalSemantic = null;
+          renderPage();
           Prototype.toast('提交并生效成功！');
+        }
+
+        function submitRules() {
+          commitAll();
+        }
+
+        function submitSemantic() {
+          var topK = parseInt(document.getElementById('semantic-top-k').value, 10);
+          var threshold = parseFloat(document.getElementById('semantic-threshold').value);
+          var relation = document.getElementById('semantic-relation').value;
+          if (isNaN(topK) || topK < 1 || topK > 10) { Prototype.toast('Top K 须为 1-10 的整数', 'error'); return; }
+          if (isNaN(threshold) || threshold < 0 || threshold > 2) { Prototype.toast('相似度阈值须在 0-2 之间', 'error'); return; }
+          if (['lt', 'lte', 'gt', 'gte'].indexOf(relation) === -1) { Prototype.toast('阈值比较关系不合法', 'error'); return; }
+          state.semantic = { top_k: topK, threshold: threshold, threshold_relation: relation };
+          commitAll();
         }
 
         // ======= Drawer =======
@@ -353,6 +471,7 @@
             IvuUI.formTopItem('缓存 TTL', formatTtl(row.cache_ttl)) +
             IvuUI.formTopItem('最大请求体', formatBytes(row.max_body_bytes)) +
             IvuUI.formTopItem('最大缓存值', formatBytes(row.max_value_bytes)) +
+            IvuUI.formTopItem('语义缓存', (row.enable_semantic_cache ? '开启' : '关闭') + (row.cache_key_strategy === 'disabled' ? '（策略为 disabled，忽略）' : '')) +
             '</form></div>';
         }
 
@@ -378,6 +497,11 @@
             IvuUI.formTopItem('缓存 TTL（秒，0 表示不过期）', IvuUI.inputNumber('', 'id="ai-cache-ttl" min="0" placeholder="0"'), false) +
             IvuUI.formTopItem('最大请求体（字节）', IvuUI.inputNumber('', 'id="ai-cache-max-body" min="1" placeholder="1048576"'), false) +
             IvuUI.formTopItem('最大缓存值（字节）', IvuUI.inputNumber('', 'id="ai-cache-max-value" min="1" placeholder="1048576"'), false) +
+            IvuUI.formTopItem('语义缓存',
+              '<div class="ivu-switch" id="ai-cache-semantic-switch">' +
+                '<span class="ivu-switch-inner"></span>' +
+              '</div>' +
+              '<span style="color:#999;margin-left:8px;font-size:12px;">缓存键策略为 disabled 时忽略此项</span>', false) +
             '</form></div>';
         }
 
@@ -394,6 +518,9 @@
           document.getElementById('ai-cache-ttl').value = row && row.cache_ttl != null ? row.cache_ttl : 0;
           document.getElementById('ai-cache-max-body').value = row && row.max_body_bytes != null ? row.max_body_bytes : 1048576;
           document.getElementById('ai-cache-max-value').value = row && row.max_value_bytes != null ? row.max_value_bytes : 1048576;
+          state.drawerSemanticEnabled = row ? !!row.enable_semantic_cache : false;
+          var semanticSwitch = document.getElementById('ai-cache-semantic-switch');
+          if (semanticSwitch) semanticSwitch.classList.toggle('ivu-switch-checked', state.drawerSemanticEnabled);
         }
 
         function openDrawer(mode, filteredIndex) {
@@ -430,6 +557,11 @@
           if (saveBtn) saveBtn.onclick = onDrawerSave;
           var resetBtn = document.getElementById('btn-ai-cache-reset');
           if (resetBtn) resetBtn.onclick = onDrawerReset;
+          var semanticSwitch = document.getElementById('ai-cache-semantic-switch');
+          if (semanticSwitch) semanticSwitch.onclick = function () {
+            state.drawerSemanticEnabled = !state.drawerSemanticEnabled;
+            semanticSwitch.classList.toggle('ivu-switch-checked', state.drawerSemanticEnabled);
+          };
         }
 
         function onDrawerSave() {
@@ -460,7 +592,8 @@
             cache_key_strategy: strategy,
             cache_ttl: ttl,
             max_body_bytes: maxBody,
-            max_value_bytes: maxValue
+            max_value_bytes: maxValue,
+            enable_semantic_cache: !!state.drawerSemanticEnabled
           };
 
           if (state.drawerMode === 'add') {
@@ -470,7 +603,7 @@
           }
 
           Prototype.closeDrawer('drawer-ai-cache');
-          renderTable();
+          renderPage();
           Prototype.toast(state.drawerMode === 'add' ? '添加成功！' : '保存成功！');
         }
 
@@ -488,7 +621,7 @@
         }
 
         Prototype.bindDrawerClose();
-        renderTable();
+        renderPage();
       });
     </script>
   </body>

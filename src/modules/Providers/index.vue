@@ -120,28 +120,6 @@ export default {
                     searchable: true
                 },
                 {
-                    title: this.$t('provider.instanceSource'),
-                    key: 'instance_source',
-                    render(h, params) {
-                        const row = params.row || {};
-                        if (row.instance_source === 'k8s_pool') {
-                            return h(
-                                'span',
-                                that.$t('provider.listK8sPool', {
-                                    name: row.k8s_pool_name || '-',
-                                    count: (row.k8s_instance_pool || []).length
-                                })
-                            );
-                        }
-                        return h(
-                            'span',
-                            that.$t('provider.listManualPool', {
-                                count: (row.instance_pool || []).length
-                            })
-                        );
-                    }
-                },
-                {
                     title: this.$t('provider.protocols'),
                     key: 'model_protocols',
                     searchable: true,

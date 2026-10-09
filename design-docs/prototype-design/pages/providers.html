@@ -115,17 +115,6 @@ document.addEventListener('DOMContentLoaded', function () {
           searchPlaceholder: '请输入描述查询'
         },
         {
-          title: '实例来源',
-          key: 'instance_source',
-          render: function (row) {
-            if (row.instance_source === 'k8s_pool') {
-              return 'K8s 池：' + escapeAttr(row.k8s_pool_name || '-') +
-                '（镜像 ' + ((row.k8s_instance_pool || []).length) + ' 实例）';
-            }
-            return '人工维护（' + ((row.instance_pool || []).length) + ' 实例）';
-          }
-        },
-        {
           title: '协议',
           key: 'model_protocols',
           sortable: true,

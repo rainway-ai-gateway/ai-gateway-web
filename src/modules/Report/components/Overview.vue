@@ -115,7 +115,7 @@
           <div v-else class="chart-empty">{{ $t('report.noData') }}</div>
         </div>
       </div>
-      <div class="chart-card chart-full">
+      <div class="chart-card">
         <h4>{{ $t('report.cacheTokensTimeseries') }}</h4>
         <div class="chart-box">
           <Echarts v-if="cacheTokensOption.series" :option="cacheTokensOption" height="100%" />

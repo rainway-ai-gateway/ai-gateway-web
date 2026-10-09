@@ -387,12 +387,12 @@
           v-if="balanceModeData.balance_mode === 'EPP' && balanceModeData.epp_config"
         >
           <ul class="clearFloat">
-            <li class="title">{{ $t('gatewayConfig.schedulingProfile') }}:</li>
-            <li class="value">{{ displayEppSchedulingProfile }}</li>
+            <li class="title">{{ $t('gatewayConfig.loadProfile') }}:</li>
+            <li class="value">{{ displayEppLoadProfile }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">{{ $t('gatewayConfig.cacheAffinity') }}:</li>
-            <li class="value">{{ displayEppCacheAffinity }}</li>
+            <li class="title">{{ $t('gatewayConfig.affinity') }}:</li>
+            <li class="value">{{ displayEppAffinity }}</li>
           </ul>
           <ul class="clearFloat">
             <li class="title">
@@ -415,6 +415,24 @@
               {{ $t('gatewayConfig.kvCacheUtilizationMax') }}:
             </li>
             <li class="value">{{ displayEppKvCacheUtilizationMax }}</li>
+          </ul>
+          <ul class="clearFloat">
+            <li class="title">{{ $t('gatewayConfig.waitingQueueMax') }}:</li>
+            <li class="value">{{ displayEppWaitingQueueMax }}</li>
+          </ul>
+          <ul class="clearFloat">
+            <li class="title">{{ $t('gatewayConfig.runningRequestsMax') }}:</li>
+            <li class="value">{{ displayEppRunningRequestsMax }}</li>
+          </ul>
+          <ul class="clearFloat">
+            <li class="title">{{ $t('gatewayConfig.fallbackOnEmpty') }}:</li>
+            <li class="value">{{ displayEppFallbackOnEmpty }}</li>
+          </ul>
+          <ul class="clearFloat">
+            <li class="title">
+              {{ $t('gatewayConfig.metricsStalenessThresholdMs') }}:
+            </li>
+            <li class="value">{{ displayEppMetricsStaleness }}</li>
           </ul>
           <ul class="clearFloat detail-row-block policy-row">
             <li class="title">{{ $t('gatewayConfig.flowControl') }}:</li>
@@ -459,7 +477,7 @@
                         {{ $t('gatewayConfig.enableEviction') }}:
                       </div>
                       <div class="review-value">
-                        {{ displayEppFlowControl.enable_eviction ? $t('com.enable') : $t('com.deactivate') }}
+                        {{ $t('gatewayConfig.enableEvictionReview') }}
                       </div>
                     </div>
                   </Col>
@@ -614,27 +632,15 @@ export default {
                 penalty_enable: isTrue(getValue('penalty_enable'))
             };
         },
-        displayEppSchedulingProfile() {
+        displayEppLoadProfile() {
             const epp = this.balanceModeData && this.balanceModeData.epp_config;
             if (!epp) return '-';
-            const profile = epp.scheduling_profile || 'balanced';
-            const map = {
-                'latency-first': this.$t('gatewayConfig.schedulingProfileLatencyFirst'),
-                balanced: this.$t('gatewayConfig.schedulingProfileBalanced'),
-                'throughput-first': this.$t('gatewayConfig.schedulingProfileThroughputFirst')
-            };
-            return map[profile] || profile;
+            return epp.load_profile || 'balanced';
         },
-        displayEppCacheAffinity() {
+        displayEppAffinity() {
             const epp = this.balanceModeData && this.balanceModeData.epp_config;
             if (!epp) return '-';
-            const affinity = epp.cache_affinity || 'medium';
-            const map = {
-                low: this.$t('gatewayConfig.cacheAffinityLow'),
-                medium: this.$t('gatewayConfig.cacheAffinityMedium'),
-                high: this.$t('gatewayConfig.cacheAffinityHigh')
-            };
-            return map[affinity] || affinity;
+            return epp.affinity || 'medium';
         },
         displayEppPrefixCacheAffinity() {
             const epp = this.balanceModeData && this.balanceModeData.epp_config;
@@ -655,6 +661,28 @@ export default {
             const epp = this.balanceModeData && this.balanceModeData.epp_config;
             if (!epp) return '-';
             return epp.kv_cache_utilization_max != null ? epp.kv_cache_utilization_max : 0.9;
+        },
+        displayEppWaitingQueueMax() {
+            const epp = this.balanceModeData && this.balanceModeData.epp_config;
+            if (!epp) return '-';
+            return epp.waiting_queue_max != null ? epp.waiting_queue_max : 0;
+        },
+        displayEppRunningRequestsMax() {
+            const epp = this.balanceModeData && this.balanceModeData.epp_config;
+            if (!epp) return '-';
+            return epp.running_requests_max != null ? epp.running_requests_max : 0;
+        },
+        displayEppFallbackOnEmpty() {
+            const epp = this.balanceModeData && this.balanceModeData.epp_config;
+            if (!epp) return '-';
+            return epp.fallback_on_empty ? this.$t('com.enable') : this.$t('com.deactivate');
+        },
+        displayEppMetricsStaleness() {
+            const epp = this.balanceModeData && this.balanceModeData.epp_config;
+            if (!epp) return '-';
+            return epp.metrics_staleness_threshold_ms != null
+                ? epp.metrics_staleness_threshold_ms
+                : 200;
         },
         displayEppFlowControl() {
             const epp = this.balanceModeData && this.balanceModeData.epp_config;

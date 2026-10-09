@@ -472,7 +472,6 @@
           '<div class="report-filter-item"><label>意图答案</label>' +
           '<select id="filter-ai_intent_answer"><option value="">全部</option></select>' +
           '</div>' +
-          '<div style="flex-basis:100%;font-size:12px;color:#ff9900;">提示：缓存状态 / 镜像命中 / 意图答案 新维度与排行仅 MySQL 后端支持，Doris 后端返回 422。</div>' +
           '<div class="report-filter-actions">' +
           '<button class="primary" onclick="applyFilters()">查询</button>' +
           '<button onclick="resetFilters()">重置</button>' +
@@ -674,7 +673,7 @@
           '<div class="chart-card"><h4>模型 Top10 排行</h4><div class="chart-box tall" id="chart-model-ranking"></div></div>' +
           '<div class="chart-card"><h4>提供商占比</h4><div class="chart-box" id="chart-provider-pie"></div></div>' +
           '<div class="chart-card"><h4>状态码分布</h4><div class="chart-box" id="chart-status-pie"></div></div>' +
-          '<div class="chart-card chart-full"><h4>缓存 Token 时序（cache_read / cache_write）</h4><div class="chart-box" id="chart-cache-tokens"></div></div>' +
+          '<div class="chart-card"><h4>缓存 Token 时序（cache_read / cache_write）</h4><div class="chart-box" id="chart-cache-tokens"></div></div>' +
           '</div>';
       }
 
