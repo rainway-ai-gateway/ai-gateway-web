@@ -70,6 +70,9 @@ export default {
                 'APIKey.list': 'ivu-icon-ios-key',
                 'APIKeyManage': 'ivu-icon-ios-key',
 
+                'BatchTask.list': 'ivu-icon-ios-archive',
+                'BatchTaskManage': 'ivu-icon-ios-archive',
+
                 'QuotaControl.list': 'ivu-icon-md-apps',
 
                 'ai_route.list.admin': 'iconfont icon-zhuanfa',
@@ -111,6 +114,11 @@ export default {
                 'report.list': 'ivu-icon-ios-stats',
 
                 'OperationLog.list': 'ivu-icon-md-list-box',
+
+                'systemSecurity.admin.list': 'ivu-icon-ios-lock',
+                'SystemSecurityManage': 'ivu-icon-ios-lock',
+                'ReencryptSweep.list': 'ivu-icon-ios-lock',
+                'ReencryptSweepManage': 'ivu-icon-ios-lock',
             }
         };
     },

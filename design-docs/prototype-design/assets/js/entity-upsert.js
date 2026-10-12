@@ -363,6 +363,7 @@ window.EntityUpsert = {
             maxMode,
             maxConc,
             isAdd,
+            batchLimits,
           ) +
           '</div>',
       ) +
@@ -756,6 +757,12 @@ window.EntityUpsert = {
 
     // 类型校验
     if (typeSelect && (!typeSelect.value || typeSelect.value === '')) {
+      valid = false;
+    }
+
+    // 批量限流数值校验
+    var batchErr = ApiKeyUpsert.validateBatchLimitsForm();
+    if (batchErr) {
       valid = false;
     }
 

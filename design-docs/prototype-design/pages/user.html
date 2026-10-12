@@ -135,6 +135,34 @@ document.addEventListener('DOMContentLoaded', function () {
     if (confirmEl) confirmEl.value = '';
   }
 
+  var RESERVED_USER_NAMES = ['admin', 'root', 'system'];
+
+  function utf8ByteLength(str) {
+    return new TextEncoder().encode(String(str || '')).length;
+  }
+
+  function isReservedUserName(name) {
+    return RESERVED_USER_NAMES.indexOf(String(name || '').toLowerCase()) !== -1;
+  }
+
+  function validatePasswordRule(password, userName) {
+    var bytes = utf8ByteLength(password);
+    if (bytes < 8 || bytes > 72) {
+      Prototype.toast(Prototype.t('user.tipPasswordLength'), 'error');
+      return false;
+    }
+    if (/\s/.test(password)) {
+      Prototype.toast(Prototype.t('user.tipPasswordWhitespace'), 'error');
+      return false;
+    }
+    var reverse = String(userName || '').split('').reverse().join('');
+    if (userName && (password === userName || password === reverse)) {
+      Prototype.toast(Prototype.t('user.tipPasswordUserName'), 'error');
+      return false;
+    }
+    return true;
+  }
+
   function fillUpdatePasswordForm(row) {
     row = row || {};
     var currentUser = Prototype.getUser();
@@ -425,6 +453,10 @@ document.addEventListener('DOMContentLoaded', function () {
       Prototype.toast('请输入用户名', 'error');
       return;
     }
+    if (isReservedUserName(userName)) {
+      Prototype.toast(Prototype.t('user.tipReservedUserName'), 'error');
+      return;
+    }
     if (!password) {
       Prototype.toast('请输入密码', 'error');
       return;
@@ -435,6 +467,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (password !== confirmPass) {
       Prototype.toast('两次密码输入不一致，请重新输入', 'error');
+      return;
+    }
+    if (!validatePasswordRule(password, userName)) {
       return;
     }
     if (userState.rows.some(function (item) { return item.user_name === userName; })) {
@@ -475,6 +510,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (newPassword !== confirmPass) {
       Prototype.toast('两次密码输入不一致，请重新输入', 'error');
+      return;
+    }
+    // 按名引用端点：不做保留名校验，仅套用 §13 密码规则
+    if (!validatePasswordRule(newPassword, row.user_name)) {
       return;
     }
     Prototype.closeDrawer('drawer-user');

@@ -255,7 +255,7 @@
                       {{ $t('gatewayConfig.keyPolicyStrategy') }}:
                     </div>
                     <div class="review-value">
-                      {{ displayKeyPolicy.strategy }}
+                      {{ displayKeyPolicyStrategy }}
                     </div>
                   </div>
                 </Col>
@@ -363,6 +363,96 @@
         </ul>
         <ul v-else class="clearFloat">
           <li class="title">{{ $t('gatewayConfig.keyAffinity') }}:</li>
+          <li class="value"><span class="empty-text">-</span></li>
+        </ul>
+        <ul
+          v-if="displayNormalizeUpstreamError"
+          class="clearFloat detail-row-block policy-row"
+        >
+          <li class="title">
+            {{ $t('gatewayConfig.normalizeUpstreamError') }}:
+          </li>
+          <li class="value">
+            <Card class="policy-card">
+              <Row :gutter="24" class="review-row">
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.normalizeEnabled') }}:
+                    </div>
+                    <div class="review-value">
+                      {{
+                        displayNormalizeUpstreamError.enabled
+                          ? $t('com.enable')
+                          : $t('com.deactivate')
+                      }}
+                    </div>
+                  </div>
+                </Col>
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.normalizeStreamEnabled') }}:
+                    </div>
+                    <div class="review-value">
+                      {{
+                        displayNormalizeUpstreamError.stream_enabled
+                          ? $t('com.enable')
+                          : $t('com.deactivate')
+                      }}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+              <Row :gutter="24" class="review-row">
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.normalizeRedactSecrets') }}:
+                    </div>
+                    <div class="review-value">
+                      {{
+                        displayNormalizeUpstreamError.redact_secrets
+                          ? $t('com.enable')
+                          : $t('com.deactivate')
+                      }}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+              <template v-if="displayNormalizeUpstreamError.enabled">
+                <Row :gutter="24" class="review-row">
+                  <Col span="12">
+                    <div class="review-item">
+                      <div class="review-label">
+                        {{ $t('gatewayConfig.normalizeUnrecognizedAction') }}:
+                      </div>
+                      <div class="review-value">
+                        {{
+                          displayNormalizeUpstreamError.unrecognized_action
+                        }}
+                      </div>
+                    </div>
+                  </Col>
+                  <Col span="12">
+                    <div class="review-item">
+                      <div class="review-label">
+                        {{ $t('gatewayConfig.normalizeMaxBodyBytes') }}:
+                      </div>
+                      <div class="review-value">
+                        {{ displayNormalizeUpstreamError.max_body_bytes }}
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
+              </template>
+            </Card>
+          </li>
+        </ul>
+        <ul v-else class="clearFloat">
+          <li class="title">
+            {{ $t('gatewayConfig.normalizeUpstreamError') }}:
+          </li>
           <li class="value"><span class="empty-text">-</span></li>
         </ul>
       </div>
@@ -609,6 +699,13 @@ export default {
                 retry_backoff_max: getValue('retry_backoff_max')
             };
         },
+        displayKeyPolicyStrategy() {
+            const strategy = this.displayKeyPolicy && this.displayKeyPolicy.strategy;
+            if (strategy === 'weighted_random') {
+                return this.$t('gatewayConfig.keyPolicyStrategyWeightedRandom');
+            }
+            return strategy || '-';
+        },
         displayKeyAffinity() {
             const affinity = this.llmConfigData && this.llmConfigData.key_affinity;
             if (!affinity) {
@@ -631,6 +728,47 @@ export default {
                 redis_prefix: getValue('redis_prefix'),
                 penalty_enable: isTrue(getValue('penalty_enable'))
             };
+        },
+        displayNormalizeUpstreamError() {
+            const nue =
+                this.llmConfigData && this.llmConfigData.normalize_upstream_error;
+            if (!nue) {
+                return null;
+            }
+            const defaults = {
+                enabled: false,
+                stream_enabled: false,
+                unrecognized_action: 'passthrough',
+                max_body_bytes: 65536,
+                redact_secrets: true
+            };
+            const getValue = key => {
+                const value = nue[key];
+                return value !== undefined && value !== null && value !== ''
+                    ? value
+                    : defaults[key];
+            };
+            const isTrue = value => value === true || value === 'true';
+            const isFalse = value => value === false || value === 'false';
+            const redactSecrets = getValue('redact_secrets');
+            return {
+                enabled: isTrue(getValue('enabled')),
+                stream_enabled: isTrue(getValue('stream_enabled')),
+                unrecognized_action: getValue('unrecognized_action'),
+                max_body_bytes: getValue('max_body_bytes'),
+                redact_secrets: isFalse(redactSecrets) ? false : true
+            };
+        },
+        displayNormalizeUnrecognizedAction() {
+            const action = this.displayNormalizeUpstreamError
+                && this.displayNormalizeUpstreamError.unrecognized_action;
+            if (action === 'passthrough') {
+                return this.$t('gatewayConfig.normalizePassthrough');
+            }
+            if (action === 'rewrite_generic') {
+                return this.$t('gatewayConfig.normalizeRewriteGeneric');
+            }
+            return action || '-';
         },
         displayEppLoadProfile() {
             const epp = this.balanceModeData && this.balanceModeData.epp_config;
@@ -816,7 +954,7 @@ export default {
     align-items: center;
 
     .review-label {
-        width: 150px;
+        width: 190px;
         flex-shrink: 0;
         text-align: right;
         margin-right: 8px;
@@ -824,6 +962,7 @@ export default {
         font-size: 13px;
         color: #515a6e;
         line-height: 22px;
+        white-space: nowrap;
     }
 
     .review-value {

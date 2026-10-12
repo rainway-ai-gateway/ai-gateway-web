@@ -78,6 +78,7 @@
 
 <script>
 import { UserNameRegCheck, PasswordRegCheck } from '@/utils/const';
+const RESERVED_USER_NAMES = ['admin', 'root', 'system'];
 export default {
     name: 'instancePools',
     data() {
@@ -87,7 +88,16 @@ export default {
                 return;
             }
             if (!PasswordRegCheck(value, this.formItem.user_name)) {
-                callback(new Error(this.$t('user.tipPasswordRule')));
+                const byteLength = new TextEncoder().encode(value).length;
+                if (byteLength < 8 || byteLength > 72) {
+                    callback(new Error(this.$t('user.tipPasswordLength')));
+                    return;
+                }
+                if (/\s/.test(value)) {
+                    callback(new Error(this.$t('user.tipPasswordWhitespace')));
+                    return;
+                }
+                callback(new Error(this.$t('user.tipPasswordUserName')));
                 return;
             }
             if (this.formItem.confirmPass !== '') {
@@ -109,6 +119,10 @@ export default {
         const validateName = (rule, value, callback) => {
             if (value === '') {
                 callback(new Error(this.$t('com.tipEnterX', { obj: this.$t('com.userName') })));
+                return;
+            }
+            if (RESERVED_USER_NAMES.includes(String(value).trim().toLowerCase())) {
+                callback(new Error(this.$t('user.tipReservedUserName')));
                 return;
             }
             if (!UserNameRegCheck(value)) {

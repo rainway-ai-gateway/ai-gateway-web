@@ -144,6 +144,16 @@ export default [
         component: (r) =>
           require.ensure(
             [],
+            () => r(require('../modules/BatchTasks')),
+            'batch-task.list',
+          ),
+        path: 'batches',
+        name: 'BatchTask.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
             () => r(require('../modules/Entity')),
             'Entity.list',
           ),
@@ -179,6 +189,16 @@ export default [
           ),
         path: 'operation-logs',
         name: 'OperationLog.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/Security')),
+            'security.list',
+          ),
+        path: 'security',
+        name: 'ReencryptSweep.list',
       },
       {
         component: r => require.ensure([], () => r(require('../modules/Cert')), 'certs.list'),

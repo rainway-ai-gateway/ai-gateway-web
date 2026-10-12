@@ -96,7 +96,9 @@
           </div>
           <div class="field-cell">
             <p class="field-label">{{ $t('operationLogs.resourceType') }}</p>
-            <p class="field-value">{{ currentData.resource_type || '-' }}</p>
+            <p class="field-value">
+              {{ resourceTypeLabel(currentData.resource_type) }}
+            </p>
           </div>
         </div>
         <div class="field-row">
@@ -226,8 +228,24 @@ const ACTION_OPTIONS = [
 const RESOURCE_TYPE_OPTIONS = [
     'entity', 'entity_type', 'api_key', 'provider', 'cluster',
     'route', 'certificate', 'quota_plan',
-    'model_price', 'user', 'token'
+    'model_price', 'batch', 'batch_file', 'user', 'token'
 ];
+
+const RESOURCE_TYPE_LABEL_KEYS = {
+    entity: 'resourceTypeEntity',
+    entity_type: 'resourceTypeEntityType',
+    api_key: 'resourceTypeApiKey',
+    provider: 'resourceTypeProvider',
+    cluster: 'resourceTypeCluster',
+    route: 'resourceTypeRoute',
+    certificate: 'resourceTypeCertificate',
+    quota_plan: 'resourceTypeQuotaPlan',
+    model_price: 'resourceTypeModelPrice',
+    batch: 'resourceTypeBatch',
+    batch_file: 'resourceTypeBatchFile',
+    user: 'resourceTypeUser',
+    token: 'resourceTypeToken'
+};
 
 const ACTION_COLOR_MAP = {
     create: 'green',
@@ -300,9 +318,11 @@ export default {
                     searchable: true,
                     searchType: 'select',
                     searchFilters: RESOURCE_TYPE_OPTIONS.map(r => ({
-                        label: r,
+                        label: this.resourceTypeLabel(r),
                         value: r
                     })),
+                    render: (h, params) =>
+                        h('span', this.resourceTypeLabel(params.row.resource_type))
                 },
                 {
                     title: this.$t('operationLogs.resourceName'),
@@ -437,6 +457,12 @@ export default {
             if (type === 0) return this.$t('operationLogs.operatorUser');
             if (type === 1) return this.$t('operationLogs.operatorToken');
             return '-';
+        },
+
+        resourceTypeLabel(type) {
+            if (!type) return '-';
+            const key = RESOURCE_TYPE_LABEL_KEYS[type];
+            return key ? this.$t(`operationLogs.${key}`) : type;
         },
 
         fetchData() {

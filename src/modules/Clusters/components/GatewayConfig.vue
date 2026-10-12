@@ -379,6 +379,126 @@
       </Card>
 
       <Card
+        :title="$t('gatewayConfig.normalizeUpstreamError')"
+        class="llm-section-card"
+      >
+        <Row :gutter="24">
+          <Col span="12">
+            <FormItem prop="normalize_upstream_error.enabled">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.normalizeEnabled') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.normalizeEnabledTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <i-switch v-model="formData.normalize_upstream_error.enabled" />
+            </FormItem>
+          </Col>
+        </Row>
+        <Row :gutter="24">
+          <Col span="12">
+            <FormItem prop="normalize_upstream_error.stream_enabled">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.normalizeStreamEnabled') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.normalizeStreamEnabledTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <i-switch
+                v-model="formData.normalize_upstream_error.stream_enabled"
+              />
+            </FormItem>
+          </Col>
+          <Col span="12">
+            <FormItem prop="normalize_upstream_error.redact_secrets">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.normalizeRedactSecrets') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.normalizeRedactSecretsTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <i-switch
+                v-model="formData.normalize_upstream_error.redact_secrets"
+              />
+            </FormItem>
+          </Col>
+        </Row>
+        <template v-if="formData.normalize_upstream_error.enabled">
+          <Row :gutter="24">
+            <Col span="12">
+              <FormItem prop="normalize_upstream_error.unrecognized_action">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.normalizeUnrecognizedAction') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.normalizeUnrecognizedActionTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <Select
+                  v-model="
+                    formData.normalize_upstream_error.unrecognized_action
+                  "
+                >
+                  <Option value="passthrough">{{
+                    $t('gatewayConfig.normalizePassthrough')
+                  }}</Option>
+                  <Option value="rewrite_generic">{{
+                    $t('gatewayConfig.normalizeRewriteGeneric')
+                  }}</Option>
+                </Select>
+              </FormItem>
+            </Col>
+            <Col span="12">
+              <FormItem prop="normalize_upstream_error.max_body_bytes">
+                <span slot="label" class="provider-label">
+                  {{ $t('gatewayConfig.normalizeMaxBodyBytes') }}
+                  <Tooltip placement="top" transfer max-width="320">
+                    <div slot="content" class="provider-tip-content">
+                      {{ $t('gatewayConfig.normalizeMaxBodyBytesTip') }}
+                    </div>
+                    <Icon
+                      type="ios-help-circle-outline"
+                      class="provider-help-icon"
+                    />
+                  </Tooltip>
+                </span>
+                <InputNumber
+                  v-model="formData.normalize_upstream_error.max_body_bytes"
+                  :min="0"
+                  :max="4194304"
+                  :precision="0"
+                  style="width: 100%;"
+                />
+              </FormItem>
+            </Col>
+          </Row>
+        </template>
+      </Card>
+
+      <Card
         :title="$t('gatewayConfig.balanceModeConfig')"
         class="llm-section-card"
       >
@@ -747,6 +867,16 @@ function defaultEppConfig() {
     };
 }
 
+function defaultNormalizeUpstreamError() {
+    return {
+        enabled: false,
+        stream_enabled: false,
+        unrecognized_action: 'passthrough',
+        max_body_bytes: 65536,
+        redact_secrets: true
+    };
+}
+
 function toBoolean(value, defaultValue) {
     if (value === true || value === 'true' || value === 1 || value === '1') {
         return true;
@@ -1037,6 +1167,31 @@ export default {
             callback();
         };
 
+        const validateNormalizeUnrecognizedAction = (rule, value, callback) => {
+            if (value == null || value === '') {
+                callback();
+                return;
+            }
+            if (['passthrough', 'rewrite_generic'].indexOf(value) === -1) {
+                callback(new Error(that.$t('gatewayConfig.normalizeUnrecognizedActionInvalid')));
+                return;
+            }
+            callback();
+        };
+
+        const validateNormalizeMaxBodyBytes = (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            const n = Number(value);
+            if (!Number.isInteger(n) || n < 0 || n > 4194304) {
+                callback(new Error(that.$t('gatewayConfig.normalizeMaxBodyBytesInvalid')));
+                return;
+            }
+            callback();
+        };
+
         return {
             selectAllModelsMarker: SELECT_ALL_MODELS_VALUE,
             providerNames: [],
@@ -1054,6 +1209,7 @@ export default {
                 keys: [{ name: '', weight: 0 }],
                 key_policy: defaultKeyPolicy(),
                 key_affinity: defaultKeyAffinity(),
+                normalize_upstream_error: defaultNormalizeUpstreamError(),
                 balance_mode: 'WRR',
                 epp_config: defaultEppConfig()
             },
@@ -1091,6 +1247,12 @@ export default {
                 ],
                 'epp_config.flow_control.enable_eviction': [
                     { validator: validateEnableEviction, trigger: 'change' }
+                ],
+                'normalize_upstream_error.unrecognized_action': [
+                    { validator: validateNormalizeUnrecognizedAction, trigger: 'change' }
+                ],
+                'normalize_upstream_error.max_body_bytes': [
+                    { validator: validateNormalizeMaxBodyBytes, trigger: 'change' }
                 ]
             }
         };
@@ -1252,6 +1414,17 @@ export default {
                 ttl: affinitySrc.ttl != null ? Number(affinitySrc.ttl) : 600,
                 redis_prefix: affinitySrc.redis_prefix || 'bfe:ai:key_affinity',
                 penalty_enable: toBoolean(affinitySrc.penalty_enable, true)
+            };
+            const nueSrc = src.normalize_upstream_error || {};
+            const nueDefault = defaultNormalizeUpstreamError();
+            this.formData.normalize_upstream_error = {
+                enabled: toBoolean(nueSrc.enabled, nueDefault.enabled),
+                stream_enabled: toBoolean(nueSrc.stream_enabled, nueDefault.stream_enabled),
+                unrecognized_action: nueSrc.unrecognized_action || nueDefault.unrecognized_action,
+                max_body_bytes: nueSrc.max_body_bytes != null
+                    ? Number(nueSrc.max_body_bytes)
+                    : nueDefault.max_body_bytes,
+                redact_secrets: toBoolean(nueSrc.redact_secrets, nueDefault.redact_secrets)
             };
             if (this.formData.provider) {
                 this.loadProviderDetail(this.formData.provider);
@@ -1553,6 +1726,17 @@ export default {
                     ttl: Number(affinity.ttl) || 600,
                     redis_prefix: String(affinity.redis_prefix || 'bfe:ai:key_affinity'),
                     penalty_enable: toBoolean(affinity.penalty_enable, true)
+                };
+                const nue = tmpData.normalize_upstream_error || {};
+                tmpData.normalize_upstream_error = {
+                    enabled: toBoolean(nue.enabled, false),
+                    stream_enabled: toBoolean(nue.stream_enabled, false),
+                    unrecognized_action: nue.unrecognized_action || 'passthrough',
+                    max_body_bytes:
+                        nue.max_body_bytes != null && nue.max_body_bytes !== ''
+                            ? Number(nue.max_body_bytes)
+                            : 65536,
+                    redact_secrets: toBoolean(nue.redact_secrets, true)
                 };
                 tmpData.balance_mode = tmpData.balance_mode || 'WRR';
                 // epp_config 非空即校验（含 WRR 时休眠保留的配置）；纯 WRR 新集群不提交 epp_config

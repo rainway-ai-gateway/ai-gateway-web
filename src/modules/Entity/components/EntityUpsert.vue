@@ -497,6 +497,29 @@
             </FormItem>
           </Col>
         </Row>
+
+        <div class="rules-section">
+          <h4 class="rules-title">{{ $t('entity.batchLimits') }}</h4>
+          <Row :gutter="16">
+            <Col v-for="field in batchLimitFields" :key="field.key" span="12">
+              <FormItem
+                :label="$t(field.labelKey)"
+                :prop="'rate_limit_policy.rules.batch_limits.' + field.key"
+                :rules="[{ validator: validateBatchLimit }]"
+              >
+                <InputNumber
+                  v-model="formData.rate_limit_policy.rules.batch_limits[field.key]"
+                  :max="INT64_MAX"
+                  :precision="0"
+                  :formatter="formatNumberInput"
+                  :parser="parseNumberInput"
+                  style="width: 100%;"
+                ></InputNumber>
+              </FormItem>
+            </Col>
+          </Row>
+          <p class="form-tip">{{ $t('entity.batchLimitsTip') }}</p>
+        </div>
       </div>
     </Card>
 
@@ -522,6 +545,14 @@ import { EntityNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX } from '@/utils/cons
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
+
+// 批量限流（batch_limits）维度：回显、校验、提交组装共用
+const BATCH_LIMIT_FIELDS = [
+    { key: 'max_create_rpm', labelKey: 'entity.batchMaxCreateRpm' },
+    { key: 'max_active_batches', labelKey: 'entity.batchMaxActiveBatches' },
+    { key: 'max_file_bytes', labelKey: 'entity.batchMaxFileBytes' },
+    { key: 'max_file_lines', labelKey: 'entity.batchMaxFileLines' }
+];
 
 export default {
     props: {
@@ -673,6 +704,7 @@ export default {
             TOKEN_QUOTA_MAX,
             RMB_QUOTA_MAX,
             INT_MAX,
+            batchLimitFields: BATCH_LIMIT_FIELDS,
             maxConcurrencyMode: 'limited',
             entityTypeList: [],
             modelServices: [],
@@ -695,7 +727,13 @@ export default {
                     rules: {
                         tpm: [],
                         rpm: [],
-                        max_concurrency: 1
+                        max_concurrency: 1,
+                        batch_limits: {
+                            max_create_rpm: null,
+                            max_active_batches: null,
+                            max_file_bytes: null,
+                            max_file_lines: null
+                        }
                     }
                 }
             },
@@ -820,6 +858,53 @@ export default {
         parseNumberInput(value) {
             return String(value).replace(/,/g, '');
         },
+        normalizeBatchLimits(batchLimits) {
+            const src = batchLimits || {};
+            const result = {};
+            BATCH_LIMIT_FIELDS.forEach((f) => {
+                const value = src[f.key];
+                result[f.key] =
+                    value !== undefined && value !== null && value !== '' && Number(value) > 0
+                        ? Number(value)
+                        : null;
+            });
+            return result;
+        },
+        validateBatchLimit(rule, value, callback) {
+            if (value === '' || value === null || value === undefined) {
+                callback();
+                return;
+            }
+            const num = Number(value);
+            if (!Number.isFinite(num) || num < 0) {
+                const fieldKey = String((rule && rule.field) || '').split('.').pop();
+                const meta = BATCH_LIMIT_FIELDS.find((f) => f.key === fieldKey);
+                callback(
+                    new Error(
+                        this.$t('entity.batchLimitNegativeError', {
+                            label: meta ? this.$t(meta.labelKey) : fieldKey
+                        })
+                    )
+                );
+                return;
+            }
+            callback();
+        },
+        collectBatchLimits(batchLimits) {
+            const result = {};
+            BATCH_LIMIT_FIELDS.forEach((f) => {
+                const raw = batchLimits ? batchLimits[f.key] : null;
+                if (raw === '' || raw === null || raw === undefined) {
+                    return;
+                }
+                const num = Number(raw);
+                if (!Number.isFinite(num) || num <= 0) {
+                    return;
+                }
+                result[f.key] = num;
+            });
+            return Object.keys(result).length > 0 ? result : null;
+        },
         initFormData(data) {
             this.formData = cloneDeep(data);
 
@@ -871,6 +956,8 @@ export default {
                     max_concurrency: -1
                 };
             }
+            this.formData.rate_limit_policy.rules.batch_limits =
+                this.normalizeBatchLimits(this.formData.rate_limit_policy.rules.batch_limits);
 
             // Ensure allow_models and block_models exist
             if (!this.formData.allow_models || this.formData.allow_models.length === 0) {
@@ -1313,6 +1400,17 @@ export default {
                             rpm: [],
                             max_concurrency: -1
                         };
+                    }
+
+                    if (submitData.rate_limit_policy.enabled) {
+                        const batchLimits = this.collectBatchLimits(
+                            submitData.rate_limit_policy.rules.batch_limits
+                        );
+                        if (batchLimits) {
+                            submitData.rate_limit_policy.rules.batch_limits = batchLimits;
+                        } else {
+                            delete submitData.rate_limit_policy.rules.batch_limits;
+                        }
                     }
 
                     if (!submitData.block_models || submitData.block_models.length === 0) {

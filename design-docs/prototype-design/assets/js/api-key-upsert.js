@@ -7,6 +7,29 @@ window.ApiKeyUpsert = {
   TOKEN_QUOTA_MAX: 9999999999,
   INT64_MAX: 9223372036854775807,
   RATE_LIMIT_NAME_RE: /^[a-zA-Z0-9_-]{1,128}$/,
+  // 批量限流（batch_limits）维度：编辑/回显、校验、提交组装共用
+  BATCH_LIMIT_FIELDS: [
+    {
+      key: 'max_create_rpm',
+      id: 'api-batch-max-create-rpm',
+      label: '批量任务创建RPM',
+    },
+    {
+      key: 'max_active_batches',
+      id: 'api-batch-max-active-batches',
+      label: '在途批量任务上限',
+    },
+    {
+      key: 'max_file_bytes',
+      id: 'api-batch-max-file-bytes',
+      label: '单文件字节上限',
+    },
+    {
+      key: 'max_file_lines',
+      id: 'api-batch-max-file-lines',
+      label: '单文件行数上限',
+    },
+  ],
 
   quotaMax(isRMB) {
     return isRMB ? ApiKeyUpsert.RMB_QUOTA_MAX : ApiKeyUpsert.TOKEN_QUOTA_MAX;
@@ -75,6 +98,88 @@ window.ApiKeyUpsert = {
       if (val) names[val] = true;
     });
     return names;
+  },
+
+  validateBatchLimitValue(value, label) {
+    if (value === '' || value == null) return null;
+    var num = Number(value);
+    if (!Number.isFinite(num) || num < 0) return label + '不能为负数';
+    return null;
+  },
+
+  bindBatchLimitInputs() {
+    ApiKeyUpsert.BATCH_LIMIT_FIELDS.forEach(function (f) {
+      var input = document.getElementById(f.id);
+      if (!input) return;
+      input.addEventListener('blur', function () {
+        var err = ApiKeyUpsert.validateBatchLimitValue(input.value, f.label);
+        if (err) {
+          input.classList.add('ivu-input-error');
+          Prototype.toast(err, 'error');
+        } else {
+          input.classList.remove('ivu-input-error');
+        }
+      });
+    });
+  },
+
+  validateBatchLimitsForm() {
+    var firstErr = null;
+    ApiKeyUpsert.BATCH_LIMIT_FIELDS.forEach(function (f) {
+      var input = document.getElementById(f.id);
+      if (!input) return;
+      var err = ApiKeyUpsert.validateBatchLimitValue(input.value, f.label);
+      if (err) {
+        input.classList.add('ivu-input-error');
+        if (!firstErr) firstErr = err;
+      } else {
+        input.classList.remove('ivu-input-error');
+      }
+    });
+    return firstErr;
+  },
+
+  // 提交组装：读取批量限流表单，返回 rate_limit_policy.rules.batch_limits 子对象；
+  // 留空或为 0 的维度不提交，全部未配置时返回 null（省略整个 batch_limits 对象）
+  collectBatchLimits() {
+    var result = null;
+    ApiKeyUpsert.BATCH_LIMIT_FIELDS.forEach(function (f) {
+      var input = document.getElementById(f.id);
+      if (!input) return;
+      var raw = input.value;
+      if (raw === '' || raw == null) return;
+      var num = Number(raw);
+      if (!Number.isFinite(num) || num <= 0) return;
+      if (!result) result = {};
+      result[f.key] = num;
+    });
+    return result;
+  },
+
+  renderBatchLimitsDetail(batchLimits) {
+    batchLimits = batchLimits || {};
+    var lines = [];
+    ApiKeyUpsert.BATCH_LIMIT_FIELDS.forEach(function (f) {
+      var v = batchLimits[f.key];
+      if (v !== undefined && v !== null && Number(v) > 0) {
+        lines.push(f.label + '：' + v);
+      }
+    });
+    if (!lines.length) return '';
+    return (
+      '<div class="rules-detail">' +
+      '<div class="rules-detail-title">批量限流 (' +
+      lines.length +
+      '项)</div>' +
+      '<div class="rule-detail-item">' +
+      lines
+        .map(function (l) {
+          return '<div>' + l + '</div>';
+        })
+        .join('') +
+      '</div>' +
+      '</div>'
+    );
   },
 
   maskKey(key) {
@@ -413,6 +518,7 @@ window.ApiKeyUpsert = {
             maxMode,
             maxConc,
             isAdd,
+            batchLimits,
           ) +
           '</div>',
       ) +
@@ -1061,7 +1167,7 @@ window.ApiKeyUpsert = {
     );
   },
 
-  renderRateLimitRules(tpmRules, rpmRules, maxMode, maxConc, isAdd) {
+  renderRateLimitRules(tpmRules, rpmRules, maxMode, maxConc, isAdd, batchLimits) {
     tpmRules = tpmRules && tpmRules.length ? tpmRules : [];
     rpmRules = rpmRules && rpmRules.length ? rpmRules : [];
     var nameReadonly = isAdd === false;
@@ -1144,6 +1250,59 @@ window.ApiKeyUpsert = {
           ),
         ),
       ) +
+      '</div>' +
+      '<div class="rules-section" id="batch-limits-section">' +
+      '<h4 class="rules-title">批量限流</h4>' +
+      ApiKeyUpsert.rowSpan2(
+        ApiKeyUpsert.col(
+          IvuUI.formTopItem(
+            '批量任务创建RPM',
+            IvuUI.inputNumber(
+              batchLimits && batchLimits.max_create_rpm > 0
+                ? batchLimits.max_create_rpm
+                : '',
+              'id="api-batch-max-create-rpm" min="0" style="width:100%"',
+            ),
+          ),
+        ) +
+          ApiKeyUpsert.col(
+            IvuUI.formTopItem(
+              '在途批量任务上限',
+              IvuUI.inputNumber(
+                batchLimits && batchLimits.max_active_batches > 0
+                  ? batchLimits.max_active_batches
+                  : '',
+                'id="api-batch-max-active-batches" min="0" style="width:100%"',
+              ),
+            ),
+          ),
+      ) +
+      ApiKeyUpsert.rowSpan2(
+        ApiKeyUpsert.col(
+          IvuUI.formTopItem(
+            '单文件字节上限',
+            IvuUI.inputNumber(
+              batchLimits && batchLimits.max_file_bytes > 0
+                ? batchLimits.max_file_bytes
+                : '',
+              'id="api-batch-max-file-bytes" min="0" style="width:100%"',
+            ),
+          ),
+        ) +
+          ApiKeyUpsert.col(
+            IvuUI.formTopItem(
+              '单文件行数上限',
+              IvuUI.inputNumber(
+                batchLimits && batchLimits.max_file_lines > 0
+                  ? batchLimits.max_file_lines
+                  : '',
+                'id="api-batch-max-file-lines" min="0" style="width:100%"',
+              ),
+            ),
+          ),
+      ) +
+      '<p class="form-tip">四维度均按 API-Key 计、与模型无关；0 或留空 = 不配此维度；' +
+      '不配置不代表批量不限流，仍受 BFE mod_ai_batch.data 全局硬顶约束</p>' +
       '</div>'
     );
   },
@@ -1201,6 +1360,7 @@ window.ApiKeyUpsert = {
     var maxConc = policy.rules && policy.rules.max_concurrency;
     var tpmRules = (policy.rules && policy.rules.tpm) || [];
     var rpmRules = (policy.rules && policy.rules.rpm) || [];
+    var batchLimits = (policy.rules && policy.rules.batch_limits) || null;
     var subnetText = '*';
     if (data.subnet) {
       if (Array.isArray(data.subnet)) {

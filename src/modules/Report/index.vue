@@ -40,6 +40,7 @@
               @on-ok="applyFilters"
             />
           </div>
+          <Button icon="md-refresh" @click="refreshLatest">{{ $t('report.refreshLatest') }}</Button>
         </div>
       </div>
 
@@ -363,6 +364,21 @@ export default {
       this.shortcut = '';
     },
 
+    // 保持当前时间跨度不变，将窗口平移到最新时刻后重新查询
+    refreshLatest() {
+      const start = this.validDate(this.startTime);
+      const end = this.validDate(this.endTime);
+      if (!start || !end || end.getTime() <= start.getTime()) {
+        this.applyFilters();
+        return;
+      }
+      const span = end.getTime() - start.getTime();
+      const newEnd = Date.now();
+      this.endTime = new Date(newEnd);
+      this.startTime = new Date(newEnd - span);
+      this.applyFilters();
+    },
+
     applyFilters() {
       if (!this.validateTimeRange()) return;
       const params = this.buildFilterParams();
@@ -374,12 +390,9 @@ export default {
       }
     },
 
+    // 重置只清空筛选条件，不动时间范围：默认时间基于"当前时刻"计算，
+    // 若重置时重算时间会静默改变查询窗口，用户会误以为查询结果不一致
     resetFilters() {
-      const end = this.now();
-      const start = end - 3600;
-      this.shortcut = '1h';
-      this.startTime = new Date(start * 1000);
-      this.endTime = new Date(end * 1000);
       this.filters = {
         models: [],
         apikey_ids: [],

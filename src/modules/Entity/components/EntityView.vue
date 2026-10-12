@@ -238,6 +238,23 @@
           <div>{{ $t('entity.maxRequests') }}：{{ rule.max_requests }}</div>
         </div>
       </div>
+
+      <div v-if="rateLimitPolicyEnabled" class="rules-detail">
+        <div class="rules-detail-title">
+          {{ $t('entity.batchLimits')
+          }}<template v-if="batchLimitLines.length > 0"
+            > ({{ batchLimitLines.length }}{{ $t('com.item') }})</template
+          >
+        </div>
+        <div class="rule-detail-item">
+          <template v-if="batchLimitLines.length > 0">
+            <div v-for="(line, index) in batchLimitLines" :key="index">
+              {{ line }}
+            </div>
+          </template>
+          <div v-else>-</div>
+        </div>
+      </div>
     </Card>
 
     <div class="com-btn-box drawer-footer">
@@ -300,6 +317,14 @@
 
 <script>
 import { TOKEN_QUOTA_MAX, RMB_QUOTA_MAX } from '@/utils/const';
+
+// 批量限流（batch_limits）维度：只读展示共用
+const BATCH_LIMIT_FIELDS = [
+  { key: 'max_create_rpm', labelKey: 'entity.batchMaxCreateRpm' },
+  { key: 'max_active_batches', labelKey: 'entity.batchMaxActiveBatches' },
+  { key: 'max_file_bytes', labelKey: 'entity.batchMaxFileBytes' },
+  { key: 'max_file_lines', labelKey: 'entity.batchMaxFileLines' }
+];
 
 export default {
     props: {
@@ -413,6 +438,16 @@ export default {
         },
         rpmRulesLength() {
             return this.rpmRules.length;
+        },
+        batchLimits() {
+            return this.rateLimitRules.batch_limits || null;
+        },
+        batchLimitLines() {
+            const limits = this.batchLimits || {};
+            return BATCH_LIMIT_FIELDS.filter((f) => {
+                const value = limits[f.key];
+                return value !== undefined && value !== null && Number(value) > 0;
+            }).map((f) => `${this.$t(f.labelKey)}：${limits[f.key]}`);
         },
         parentEntityName() {
             if (!this.displayData.parent_id) return '';

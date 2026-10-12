@@ -196,6 +196,12 @@ window.MockData = {
               max_requests: 1000,
             },
           ],
+          batch_limits: {
+            max_create_rpm: 10,
+            max_active_batches: 5,
+            max_file_bytes: 104857600,
+            max_file_lines: 50000,
+          },
         },
       },
       route_rules: {
@@ -346,6 +352,15 @@ window.MockData = {
       provider: 'openai',
       balance_mode: 'WRR',
       epp_config: null,
+      llm_config: {
+        normalize_upstream_error: {
+          enabled: true,
+          stream_enabled: false,
+          unrecognized_action: 'passthrough',
+          max_body_bytes: 65536,
+          redact_secrets: true,
+        },
+      },
     },
     {
       name: 'epp-cluster-a',
@@ -689,6 +704,7 @@ window.MockData = {
         input_cost_per_token: 0.00000015,
         output_cost_per_token: 0.0000006,
       },
+      batch_discount: 0.5,
       metadata: {
         source: 'https://openai.com/api/pricing/',
         notes: '',
@@ -844,6 +860,31 @@ window.MockData = {
       create_time: 1725148800,
       update_time: 1725148800,
     },
+    {
+      id: 8,
+      provider: 'deepseek',
+      model: 'DeepSeek V3',
+      base_model: 'deepseek-v3',
+      mode: 'batch',
+      capabilities: ['chat'],
+      supported_parameters: ['temperature', 'top_p', 'max_tokens'],
+      limits: {
+        context_window: 64000,
+        max_output_tokens: 8192,
+      },
+      prices: {
+        input_cost_per_token: 1.35e-7,
+        output_cost_per_token: 5.5e-7,
+        cache_read_input_token_cost: 3.5e-8,
+      },
+      metadata: {
+        source: 'https://platform.deepseek.com/pricing',
+        notes:
+          '手工维护的批量价格行（= chat 价 × 0.5），导出时优先于 batch_discount 系数展开',
+      },
+      create_time: 1725148800,
+      update_time: 1725148800,
+    },
   ],
   getModelPriceProviders: function () {
     var names = {};
@@ -874,6 +915,7 @@ window.MockData = {
     'ocr',
     'search',
     'realtime',
+    'batch',
   ],
   modelCapabilities: [
     'chat',
@@ -1196,6 +1238,8 @@ window.MockData = {
     'certificate',
     'quota_plan',
     'model_price',
+    'batch',
+    'batch_file',
     'user',
     'token',
   ],
@@ -1638,4 +1682,391 @@ window.MockData = {
       },
     ],
   },
+
+  // ========== 批量任务管控（GET /open-api/v1/batches） ==========
+  // reserve_units / settle_units 为 1e-8 定点整数（单位 RMB），不做 ÷1e8 换算
+  batchTasks: {
+    list: [
+      {
+        batch_id: 'batch_abc123',
+        api_key_id: 'ak-2v8x9k3m7p',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-input1',
+        output_file_id: 'file-output1',
+        status: 'completed',
+        request_counts: { total: 100, completed: 98, failed: 2 },
+        est_lines: 100,
+        usage_input_tokens: 50000,
+        usage_output_tokens: 12000,
+        usage_source: 'download',
+        reserve_units: 250000000,
+        settle_units: 180000000,
+        settle_status: 'settled',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-06T10:00:00+08:00',
+        updated_at: '2026-10-06T10:20:00+08:00',
+        terminal_at: '2026-10-06T10:20:00+08:00',
+        batch_files: [
+          { file_id: 'file-input1', provider: 'openai', purpose: 'batch_input', filename: 'input.jsonl', bytes: 1048576, created_at: '2026-10-06T09:55:00+08:00' },
+          { file_id: 'file-output1', provider: 'openai', purpose: 'batch_output', filename: 'output.jsonl', bytes: 2097152, created_at: '2026-10-06T10:20:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_7f8e9d0c1b2a',
+        api_key_id: 'ak-2v8x9k3m7p',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-input2',
+        output_file_id: '',
+        status: 'in_progress',
+        request_counts: { total: 200, completed: 86, failed: 3 },
+        est_lines: 200,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 500000000,
+        settle_units: 0,
+        settle_status: 'reserved',
+        over_reserved: false,
+        sync_source: 'redis',
+        created_at: '2026-10-08T14:30:00+08:00',
+        updated_at: '2026-10-08T14:40:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-input2', provider: 'openai', purpose: 'batch_input', filename: 'bulk_chat_input.jsonl', bytes: 4194304, created_at: '2026-10-08T14:25:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_cancelling001',
+        api_key_id: 'ak-001',
+        product_name: 'AI_product',
+        entity_id: 'entity-2',
+        provider: 'deepseek',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-ds-input1',
+        output_file_id: '',
+        status: 'cancelling',
+        request_counts: { total: 500, completed: 120, failed: 5 },
+        est_lines: 500,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 300000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-08T09:10:00+08:00',
+        updated_at: '2026-10-08T09:22:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-ds-input1', provider: 'deepseek', purpose: 'batch_input', filename: 'ds_input.jsonl', bytes: 8388608, created_at: '2026-10-08T09:05:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_cancelled_old1',
+        api_key_id: 'ak-001',
+        product_name: 'AI_product',
+        entity_id: 'entity-2',
+        provider: 'deepseek',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-ds-input0',
+        output_file_id: '',
+        status: 'cancelled',
+        request_counts: { total: 300, completed: 45, failed: 2 },
+        est_lines: 300,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 150000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-02T11:00:00+08:00',
+        updated_at: '2026-10-02T11:30:00+08:00',
+        terminal_at: '2026-10-02T11:30:00+08:00',
+        batch_files: [
+          { file_id: 'file-ds-input0', provider: 'deepseek', purpose: 'batch_input', filename: 'ds_input_old.jsonl', bytes: 5242880, created_at: '2026-10-02T10:55:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_fail_expired1',
+        api_key_id: 'ak-002',
+        product_name: 'AI_product',
+        entity_id: 'entity-3',
+        provider: 'anthropic',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-ant-input1',
+        output_file_id: '',
+        status: 'failed',
+        request_counts: { total: 50, completed: 0, failed: 50 },
+        est_lines: 50,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 80000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-05T16:00:00+08:00',
+        updated_at: '2026-10-05T16:05:00+08:00',
+        terminal_at: '2026-10-05T16:05:00+08:00',
+        batch_files: [
+          { file_id: 'file-ant-input1', provider: 'anthropic', purpose: 'batch_input', filename: 'ant_input.jsonl', bytes: 2097152, created_at: '2026-10-05T15:55:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_queue_final001',
+        api_key_id: 'ak-002',
+        product_name: 'AI_product',
+        entity_id: 'entity-3',
+        provider: 'gemini',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-gem-input1',
+        output_file_id: '',
+        status: 'queued',
+        request_counts: { total: 1000, completed: 0, failed: 0 },
+        est_lines: 1000,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 1200000000,
+        settle_units: 0,
+        settle_status: 'reserved',
+        over_reserved: false,
+        sync_source: 'redis',
+        created_at: '2026-10-09T08:30:00+08:00',
+        updated_at: '2026-10-09T08:30:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-gem-input1', provider: 'gemini', purpose: 'batch_input', filename: 'gem_input.jsonl', bytes: 16777216, created_at: '2026-10-09T08:25:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_expired000001',
+        api_key_id: 'ak-001',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-exp-input1',
+        output_file_id: '',
+        status: 'expired',
+        request_counts: { total: 80, completed: 0, failed: 0 },
+        est_lines: 80,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 60000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-09-28T10:00:00+08:00',
+        updated_at: '2026-10-05T10:00:00+08:00',
+        terminal_at: '2026-10-05T10:00:00+08:00',
+        batch_files: [
+          { file_id: 'file-exp-input1', provider: 'openai', purpose: 'batch_input', filename: 'expired_input.jsonl', bytes: 1048576, created_at: '2026-09-28T09:55:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_validating0001',
+        api_key_id: 'ak-2v8x9k3m7p',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-val-input1',
+        output_file_id: '',
+        status: 'validating',
+        request_counts: { total: 0, completed: 0, failed: 0 },
+        est_lines: 60,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 0,
+        settle_units: 0,
+        settle_status: 'reserved',
+        over_reserved: false,
+        sync_source: 'redis',
+        created_at: '2026-10-09T10:05:00+08:00',
+        updated_at: '2026-10-09T10:05:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-val-input1', provider: 'openai', purpose: 'batch_input', filename: 'validate_input.jsonl', bytes: 524288, created_at: '2026-10-09T10:00:00+08:00' },
+        ],
+      },
+    ],
+    next_cursor: 0,
+  },
+
+  // ========== 密钥收敛任务（GET /open-api/v1/security/reencrypt-sweeps） ==========
+  // running 时 summary 为空对象、duration_ms=0、finished_at 为空；完成时才按表分组落库；
+  // dry-run 成功任务 error="dry_run"（语义标记，非失败）；failed 含 executor lost。
+  reencryptSweeps: {
+    list: [
+      {
+        task_id: 'rsp-01J9RXQ8Z3K7M2P1A0',
+        status: 'running',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-10-11T01:20:00Z',
+        finished_at: '',
+        duration_ms: 0,
+        summary: {},
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J9AB7Y6Q4N8T2V5C',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-10-10T09:30:00Z',
+        finished_at: '2026-10-10T09:30:08Z',
+        duration_ms: 8300,
+        summary: {
+          providers: { scanned: 120, rewritten: 118, skipped: 2 },
+          api_keys: { scanned: 2400, rewritten: 2390, skipped: 10 }
+        },
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J98H11W2D6R9B4E7',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'providers',
+        active_key_id: 2,
+        created_by: 'operator-chen',
+        started_at: '2026-10-08T14:05:00Z',
+        finished_at: '2026-10-08T14:05:02Z',
+        duration_ms: 2100,
+        summary: {
+          providers: { scanned: 120, rewritten: 120, skipped: 0 }
+        },
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J96ZK39X1C5G8Q2M',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: true,
+        scope: 'api_keys',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-10-07T03:12:00Z',
+        finished_at: '2026-10-07T03:12:05Z',
+        duration_ms: 4800,
+        summary: {
+          api_keys: { scanned: 2400, rewritten: 2361, skipped: 39 }
+        },
+        error: 'dry_run'
+      },
+      {
+        task_id: 'rsp-01J95P07T8V3N6L1D4',
+        status: 'failed',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'operator-li',
+        started_at: '2026-10-06T22:40:00Z',
+        finished_at: '2026-10-06T22:47:00Z',
+        duration_ms: 420000,
+        summary: {},
+        error: 'executor lost'
+      },
+      {
+        task_id: 'rsp-01J92F55B9K4M7Q0W3',
+        status: 'succeeded',
+        mode: 'decrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 0,
+        created_by: 'admin',
+        started_at: '2026-10-03T06:00:00Z',
+        finished_at: '2026-10-03T06:00:09Z',
+        duration_ms: 9100,
+        summary: {
+          providers: { scanned: 120, rewritten: 120, skipped: 0 },
+          api_keys: { scanned: 2400, rewritten: 2400, skipped: 0 }
+        },
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J91C22A7M5P8R1U6',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: true,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'operator-chen',
+        started_at: '2026-10-02T11:15:00Z',
+        finished_at: '2026-10-02T11:15:05Z',
+        duration_ms: 5200,
+        summary: {
+          providers: { scanned: 120, rewritten: 118, skipped: 2 },
+          api_keys: { scanned: 2400, rewritten: 2361, skipped: 39 }
+        },
+        error: 'dry_run'
+      },
+      {
+        task_id: 'rsp-01J8Y90D4F2H7K0N3S',
+        status: 'failed',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'providers',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-09-30T08:00:00Z',
+        finished_at: '2026-09-30T08:00:03Z',
+        duration_ms: 3200,
+        summary: {},
+        error: 'db connection reset'
+      }
+    ]
+  }
 };
+
+// 补充历史任务填充行，用于演示列表 offset 分页（page/page_size，默认 1/20）
+(function () {
+  var list = window.MockData.reencryptSweeps.list;
+  var base = Date.parse('2026-09-18T02:00:00Z');
+  for (var i = 1; i <= 16; i++) {
+    var started = new Date(base + i * 20 * 3600 * 1000);
+    var dry = i % 4 === 0;
+    var failed = i % 7 === 0;
+    var duration = 5000 + i * 137;
+    list.push({
+      task_id: 'rsp-01J8H' + (1000 + i),
+      status: failed ? 'failed' : 'succeeded',
+      mode: 'reencrypt',
+      dry_run: dry,
+      scope: 'all',
+      active_key_id: 2,
+      created_by: i % 2 === 0 ? 'operator-chen' : 'admin',
+      started_at: started.toISOString(),
+      finished_at: failed ? '' : new Date(started.getTime() + duration).toISOString(),
+      duration_ms: failed ? 0 : duration,
+      summary: failed ? {} : {
+        providers: { scanned: 120, rewritten: 118, skipped: 2 },
+        api_keys: { scanned: 2400, rewritten: 2390, skipped: 10 }
+      },
+      error: failed ? 'executor lost' : (dry ? 'dry_run' : '')
+    });
+  }
+})();

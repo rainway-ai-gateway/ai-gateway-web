@@ -592,9 +592,9 @@ export default {
                 });
             }
         },
-        'formData.instance_source'() {
+        'formData.instance_source'(val) {
             this.$nextTick(() => {
-                if (this.$refs.formData) {
+                if (this.$refs.formData && val === 'k8s_pool') {
                     this.$refs.formData.validateField('k8s_pool_name');
                 }
             });

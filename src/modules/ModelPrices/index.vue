@@ -94,7 +94,7 @@ import { cloneDeep } from 'lodash';
 const MODE_OPTIONS = [
     'chat', 'completion', 'responses', 'image_generation', 'image_edit',
     'embedding', 'rerank', 'audio_speech', 'audio_transcription',
-    'video_generation', 'ocr', 'search', 'realtime'
+    'video_generation', 'ocr', 'search', 'realtime', 'batch'
 ];
 
 export default {

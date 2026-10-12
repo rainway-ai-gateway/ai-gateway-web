@@ -62,7 +62,7 @@ window.UserUpsert = {
     return '<form class="ivu-form ivu-form-label-top user-upsert-form">' +
       IvuUI.formTopItem('用户名', UserUpsert.textField('user-password-name', row.user_name || '', '请输入用户名', true), true) +
       oldPasswordField +
-      IvuUI.formTopItem('新密码', UserUpsert.passwordField('user-password-new', '密码必须包含字母，数字和特殊字符', 'off'), true) +
+      IvuUI.formTopItem('新密码', UserUpsert.passwordField('user-password-new', window.Prototype ? Prototype.t('user.passwordPlaceholder') : '长度 8-72 字节（bcrypt 上限），不含空白字符，不能等于用户名或其逆序', 'off'), true) +
       IvuUI.formTopItem('确认密码', UserUpsert.passwordField('user-password-confirm', '请再次确认密码', 'off'), true) +
       '</form>';
   },

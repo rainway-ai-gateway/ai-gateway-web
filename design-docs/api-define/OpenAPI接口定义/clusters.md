@@ -65,6 +65,13 @@
             "redis_prefix": "bfe:ai:key_affinity",
             "penalty_enable": true
         },
+        "normalize_upstream_error": {
+            "enabled": true,
+            "stream_enabled": false,
+            "unrecognized_action": "passthrough",
+            "max_body_bytes": 65536,
+            "redact_secrets": true
+        },
         "provider": "deepseek",
         "match_prefix": "deepseek/",
         "strip_prefix": true
@@ -169,6 +176,7 @@
 | keys| []ClusterKeyRef |  Key 引用与权重列表 | N | 一个 cluster 支持配置多个 Key，按权重做路由；通过 `name` 引用 provider 中定义的 key；为空数组表示不配置 API-Key | 非必填；默认值为空数组 `[]`；元素须满足 表：ClusterKeyRef 结构 |
 | key_policy| object |  Key 路由策略 | N | 多 Key 时的选择策略、重试与退避配置 | 非必填；默认见下方 表：Key 路由策略；`strategy` 本版仅支持 `weighted_random` |
 | key_affinity| object |  Key 亲和性配置 | N | 基于 Redis + `ClientKeyId` 的会话级 Key 亲和性 | 非必填；默认见下方 表：Key 亲和性配置 |
+| normalize_upstream_error| object |  上游错误体归一配置 | N | 上游厂商错误归一为网关统一错误码与 OpenAI 兼容错误体（含状态码重映射、凭证脱敏、SSE 错误事件改写），按集群独立灰度 | 非必填；默认见下方 表：上游错误归一配置；缺省 = 关闭（上游错误原样透传） |
 | provider| string |  所属 provider | Y | 用于关联 provider、解析后端实例池/key 明文/生成 `ModelTable` | 必填；非空；必须引用 `/providers` 中已存在的 provider |
 | match_prefix| string |  需要匹配的 provider/model 前缀 | N | 例如 `openrouter/`；用于 OpenRouter 等聚合 provider 场景；必须以 `/` 结尾 | 非必填；`strip_prefix=true` 时必填 |
 | strip_prefix| bool |  是否裁剪 `match_prefix` 指定前缀 | N | `true` 时转发给下游前会从请求 `model` 字段中去掉该前缀；`false` 时仅用于路由标识，不裁剪 | 非必填；默认 `false` |
@@ -203,6 +211,18 @@
 | ttl | int | 绑定空闲超时时间 | N | 单位秒，默认 `600`；命中绑定后 BFE 会刷新 TTL，持续请求则绑定保持 | 非必填；若传入，须为 `>0` 的整数 |
 | redis_prefix | string | Redis key 前缀 | N | 默认 `"bfe:ai:key_affinity"` | 非必填；若传入，必须非空 |
 | penalty_enable | bool | 是否开启 Key 惩罚 | N | 默认 `true`；为 `true` 时，近期返回 429/401/403 的 Key 会被跳过 | 非必填；必须为 bool |
+
+**表：上游错误归一配置（`llm_config.normalize_upstream_error`）**
+
+| 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
+| - | - | - | - | - | - |
+| enabled | bool | 非流式归一开关 | N | `true` 时上游 4xx/5xx 错误重写为统一错误体（OpenAI 兼容），状态码按统一映射表重映射（如上游 401/402/403 → 502 `UPSTREAM_AUTH_ERROR`，与客户端自身凭证错误的 401 区分）；默认 `false`（透传，历史行为） | 非必填；必须为 bool |
+| stream_enabled | bool | 流式（SSE）归一开关 | N | 独立于 `enabled` 灰度；`true` 时流内错误事件 data 载荷改写为统一错误 JSON（响应状态保持 200），并对流截断（EOF 缺失协议终止事件）打访问日志标记；默认 `false` | 非必填；必须为 bool |
+| unrecognized_action | string | 未识别错误体的处理 | N | `passthrough`（默认：原样透传，仍做凭证脱敏）/ `rewrite_generic`（重写为 `UPSTREAM_UNKNOWN` 通用错误）；流式未识别事件始终透传 | 非必填；取值仅支持 `passthrough`、`rewrite_generic` |
+| max_body_bytes | int | 错误响应体读取上限（字节） | N | 超限按未识别处理；`0`/缺省用 BFE 默认 `65536` | 非必填；须为 ∈ [0, 4194304] 的整数 |
+| redact_secrets | bool | 凭证脱敏开关 | N | 外发错误内容（客户端响应与访问日志，含归一重写与透传路径）中出现的本集群 API-Key 各编码形态（原文/base64/URL 编码/JSON 转义）替换为掩码 `••••••••`；默认 `true`，显式 `false` 关闭 | 非必填；必须为 bool |
+
+> **行为说明：** 归一仅在转发重试（fallback）结束、最终结果确定后生效，不影响重试与 Key 罚分决策；网关自生成错误（认证/限流/配额等）已是统一格式，不参与归一；上游原始状态码与原始错误码记录于响应 `error.details.upstream_status`/`upstream_code` 与访问日志字段（`ai_upstream_status` 等，bfe-access-pb 字段 810-815）。
 
 **表：模型映射**
 
@@ -258,6 +278,11 @@
   - `ttl` 须为 `>0` 的整数；
   - `redis_prefix` 若传入须非空；
   - `penalty_enable` 必须为 bool。
+- `llm_config.normalize_upstream_error` 若传入：
+  - `enabled` / `stream_enabled` / `redact_secrets` 必须为 bool；
+  - `unrecognized_action` 取值仅支持 `passthrough`、`rewrite_generic`；
+  - `max_body_bytes` 须为 ∈ [0, 4194304] 的整数（`0` = 用 BFE 默认 65536）；
+  - 校验规则与 BFE `AIConfCheck` 逐条对齐（防止"控制面放行、BFE 加载失败"的配置穿透）。
 - `llm_config.match_prefix` / `strip_prefix`：
   - `strip_prefix=true` 时，`match_prefix` 必填且非空；
   - `match_prefix` 若传入，必须以 `/` 结尾。

@@ -20,6 +20,9 @@ var NAV_ICONS = {
   'resource.admin.list': 'ivu-icon ivu-icon-md-appstore',
   'ModelPrice.list': 'ivu-icon ivu-icon-logo-yen',
   'OperationLog.list': 'ivu-icon ivu-icon-md-list-box',
+  'BatchTask.list': 'ivu-icon ivu-icon-ios-archive',
+  'systemSecurity.admin.list': 'ivu-icon ivu-icon-ios-lock',
+  'ReencryptSweep.list': 'ivu-icon ivu-icon-ios-lock',
   'Report.list': 'ivu-icon ivu-icon-md-analytics',
 };
 
@@ -128,12 +131,35 @@ window.PrototypeNav = [
         text: 'API Key 管理',
         icon: navIcon('APIKey.list'),
       },
+      // 后端 nav_tree.toml 尚无此菜单项，原型中作为占位先行（已确认决策）
+      {
+        id: 'BatchTask.list',
+        i18n: 'BatchTaskManage',
+        page: 'batches.html',
+        text: '批量任务',
+        icon: navIcon('BatchTask.list'),
+      },
       {
         id: 'Entity.list',
         i18n: 'EntityManage',
         page: 'entity.html',
         text: 'Entity 管理',
         icon: navIcon('Entity.list'),
+      },
+    ],
+  },
+  {
+    id: 'systemSecurity.admin.list',
+    i18n: 'SystemSecurityManage',
+    text: '系统安全',
+    icon: navIcon('systemSecurity.admin.list'),
+    children: [
+      {
+        id: 'ReencryptSweep.list',
+        i18n: 'ReencryptSweepManage',
+        page: 'security.html',
+        text: '密钥收敛',
+        icon: navIcon('ReencryptSweep.list'),
       },
     ],
   },

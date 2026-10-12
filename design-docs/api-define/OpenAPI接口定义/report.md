@@ -1,7 +1,7 @@
 # /report
 
-> 数据报表查询接口：总览指标、时序、维度排行、占比分布、日志明细五类只读端点。查询后端通过 `[Report].Backend` 配置切换 MySQL（轻量形态，log-reader `mod_log_mysql` 插件落库）或 Doris（标准形态，既有 Kafka → Doris 链路），同一套接口两种后端结构一致（差异仅在可选字段的有无，如 MySQL 后端无分位数）。
-> 本接口消费 ai-cache / 流量镜像 / ai-intent 三组访问日志字段（明细表 +10 列、聚合表 +3 维度，见 [modifications/2026-09-27-report-cache-mirror-intent-fields](../../modifications/2026-09-27-report-cache-mirror-intent-fields/api-changes.md)）：新维度 `ai_cache_status` / `mirror_hit` / `ai_intent_answer` 一期仅 MySQL 后端可用，二期已对齐 Doris（见 [modifications/2026-10-01-report-doris-cache-mirror-intent-alignment](../../modifications/2026-10-01-report-doris-cache-mirror-intent-alignment/api-changes.md)，需 Doris 侧表结构先行升级），两后端均可用。模块细节设计见 [报表查询模块](../../sys-design/details/报表查询模块.md)。
+> 数据报表查询接口：总览指标、时序、维度排行、占比分布、日志明细五类只读端点。查询后端通过 `[Report].Backend` 配置切换 MySQL（轻量形态，log-reader `mod_log_mysql` 插件落库）、Doris（标准形态，既有 Kafka → Doris 链路）、ClickHouse（标准形态，Kafka → ClickHouse 链路，native TCP 9000，驱动 `Driver = "clickhouse"`）或 StarRocks（标准形态，Kafka → StarRocks 链路，FE 9030 MySQL 协议，驱动 `Driver = "mysql"` 零新驱动），同一套接口四种后端结构一致（差异仅在可选字段的有无，如 MySQL 后端无分位数）。ClickHouse 形态配置样例见 [modifications/2026-10-02-report-clickhouse-backend](../../modifications/2026-10-02-report-clickhouse-backend/design-changes.md)；StarRocks 形态配置样例见 [modifications/2026-10-02-report-starrocks-backend](../../modifications/2026-10-02-report-starrocks-backend/design-changes.md)。
+> 本接口消费 ai-cache / 流量镜像 / ai-intent 三组访问日志字段（明细表 +10 列、聚合表 +3 维度，见 [modifications/2026-09-27-report-cache-mirror-intent-fields](../../modifications/2026-09-27-report-cache-mirror-intent-fields/api-changes.md)）：新维度 `ai_cache_status` / `mirror_hit` / `ai_intent_answer` 一期仅 MySQL 后端可用，二期已对齐 Doris（见 [modifications/2026-10-01-report-doris-cache-mirror-intent-alignment](../../modifications/2026-10-01-report-doris-cache-mirror-intent-alignment/api-changes.md)，需 Doris 侧表结构先行升级），四后端均可用。模块细节设计见 [报表查询模块](../../sys-design/details/报表查询模块.md)。
 
 ## 1. 数据模型
 
@@ -22,7 +22,7 @@
 
 ### 1.2 明细行（/report/logs 的 items 元素）
 
-明细行是 MySQL/Doris 明细表 `bfe_ai_request_log`（99 列，两后端同名同列）面向展示的投影，字段名与表列名一致；JSON 列原样返回字符串，由前端展开：
+明细行是 MySQL/Doris/ClickHouse/StarRocks 明细表 `bfe_ai_request_log`（99 列，四后端同名同列）面向展示的投影，字段名与表列名一致；JSON 列原样返回字符串，由前端展开：
 
 ```json
 {
@@ -164,7 +164,7 @@
 }
 ```
 
-> `latency_p50_ms`/`p90`/`p99` 仅 Doris 后端返回；MySQL 后端无原生分位数，字段恒不存在（前端按字段有无降级为 avg/max 展示）。
+> `latency_p50_ms`/`p90`/`p99` MySQL 后端恒不返回（无原生分位数，字段不存在，前端按字段有无降级为 avg/max 展示）；Doris / StarRocks 后端均返回（`percentile_approx` 同名近似）；ClickHouse 后端返回（`quantiles` t-digest 近似算法）；数值均不承诺跨引擎相等。
 
 缓存/镜像/意图三组指标的口径：
 
@@ -197,7 +197,7 @@
 |--------|------|--------|
 | `qps` | 请求 QPS | `value` |
 | `tokens` | Token 吞吐（个/秒） | `input`、`output`、`total` |
-| `latency` | 延迟（毫秒） | `avg`、`max`（Doris 后端另有 `p50`、`p90`、`p99`） |
+| `latency` | 延迟（毫秒） | `avg`、`max`（Doris / StarRocks / ClickHouse 后端另有 `p50`、`p90`、`p99`） |
 | `ttft` / `tpot` | 首 Token / 每 Token 延迟（毫秒，聚合于 stream 请求） | `avg` |
 | `cost` | 成本增速（金额/秒，元/秒、美元/秒） | 按币种多条序列，`currency` 字段区分 |
 | `cache_tokens` | 缓存 Token 速率（个/秒） | 按 `cache_read` / `cache_write` 两条序列，`kind` 字段区分 |
@@ -211,8 +211,8 @@
 **约束**
 
 - 时间桶（`bucket_sec`）由服务端按窗口自动计算：≤6h→60s，≤3d→300s，≤7d→1800s，客户端不传。
-- 时序只读聚合表（MySQL `bfe_ai_metrics_1m` / Doris 同名表），不扫明细。
-- `dimension` 缺省时行为不变（按时间聚合单序列）；传入后按 `(时间桶, 维度值)` 分组，每个序列的点携带 `name`（维度值；空值为 `""`）区分，值字段与对应 metric 一致；`latency` 带 dimension 时两后端均只返回 `avg`/`max`（分位数仅 Doris 无 dimension 的单序列返回，见 2.2 metric 表）。
+- 时序只读聚合表（MySQL `bfe_ai_metrics_1m` / Doris / ClickHouse / StarRocks 同名表），不扫明细。
+- `dimension` 缺省时行为不变（按时间聚合单序列）；传入后按 `(时间桶, 维度值)` 分组，每个序列的点携带 `name`（维度值；空值为 `""`）区分，值字段与对应 metric 一致；`latency` 带 dimension 时各后端均只返回 `avg`/`max`（分位数仅 Doris / StarRocks / ClickHouse 无 dimension 的单序列返回，见 2.2 metric 表）。
 
 **返回数据（Data 内容）**
 
@@ -326,7 +326,7 @@
 
 其余为共有过滤项（含 `models`、`apikey_ids`、`providers`、`hosts`、`stream`、`status_codes`；`start`、`end` 必填）。
 
-**约束**：按 `log_time` 倒序；JSON 列返回原文字符串，由前端行展开展示。新过滤参数基于明细表新列，两后端均可用（与后端维度能力门控无关）。
+**约束**：按 `log_time` 倒序；JSON 列返回原文字符串，由前端行展开展示。新过滤参数基于明细表新列，四后端均可用（与后端维度能力门控无关）。
 
 **返回数据（Data 内容）**
 
@@ -345,7 +345,7 @@
 
 | 场景 | 表现 |
 |------|------|
-| 参数缺失/非法（`start`≥`end`、窗口超 7 天、metric/dimension 非枚举值、`page_size` 超上限、`intent_source` 非枚举值） | 参数校验错误，HTTP 400（ErrNum 422） |
+| 参数缺失/非法（`start`≥`end`、窗口超 7 天、metric/dimension 非枚举值、`page_size` 超上限、`intent_source` 非枚举值） | 参数校验错误，HTTP 422（ErrNum 422，Param Illegal） |
 | 未认证 / 无 FeatureReport 权限 | HTTP 401 / 402 |
 | Report 模块未装配（`[Report]` 配置缺省） | 路由不存在，HTTP 404 |
 | 后端查询失败 | 内部错误，HTTP 500 |

@@ -268,6 +268,19 @@ function formatLlmConfigForApi(llmConfig) {
     if (result.strip_prefix) {
         result.match_prefix = src.match_prefix || '';
     }
+    const nue = src.normalize_upstream_error;
+    if (nue) {
+        result.normalize_upstream_error = {
+            enabled: !!nue.enabled,
+            stream_enabled: !!nue.stream_enabled,
+            unrecognized_action: nue.unrecognized_action || 'passthrough',
+            max_body_bytes:
+                nue.max_body_bytes != null && nue.max_body_bytes !== ''
+                    ? Number(nue.max_body_bytes)
+                    : 65536,
+            redact_secrets: nue.redact_secrets !== false
+        };
+    }
     return result;
 }
 

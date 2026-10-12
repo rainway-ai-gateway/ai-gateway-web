@@ -70,8 +70,8 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 用户名 | Y | - | 必填；类型为 [UserName](#12-用户名username) |
-| password | string | 用户密码 | Y | - | 必填；类型为 [Password](#13-用户密码password)；不能等于 `user_name` 或其逆序 |
+| user_name | string | 用户名 | Y | - | 必填；类型为 [UserName](00-common.md#12-用户名username) |
+| password | string | 用户密码 | Y | - | 必填；类型为 [Password](00-common.md#13-用户密码password)；不能等于 `user_name` 或其逆序 |
 | is_admin | bool | 是否为系统管理员 | N | 固定为 `true`，暂不支持 `false`；若未传则默认填充为 `true` | 必须为 `true` |
 
 **HTTP BODY参数示例**
@@ -109,7 +109,7 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 待删除的用户名 | Y | - | 必填；类型为 [UserName](#12-用户名username)；对应用户必须存在 |
+| user_name | string | 待删除的用户名 | Y | - | 必填；类型为 [UserName](00-common.md#12-用户名username)；对应用户必须存在 |
 
 **执行逻辑**
 
@@ -137,14 +137,14 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 待修改密码的用户名 | Y | - | 必填；类型为 [UserName](#12-用户名username)；对应用户必须存在 |
+| user_name | string | 待修改密码的用户名 | Y | - | 必填；类型为 [UserName](00-common.md#12-用户名username)；对应用户必须存在 |
 
 **输入参数（Body）**
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
 | old_password | string | 旧的用户密码 | N | 当被修改的用户为当前登录用户，需要填入旧密码 | 修改当前登录用户密码时必填，且必须与当前密码一致 |
-| password | string | 用户新密码 | Y | - | 必填；类型为 [Password](#13-用户密码password)；不能等于 `user_name` 或其逆序 |
+| password | string | 用户新密码 | Y | - | 必填；类型为 [Password](00-common.md#13-用户密码password)；不能等于 `user_name` 或其逆序 |
 
 **HTTP BODY参数示例**
 
@@ -345,7 +345,7 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| name | string | token名字 | Y | name必须全局唯一 | 必填；类型为 [TokenName](#14-token-名称tokenname) |
+| name | string | token名字 | Y | name必须全局唯一 | 必填；类型为 [TokenName](00-common.md#14-token-名称tokenname) |
 | scope | string | scope | Y | 只能指定一个scope；取值 `System` / `Support` | 必填；枚举值：`System`、`Support` |
 
 **HTTP BODY参数示例**
@@ -397,7 +397,7 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| token_name | string | 待删除的token name | Y | - | 必填；类型为 [TokenName](#14-token-名称tokenname)；对应Token必须存在 |
+| token_name | string | 待删除的token name | Y | - | 必填；类型为 [TokenName](00-common.md#14-token-名称tokenname)；对应Token必须存在 |
 
 **执行逻辑**
 
@@ -424,7 +424,7 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| token_name | string | token name | Y | - | 必填；类型为 [TokenName](#14-token-名称tokenname)；对应Token必须存在 |
+| token_name | string | token name | Y | - | 必填；类型为 [TokenName](00-common.md#14-token-名称tokenname)；对应Token必须存在 |
 
 **返回数据（Data内容）**
 

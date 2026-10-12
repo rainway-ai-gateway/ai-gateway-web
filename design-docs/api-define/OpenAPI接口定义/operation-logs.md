@@ -39,7 +39,7 @@
 | `operator_id` | int64 | 操作者在对应表中的主键 ID | - |
 | `operator_name` | string | 操作者名称 | - |
 | `action` | string | 操作动作 | `create` / `update` / `delete` / `reset` / `import` / `bind` / `unbind` |
-| `resource_type` | string | 资源类型 | `entity` / `entity_type` / `api_key` / `provider` / `cluster` / `route` / `certificate` / `quota_plan` / `model_price` / `user` / `token` |
+| `resource_type` | string | 资源类型 | `entity` / `entity_type` / `api_key` / `provider` / `cluster` / `route` / `certificate` / `quota_plan` / `model_price` / `batch` / `batch_file` / `user` / `token` |
 | `resource_id` | string | 被操作资源业务 ID | - |
 | `resource_name` | string | 被操作资源名称 | - |
 | `resource_parent_id` | string | 资源父级业务 ID | 如 entity 层级中的父节点 |

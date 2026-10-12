@@ -245,11 +245,12 @@ export function TokenNameRegCheck(value) {
 }
 
 export function PasswordRegCheck(value, userName) {
-  // Password: 8-128 chars; no whitespace; cannot equal userName or its reverse
+  // Password: 8-72 bytes (UTF-8, bcrypt upper bound); no whitespace; cannot equal userName or its reverse
   if (!value || typeof value !== 'string') {
     return false;
   }
-  if (value.length < 8 || value.length > 128) {
+  const byteLength = new TextEncoder().encode(value).length;
+  if (byteLength < 8 || byteLength > 72) {
     return false;
   }
   if (/\s/.test(value)) {

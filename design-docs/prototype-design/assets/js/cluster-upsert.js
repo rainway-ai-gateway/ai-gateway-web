@@ -72,6 +72,15 @@ window.ClusterUpsert = (function () {
         penalty_enable: true,
       };
     }
+    if (!data.llmConfigData.normalize_upstream_error) {
+      data.llmConfigData.normalize_upstream_error = {
+        enabled: false,
+        stream_enabled: false,
+        unrecognized_action: 'passthrough',
+        max_body_bytes: 65536,
+        redact_secrets: true,
+      };
+    }
   }
 
   function createDefaultData(row) {
@@ -139,6 +148,16 @@ window.ClusterUpsert = (function () {
           redis_prefix: 'bfe:ai:key_affinity',
           penalty_enable: true,
         },
+        normalize_upstream_error:
+          row.llm_config && row.llm_config.normalize_upstream_error
+            ? JSON.parse(JSON.stringify(row.llm_config.normalize_upstream_error))
+            : {
+                enabled: false,
+                stream_enabled: false,
+                unrecognized_action: 'passthrough',
+                max_body_bytes: 65536,
+                redact_secrets: true,
+              },
       },
     };
   }
@@ -701,6 +720,87 @@ window.ClusterUpsert = (function () {
           '</div></div>'
         : '');
 
+    var nue = llm.normalize_upstream_error || {};
+    var normalizeErrorHtml =
+      '<div class="llm-card-title">上游错误归一</div>' +
+      '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+      '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+      IvuUI.formTopItem(
+        '是否启用' +
+          helpIcon(
+            '开启后，上游 4xx/5xx 错误重写为统一错误体（OpenAI 兼容），状态码按统一映射表重映射（如上游 401/402/403 → 502 UPSTREAM_AUTH_ERROR）；缺省关闭，上游错误原样透传',
+          ),
+        ivuSelectNative('llm.normalize_upstream_error.enabled', nue.enabled, [
+          { value: 'false', label: '停用' },
+          { value: 'true', label: '启用' },
+        ]),
+      ) +
+      '</div></div>' +
+      '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+      '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+      IvuUI.formTopItem(
+        '流式归一(SSE)' +
+          helpIcon(
+            '独立于非流式归一开关灰度；开启后流内错误事件 data 载荷改写为统一错误 JSON（响应状态保持 200）',
+          ),
+        ivuSelectNative(
+          'llm.normalize_upstream_error.stream_enabled',
+          nue.stream_enabled,
+          [
+            { value: 'false', label: '停用' },
+            { value: 'true', label: '启用' },
+          ],
+        ),
+      ) +
+      '</div>' +
+      '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+      IvuUI.formTopItem(
+        '凭证脱敏' +
+          helpIcon(
+            '外发错误内容中出现的本集群 API-Key 各编码形态（原文/base64/URL 编码/JSON 转义）替换为掩码 ••••••••，关闭后不外发替换',
+          ),
+        ivuSelectNative(
+          'llm.normalize_upstream_error.redact_secrets',
+          nue.redact_secrets,
+          [
+            { value: 'true', label: '开启' },
+            { value: 'false', label: '关闭' },
+          ],
+        ),
+      ) +
+      '</div></div>' +
+      (nue.enabled
+        ? '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+          '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+          IvuUI.formTopItem(
+            '未识别错误体处理' +
+              helpIcon(
+                'passthrough：原样透传（仍做凭证脱敏）；rewrite_generic：重写为 UPSTREAM_UNKNOWN 通用错误；流式未识别事件始终透传',
+              ),
+            ivuSelectNative(
+              'llm.normalize_upstream_error.unrecognized_action',
+              nue.unrecognized_action,
+              [
+                { value: 'passthrough', label: 'passthrough（原样透传）' },
+                { value: 'rewrite_generic', label: 'rewrite_generic（重写为通用错误）' },
+              ],
+            ),
+          ) +
+          '</div>' +
+          '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+          IvuUI.formTopItem(
+            '错误响应体读取上限(字节)' +
+              helpIcon(
+                '错误响应体读取上限，超限按未识别处理；取值范围 0-4194304，0 或缺省用 BFE 默认 65536',
+              ),
+            IvuUI.inputNumber(
+              nue.max_body_bytes != null ? nue.max_body_bytes : 65536,
+              'class="proto-field" data-field="llm.normalize_upstream_error.max_body_bytes" min="0" max="4194304"',
+            ),
+          ) +
+          '</div></div>'
+        : '');
+
     var instanceHint = '';
     // if (provider && provider.instance_pool && provider.instance_pool.length) {
     //   instanceHint =
@@ -754,6 +854,9 @@ window.ClusterUpsert = (function () {
       '</div></div>' +
       '<div class="llm-card"><div class="llm-card-body">' +
       keyAffinityHtml +
+      '</div></div>' +
+      '<div class="llm-card"><div class="llm-card-body">' +
+      normalizeErrorHtml +
       '</div></div>' +
       '<div class="llm-card"><div class="llm-card-title">均衡模式配置</div><div class="llm-card-body">' +
       IvuUI.formTop(
@@ -1137,7 +1240,33 @@ window.ClusterUpsert = (function () {
           (ka.penalty_enable ? '开启' : '关闭') +
           '</div>'
         : '') +
-      '</div></div></div></li></ul>';
+      '</div></div></li></ul>';
+
+    var nue = llm.normalize_upstream_error || {};
+    var normalizeErrorHtml =
+      '<ul class="clearFloat detail-row detail-row-block policy-row"><li class="title">上游错误归一:</li><li class="value">' +
+      '<div class="policy-card" style="border:1px solid #e7e9f0;border-radius:4px;padding:12px;background:#fafafa;">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;">' +
+      '<div>启用：' +
+      (nue.enabled ? '开启' : '关闭') +
+      '</div>' +
+      '<div>流式归一(SSE)：' +
+      (nue.stream_enabled ? '开启' : '关闭') +
+      '</div>' +
+      '<div>凭证脱敏：' +
+      (nue.redact_secrets == null || nue.redact_secrets ? '开启' : '关闭') +
+      '</div>' +
+      (nue.enabled
+        ? '<div>未识别错误体处理：' +
+          IvuUI.escapeHtml(nue.unrecognized_action || 'passthrough') +
+          '</div>' +
+          '<div>错误响应体读取上限(字节)：' +
+          IvuUI.escapeHtml(
+            nue.max_body_bytes != null ? nue.max_body_bytes : 65536,
+          ) +
+          '</div>'
+        : '') +
+      '</div></div></li></ul>';
 
     var llmRows =
       reviewRow('所属服务商', llm.provider || '-') +
@@ -1167,7 +1296,8 @@ window.ClusterUpsert = (function () {
       keysHtml +
       '</li></ul>' +
       keyPolicyHtml +
-      keyAffinityHtml;
+      keyAffinityHtml +
+      normalizeErrorHtml;
 
     var eppConfigRows = '';
     if (isEpp) {
@@ -1292,6 +1422,23 @@ window.ClusterUpsert = (function () {
               value === 'true' || value === true;
           } else {
             data.llmConfigData.key_affinity[kaKey] = value;
+          }
+        } else if (key.indexOf('normalize_upstream_error.') === 0) {
+          if (!data.llmConfigData.normalize_upstream_error)
+            data.llmConfigData.normalize_upstream_error = {};
+          var nueKey = key.slice(25);
+          if (
+            nueKey === 'enabled' ||
+            nueKey === 'stream_enabled' ||
+            nueKey === 'redact_secrets'
+          ) {
+            data.llmConfigData.normalize_upstream_error[nueKey] =
+              value === 'true' || value === true;
+          } else if (nueKey === 'max_body_bytes') {
+            data.llmConfigData.normalize_upstream_error[nueKey] =
+              value === null || value === '' ? null : Number(value);
+          } else {
+            data.llmConfigData.normalize_upstream_error[nueKey] = value;
           }
         } else {
           data.llmConfigData[key] = value;
@@ -1459,6 +1606,23 @@ window.ClusterUpsert = (function () {
     var kp = llm.key_policy || {};
     if (Number(kp.retry_backoff_max) < Number(kp.retry_backoff_initial)) {
       return '最大退避时间必须大于或等于初始退避时间';
+    }
+
+    var nue = llm.normalize_upstream_error || {};
+    if (
+      nue.unrecognized_action != null &&
+      ['passthrough', 'rewrite_generic'].indexOf(nue.unrecognized_action) === -1
+    ) {
+      return '未识别错误体处理仅支持 passthrough / rewrite_generic';
+    }
+    var maxBodyBytes = Number(nue.max_body_bytes);
+    if (
+      nue.max_body_bytes != null &&
+      (!Number.isFinite(maxBodyBytes) ||
+        maxBodyBytes < 0 ||
+        maxBodyBytes > 4194304)
+    ) {
+      return '错误响应体读取上限须为 0-4194304 的整数';
     }
     return null;
   }
@@ -1927,6 +2091,15 @@ window.ClusterUpsert = (function () {
       );
       if (keyPenaltySelect)
         keyPenaltySelect.addEventListener('change', function () {
+          syncFromDom(bodyEl, state.data);
+          render();
+        });
+
+      var normalizeErrorSelect = bodyEl.querySelector(
+        '[data-field="llm.normalize_upstream_error.enabled"]',
+      );
+      if (normalizeErrorSelect)
+        normalizeErrorSelect.addEventListener('change', function () {
           syncFromDom(bodyEl, state.data);
           render();
         });
