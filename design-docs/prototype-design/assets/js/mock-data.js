@@ -385,6 +385,16 @@ window.MockData = {
           enable_eviction: false,
         },
       },
+      epp_runtime: {
+        check: {
+          disabled: false,
+          check_interval: '1s',
+          fail_threshold: 5,
+          cooldown: '30s',
+          success_threshold: 3,
+        },
+        timeout: { connect: '300ms', call: '2s' },
+      },
     },
     {
       name: 'epp-cluster-b',
@@ -409,6 +419,7 @@ window.MockData = {
           enable_eviction: false,
         },
       },
+      epp_runtime: null,
     },
   ],
   eppPool: {
@@ -613,9 +624,9 @@ window.MockData = {
     },
   ],
   users: [
-    { user_name: 'admin', is_admin: true },
-    { user_name: 'operator', is_admin: true },
-    { user_name: 'viewer', is_admin: false },
+    { user_name: 'admin', role: 'system_admin' },
+    { user_name: 'operator', role: 'system_admin' },
+    { user_name: 'viewer', role: 'system_admin_readonly' },
   ],
   tokens: [
     {

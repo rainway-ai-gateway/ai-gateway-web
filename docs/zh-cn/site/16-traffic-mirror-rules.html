@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>16 功能增强：流量镜像规则</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a class="active" href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="16-功能增强流量镜像规则">16 功能增强：流量镜像规则</h1>
+<p><strong>流量镜像（shadow traffic）</strong>把生产请求的<strong>副本</strong>异步发往镜像目标集群：生产请求照常转发，副本的响应读空丢弃、只入统计（报表中的「镜像命中」，见 <a href="12-report.html">12 章</a>）。镜像请求是网关内部的子请求——不扣配额、不重复鉴权、不计入客户用量，访问日志以 <code>mirror_hit</code> / <code>mirror_cluster</code> 标识命中情况。典型用途是新模型上线前的<strong>双跑验证</strong>、故障演练与兜底链路压测。</p>
+<p><strong>入口</strong>：功能增强 → 流量镜像规则（页面路由名 <code>TrafficMirrorRule.list</code>）。</p>
+<p>这个页面没有「单条规则」的增删改接口：整组规则是一个<strong>集合</strong>，页面由 <strong>1 个规则列表 + 2 个抽屉</strong>构成（查看抽屉、添加/编辑抽屉），没有页签、没有独立详情页、也没有全局设置项。所有增删改先在页面内存里完成，最后用「提交并生效」把<strong>整组规则一次性写回</strong>（<code>PUT /traffic-mirror-rules</code>），数组顺序即优先级，<strong>首条命中生效</strong>（first-match-wins）。</p>
+<ul><li><strong>集合语义</strong>：规则没有 <code>enabled</code> 字段。删除规则 = 从集合移除后再提交；单条规则临时停用 = 采样比例填 <code>0</code>（命中但不采样）；提交 <code>{"rules": []}</code> = <strong>镜像总开关关闭</strong>。</li><li><strong>依赖</strong>：镜像目标集群需先在「AI业务集群」中创建（见 <a href="04-ai-business-cluster.html">04 章</a>）；下拉选项来自 <code>GET clusters</code> 的集群名。</li><li><strong>生效时延</strong>：提交成功后，规则经 conf-agent 轮询 + BFE 热加载下发，镜像流量不会立即变化。</li></ul>
+<h2 id="161-列表页">16.1 列表页</h2>
+<p>进入页面后默认处于<strong>视图模式</strong>：页面左上为标题「流量镜像规则（集合级，按优先级顺序匹配，首条命中生效）」，右上角仅一个「进入编辑模式」按钮；表格按接口返回的数组顺序展示规则（顺序即优先级）。</p>
+<p><img src="images/16-traffic-mirror-list.png" alt="流量镜像规则列表" loading="lazy" /></p>
+<p><strong>表格列说明</strong>：</p>
+<table><thead><tr><th>列名</th><th>取值 / 展示</th><th>支持搜索</th><th>支持排序</th></tr></thead><tbody><tr><td>规则名称</td><td>规则标识；为空显示 <code>-</code></td><td>是</td><td>是</td></tr><tr><td>生效条件</td><td>BFE 条件表达式原文；为空显示 <code>-</code></td><td>是</td><td>是</td></tr><tr><td>镜像集群</td><td>镜像目标集群名；为空显示 <code>-</code></td><td>是</td><td>是</td></tr><tr><td>采样比例</td><td>按 <code>{值}%</code> 展示（如 <code>10%</code>、<code>0%</code>）；接口缺省 <code>null</code> 时显示 <code>-</code></td><td>否</td><td>是</td></tr><tr><td>头部剔除</td><td>三态文案，见下方说明</td><td>否</td><td>是</td></tr><tr><td>路径改写</td><td>改写后的完整路径；为空串或缺省显示 <code>-</code></td><td>否</td><td>是</td></tr><tr><td>操作</td><td>视图模式仅「查看」；编辑模式为「编辑」「删除」</td><td>否</td><td>否（列头不可排序）</td></tr></tbody></table>
+<p><strong>头部剔除列的三态文案</strong>（同一份数据有三种含义，肉眼必须能区分）：</p>
+<table><thead><tr><th>接口取值</th><th>列表 / 查看抽屉文案</th><th>含义</th></tr></thead><tbody><tr><td>字段缺省（<code>null</code> / 未返回）</td><td><code>默认黑名单（Authorization / Cookie / X-Api-Key）</code></td><td>服务端会填入默认黑名单，副本剔除这三个敏感头</td></tr><tr><td>显式空数组 <code>[]</code></td><td><code>不剔除任何头部</code></td><td>副本原样携带全部请求头（含鉴权头），慎用</td></tr><tr><td>非空数组</td><td>元素以 <code>,</code> 连接展示，如 <code>Authorization, Cookie, X-Api-Key, X-Custom-Secret</code></td><td>自定义剔除列表</td></tr></tbody></table>
+<p><strong>搜索与排序</strong>：表格上方有独立的搜索行，仅「规则名称」「生效条件」「镜像集群」三列带输入框，占位文案分别为「请输入规则名称查询」「请输入生效条件查询」「请输入镜像集群查询」；多个输入框同时填写为<strong>与</strong>关系，匹配为<strong>不区分大小写的包含匹配</strong>，且为客户端过滤（不改变服务端集合顺序），搜索后自动回到第 1 页。点击可排序列的列头可切换升序 / 降序 / 取消排序，排序同样只影响当前展示，不会改变提交给服务端的规则顺序。</p>
+<p><strong>分页</strong>：客户端分页，默认每页 <code>20</code> 条，可在页码控件处切换 <code>20 / 30 / 40 / 50</code>。</p>
+<p><strong>边界情况</strong>：</p>
+<ul><li>集合为空（<code>{"rules": []}</code>）：表格无数据行，展示空态，页面无报错，右上角仍显示「进入编辑模式」；此时等于镜像总开关关闭。</li><li>列表加载失败（非 200 或网络异常）：弹出错误提示「加载流量镜像规则失败」，表格为空。</li></ul>
+<blockquote>
+<p>只读视角：以「系统管理员（只读）」（<code>role = system_admin_readonly</code>）登录时，页头「进入编辑模式」按钮被隐藏（写按钮统一挂全局指令 <code>v-has</code>，只读登录态下加 <code>.v-has-hidden</code> 隐藏），页面恒停留视图模式，因此「添加规则」「退出编辑模式」「提交并生效」都不可达；列表「操作」列保留只读的「查看」入口，搜索、排序、分页等只读能力不受影响。</p>
+</blockquote>
+<h2 id="162-视图--编辑双模式与提交并生效">16.2 视图 / 编辑双模式与提交并生效</h2>
+<p>规则的新增、编辑、删除都必须在<strong>编辑模式</strong>下进行。注意这里有<strong>两个「保存」步骤</strong>，缺一不可：</p>
+<table><thead><tr><th>步骤</th><th>操作</th><th>作用</th><th>是否影响线上</th></tr></thead><tbody><tr><td>1</td><td>点击右上角「进入编辑模式」</td><td>进入可编辑状态，并对当前规则集合做快照</td><td>不影响</td></tr><tr><td>2</td><td>添加 / 编辑 / 删除规则</td><td>修改内存中的规则集合</td><td>不影响</td></tr><tr><td>3</td><td>在抽屉中点击「本地保存」</td><td>把本条规则暂存到列表里（仍只在浏览器内存中）</td><td><strong>仍不影响</strong></td></tr><tr><td>4</td><td>点击右上角「提交并生效」</td><td>把整组规则一次性写回服务端（<code>PUT /traffic-mirror-rules</code>）</td><td><strong>正式生效</strong></td></tr></tbody></table>
+<p>进入编辑模式后：左侧出现「添加规则」按钮，右上角变为「退出编辑模式」+「提交并生效」，行操作由「查看」变为「编辑」+「删除」。</p>
+<p><img src="images/16-traffic-mirror-edit-mode.png" alt="流量镜像规则编辑模式" loading="lazy" /></p>
+<p><strong>退出编辑模式</strong>：</p>
+<ul><li>无未提交改动：直接回到视图模式并重新拉取列表，无弹窗。</li><li>有未提交改动：弹出信息提示「当前有未提交的改动，退出编辑模式将丢弃这些改动，确认退出？」。点「确定」丢弃改动、回滚到进入编辑模式时的快照并重新拉取列表，提示「已退出编辑模式」；点「取消」留在编辑模式，改动保留，提示「已取消退出」。</li></ul>
+<p><strong>提交并生效</strong>：</p>
+<ul><li>提交前先做两次集合内查重（规则名称、生效条件），有重复直接拦截并提示，不发起请求。</li><li>提交期间按钮进入 loading 态（防重复提交）；请求体为 <code>{ rules: [...] }</code>，且<strong>不含</strong> <code>created_at</code> / <code>updated_at</code> 两个只读字段。</li><li>成功：提示「提交并生效成功！」，自动回到视图模式并重新 <code>GET</code> 列表（回填服务端生成的只读字段）。</li><li>失败（非 200 或异常）：提示「提交失败!」，<strong>仍停留在编辑模式</strong>，未提交的改动保留，可修正后重试。</li><li>服务端为<strong>整组替换</strong>：不在提交列表中的规则即被删除；任一校验失败则整体回滚，集合保持原状。</li></ul>
+<blockquote>
+<p>只读视角：模式切换入口整体被隐藏，「提交并生效」按钮不渲染，因此不存在任何写提交路径；即使绕过前端直接调用 <code>PUT /traffic-mirror-rules</code>，后端也会以 403 兜底拒绝。</p>
+</blockquote>
+<h2 id="163-添加--编辑镜像规则">16.3 添加 / 编辑镜像规则</h2>
+<p>编辑模式下点击左上角「添加规则」，或在行操作点击「编辑」，右侧弹出抽屉（宽度约 60%）。抽屉标题为「添加镜像规则」或「编辑镜像规则」；表单抽屉点击遮罩<strong>不会关闭</strong>，需用抽屉右上角关闭图标或下方按钮结束操作。</p>
+<p><img src="images/16-traffic-mirror-form.png" alt="添加镜像规则抽屉" loading="lazy" /></p>
+<p><strong>表单字段</strong>：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>规则名称</td><td>是</td><td>空</td><td>1-128 字符（失焦校验，非输入框硬截断）；集合内不得重复</td><td>可读性 / 审计用，不是寻址键；占位「请输入规则名称，集合内唯一」</td></tr><tr><td>生效条件</td><td>是</td><td>空</td><td>必须能通过 BFE 条件编译；空串不接受；集合内不得重复</td><td>标签为「生效条件（全量匹配请显式使用 default_t()）」，用表达式构造器填写，命中即对该请求启用镜像</td></tr><tr><td>镜像集群</td><td>是</td><td>集群下拉首项（无集群时为空）</td><td>下拉仅列 <code>GET clusters</code> 的集群名；服务端校验集群是否存在，不存在返回 422</td><td>镜像目标；鉴权凭证不在规则内配置</td></tr><tr><td>采样比例</td><td>是（前端校验）</td><td><code>100</code></td><td><code>0</code>-<code>100</code> 的整数，输入框 <code>min=0</code> / <code>max=100</code></td><td>标签为「采样比例（0-100，0 表示命中不采样）」；留空会被校验拦截但输入框不显示必填星号；接口侧为非必填，未传时服务端按 <code>100</code> 处理</td></tr><tr><td>头部剔除策略</td><td>否</td><td>使用默认黑名单</td><td>选「自定义剔除列表」时，逗号分隔后不得全部为空</td><td>三态下拉，决定 <code>remove_headers</code> 的提交方式，见下表</td></tr><tr><td>设置请求头</td><td>否</td><td>空（空态「暂无设置请求头」）</td><td>每行 key 与 value 去空格后均不能为空</td><td>注入镜像副本的自定义 Header；点「添加请求头」增行，行内「删除」减行；不建议配置 <code>X-Bfe-Mirror</code></td></tr><tr><td>请求体改写</td><td>否</td><td>空（空态「暂无请求体改写」）</td><td><code>value</code> 去空格后不能为空；<code>path</code> 一期仅允许 <code>model</code></td><td>标签为「请求体改写（一期仅支持 model 字段）」；点「添加改写」增行，左侧路径为固定下拉 <code>model</code></td></tr><tr><td>路径改写</td><td>否</td><td>空（不改写）</td><td>非空时必须以 <code>/</code> 开头</td><td>标签为「路径改写（留空表示不改写；非空须以 / 开头）」，占位 <code>/v1/chat/completions</code>；整体替换镜像路径，query 保留</td></tr></tbody></table>
+<blockquote>
+<p>表单上带必填星号的只有「规则名称」「生效条件」「镜像集群」三项；采样比例没有星号，但留空同样会被校验拦截（提示「采样比例必须为 0-100 的整数」）。</p>
+</blockquote>
+<p><strong>头部剔除策略三态与提交行为</strong>：</p>
+<table><thead><tr><th>下拉选项</th><th>界面表现</th><th>提交时</th><th>服务端结果</th></tr></thead><tbody><tr><td>使用默认黑名单</td><td>不显示自定义输入框</td><td><strong>不携带</strong> <code>remove_headers</code> 字段</td><td>由服务端填入 <code>["Authorization","Cookie","X-Api-Key"]</code></td></tr><tr><td>不剔除任何头部</td><td>不显示自定义输入框</td><td>携带 <code>remove_headers: []</code></td><td>副本不剔除任何头</td></tr><tr><td>自定义剔除列表</td><td>展开输入框，占位「逗号分隔，如 Authorization,Cookie」</td><td>携带拆分后的数组</td><td>按提交的列表剔除；列表全为空则拦截</td></tr></tbody></table>
+<blockquote>
+<p>「使用默认黑名单」与「自定义剔除列表里手写 <code>Authorization,Cookie,X-Api-Key</code>」在界面上看起来一样，但提交语义不同：前者留空交给服务端，后者是显式名单。</p>
+</blockquote>
+<p><strong>底部按钮</strong>：</p>
+<ul><li><strong>本地保存</strong>：校验通过后把本条规则写入列表（新增时插入集合<strong>头部</strong>，即新规则优先级最高），提示「添加成功！」或「保存成功！」；这一步<strong>不发起任何网络请求</strong>。</li><li><strong>重置</strong>：丢弃抽屉内当前填写内容，恢复为打开抽屉时的状态（新增时恢复为默认值）。</li></ul>
+<h2 id="164-查看镜像规则">16.4 查看镜像规则</h2>
+<p>视图模式下点击行操作「查看」，右侧弹出只读抽屉（标题「查看镜像规则」，宽度约 60%，点击遮罩可关闭）。抽屉内<strong>没有任何输入控件，也不显示必填星号</strong>，只有 8 行文案：</p>
+<p><img src="images/16-traffic-mirror-view.png" alt="查看镜像规则" loading="lazy" /></p>
+<table><thead><tr><th>信息行</th><th>展示内容</th></tr></thead><tbody><tr><td>规则名称</td><td>规则名；为空显示 <code>-</code></td></tr><tr><td>生效条件</td><td>表达式原文，等宽字体展示；为空显示 <code>-</code></td></tr><tr><td>镜像集群</td><td>集群名；为空显示 <code>-</code></td></tr><tr><td>采样比例</td><td>按 <code>{值}%</code> 展示；接口缺省时按 <code>100%</code> 展示</td></tr><tr><td>头部剔除</td><td>三态文案（同 <a href="#161-列表页">16.1</a> 表格）</td></tr><tr><td>设置请求头</td><td>逐行 <code>名称：值</code>；无内容显示「无」</td></tr><tr><td>请求体改写</td><td>逐行 <code>path → value</code>；无内容显示「无」</td></tr><tr><td>路径改写</td><td>改写路径；为空串或缺省显示 <code>-</code></td></tr></tbody></table>
+<blockquote>
+<p>注意：查看抽屉对<strong>缺省采样比例</strong>按 <code>100%</code> 展示（服务端默认值），而列表的采样比例列对同样的缺省值显示 <code>-</code>。两者都是"接口未返回"的表现，不代表规则未生效。</p>
+</blockquote>
+<h2 id="165-删除规则与清空集合">16.5 删除规则与清空集合</h2>
+<p>编辑模式下点击行操作「删除」，弹出确认框「确认删除该镜像规则？删除后需提交并生效。」：点「确定」立即从列表移除并提示「删除成功!」，点「取消」提示「取消删除」。删除只作用于内存集合，<strong>必须再点「提交并生效」才真正删除</strong>。</p>
+<p><strong>清空集合 = 关闭镜像总开关</strong>：逐条删除至列表为空后提交，请求体为 <code>{"rules": []}</code>，语义是"不再镜像任何请求"，而不是删除集合本身。需要重新启用时，重新进入编辑模式新增规则并提交即可。</p>
+<blockquote>
+<p>只读视角：行操作仅渲染「查看」，写按钮「编辑」「删除」被隐藏（<code>v-has</code> 指令），无法删除或清空任何规则。</p>
+</blockquote>
+<h2 id="166-字段校验与错误提示">16.6 字段校验与错误提示</h2>
+<p>校验分两层：抽屉内 <code>RuleForm</code> 的表单校验（第一道，抽屉不关闭、不写入集合）与服务端接口约束（第二道兜底）。</p>
+<table><thead><tr><th>字段 / 场景</th><th>校验规则</th><th>错误提示</th></tr></thead><tbody><tr><td>规则名称</td><td>去空格后非空</td><td><code>请输入规则名称</code></td></tr><tr><td>规则名称</td><td>长度不超过 128 字符</td><td><code>规则名称长度应为 1-128 字符</code></td></tr><tr><td>规则名称</td><td>集合内唯一（编辑时排除自身；本地保存与提交前各查一次）</td><td><code>规则名称已存在，集合内必须唯一</code></td></tr><tr><td>生效条件</td><td>必填；表达式编译错误的提示优先于必填提示</td><td><code>请填写生效条件</code></td></tr><tr><td>生效条件</td><td>集合内唯一</td><td><code>生效条件重复，集合内必须唯一</code></td></tr><tr><td>镜像集群</td><td>必填</td><td><code>请选择镜像集群</code></td></tr><tr><td>镜像集群</td><td>服务端引用校验（集群不存在）</td><td>接口返回 422</td></tr><tr><td>采样比例</td><td>空值或非 <code>0</code>-<code>100</code></td><td><code>采样比例必须为 0-100 的整数</code></td></tr><tr><td>头部剔除（自定义）</td><td>逗号分隔后不得为空</td><td><code>自定义剔除列表不能为空</code></td></tr><tr><td>设置请求头</td><td>每行 key 与 value 均非空</td><td><code>设置请求头的名称与值均不能为空</code></td></tr><tr><td>请求体改写</td><td><code>value</code> 非空</td><td><code>请求体改写的值不能为空</code></td></tr><tr><td>路径改写</td><td>非空须以 <code>/</code> 开头</td><td><code>路径改写必须以 / 开头</code></td></tr><tr><td>表单整体</td><td>任一字段校验失败时点「本地保存」</td><td><code>请检查参数填写是否规范!</code></td></tr></tbody></table>
+<p>表单校验失败时抽屉保持打开、不写入集合；集合内查重失败时同样不发起提交请求。</p>
+<h2 id="167-只读视角">16.7 只读视角</h2>
+<p>以「系统管理员（只读）」登录时，本页只保留只读能力：</p>
+<ul><li><strong>保留</strong>：列表查看、搜索、排序、分页，「查看」抽屉（纯文案展示规则全部字段）。</li><li><strong>隐藏</strong>：页头「进入编辑模式」、「添加规则」、「退出编辑模式」、「提交并生效」，以及行操作的「编辑」「删除」。页面恒停留视图模式，编辑态入口整体不可达。</li><li><strong>兜底</strong>：后端对写端点 <code>PUT /traffic-mirror-rules</code> 做 403 校验，前端隐藏之外仍有服务端强制。</li></ul>
+<h2 id="168-注意事项">16.8 注意事项</h2>
+<ul><li><strong>两个「保存」不是一回事</strong>：抽屉里的「本地保存」只写进浏览器内存，<strong>只有「提交并生效」才会下发到 BFE</strong>；未提交就退出编辑模式，改动会被丢弃（有二次确认）。</li><li><strong>没有启用 / 停用开关</strong>：想临时停掉一条规则，把它的采样比例改成 <code>0</code>（命中但不采样），而不是删除；删除规则要连同提交一起做才生效。</li><li><strong>数组顺序即优先级，且新增规则插到最前面</strong>：新增规则会插入集合头部，因此它会<strong>先于</strong>已有规则命中（first-match-wins）。如果希望旧规则优先，需要重新编辑调整列表顺序后再提交，页面上没有拖拽或 <code>priority</code> 字段可用。</li><li><strong>全量匹配必须显式写 <code>default_t()</code></strong>：生效条件不接受空串，也不用"留空"表示全匹配；且同一集合内两条规则的生效条件不能相同——两条都写 <code>default_t()</code> 属于集合内重复，会被服务端 422 拒绝。全量镜像是双倍推理成本，建议先小比例（如 <code>1%</code>）验证。</li><li><strong>头部剔除的"缺省"与"显式默认名单"不同</strong>：选「使用默认黑名单」时提交体不带该字段，由服务端填默认黑名单；只有显式提交 <code>[]</code> 才是"不剔除任何头部"。若填自定义列表，请确认已剔除 <code>Authorization</code>、<code>Cookie</code>、<code>X-Api-Key</code> 等敏感头，避免凭证随副本流向镜像集群。</li><li><strong>模块级参数不在此页配置</strong>：镜像目标集群的鉴权凭证、分层超时 / 并发上限 / 熔断阈值由 BFE 静态配置下发，规则里只描述"哪些请求、按什么比例、发往哪个集群、怎么改写"；镜像流量不扣配额、不计用量，但确实会占用镜像集群的算力。配置变更会写入操作日志（详见 <a href="11-operation-logs.html">11 章</a>）；该页只读，不提供手工录入入口。</li></ul>
+  </main>
+</div>
+</body>
+</html>

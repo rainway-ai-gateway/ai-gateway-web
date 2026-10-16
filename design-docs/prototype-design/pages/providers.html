@@ -18,9 +18,10 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var root = Layout.render({ pageId: 'Provider.list', basePath: '../' });
+  var isReadonly = Prototype.isReadonly();
   root.innerHTML =
     '<div class="clusters">' +
-      IvuUI.btn('添加服务商', 'primary', 'small', '', 'id="btn-add-provider"') +
+      (isReadonly ? '' : IvuUI.btn('添加服务商', 'primary', 'small', '', 'id="btn-add-provider"')) +
       '<div id="provider-table"></div>' +
     '</div>' +
     drawerUpsert() +
@@ -140,15 +141,18 @@ document.addEventListener('DOMContentLoaded', function () {
           key: 'action',
           minWidth: 460,
           render: function (row) {
-            return (
-              '<div class="proto-table-actions">' +
+            var actions =
               IvuUI.btn('详情', 'success', 'small', '', 'data-action="detail" data-name="' + escapeAttr(row.name) + '"') +
-              IvuUI.btn('分段计价配置', 'warning', 'small', '', 'data-action="pricing-tiers" data-name="' + escapeAttr(row.name) + '"') +
-              IvuUI.btn('查询模型价格', 'primary', 'small', '', 'data-action="prices" data-name="' + escapeAttr(row.name) + '"') +
-              IvuUI.btn('编辑', 'primary', 'small', '', 'data-action="edit" data-name="' + escapeAttr(row.name) + '"') +
-              IvuUI.btn('删除', 'error', 'small', '', 'data-action="delete" data-name="' + escapeAttr(row.name) + '"') +
-              '</div>'
-            );
+              IvuUI.btn('查询模型价格', 'primary', 'small', '', 'data-action="prices" data-name="' + escapeAttr(row.name) + '"');
+            if (!isReadonly) {
+              actions =
+                IvuUI.btn('详情', 'success', 'small', '', 'data-action="detail" data-name="' + escapeAttr(row.name) + '"') +
+                IvuUI.btn('分段计价配置', 'warning', 'small', '', 'data-action="pricing-tiers" data-name="' + escapeAttr(row.name) + '"') +
+                IvuUI.btn('查询模型价格', 'primary', 'small', '', 'data-action="prices" data-name="' + escapeAttr(row.name) + '"') +
+                IvuUI.btn('编辑', 'primary', 'small', '', 'data-action="edit" data-name="' + escapeAttr(row.name) + '"') +
+                IvuUI.btn('删除', 'error', 'small', '', 'data-action="delete" data-name="' + escapeAttr(row.name) + '"');
+            }
+            return '<div class="proto-table-actions">' + actions + '</div>';
           }
         }
       ],
@@ -309,7 +313,8 @@ document.addEventListener('DOMContentLoaded', function () {
     Prototype.openDrawer('drawer-provider-detail');
   }
 
-  document.getElementById('btn-add-provider').addEventListener('click', function () {
+  var addProviderBtn = document.getElementById('btn-add-provider');
+  if (addProviderBtn) addProviderBtn.addEventListener('click', function () {
     openUpsert(true, {});
   });
 

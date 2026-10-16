@@ -24,6 +24,7 @@
           <div class="route-header-actions">
             <Button
               v-show="mode === 'edit'"
+              v-has
               size="small"
               type="primary"
               @click="onAddRule"
@@ -31,7 +32,7 @@
               {{ $t('aiCache.addRule') }}
             </Button>
           </div>
-          <div class="route-header-submit">
+          <div v-has class="route-header-submit">
             <template v-if="mode === 'view'">
               <Button size="small" type="primary" @click="enterEditMode">
                 {{ $t('route.enterEditMode') }}
@@ -45,6 +46,7 @@
                 size="small"
                 type="success"
                 :loading="submitting"
+                :disabled="!isDirty"
                 @click="submitRules"
               >
                 {{ $t('com.submitAndEffect') }}
@@ -58,7 +60,13 @@
           :columns="ruleColumns"
           :tableData="rules"
           :loading="loading"
+          :draggable="mode === 'edit'"
+          @dragDrop="onRuleDragDrop"
         />
+
+        <div v-if="mode === 'edit'" class="drag-tip">
+          {{ $t('aiCache.dragToChangeOrder') }}
+        </div>
       </TabPane>
 
       <TabPane :label="$t('aiCache.tabSemantic')" name="semantic">
@@ -66,7 +74,7 @@
           <div class="route-owner-label">
             {{ $t('aiCache.semanticSubtitle') }}
           </div>
-          <div class="route-header-submit">
+          <div v-has class="route-header-submit">
             <template v-if="semanticMode === 'view'">
               <Button size="small" type="primary" @click="enterSemanticEditMode">
                 {{ $t('com.edit') }}
@@ -299,6 +307,19 @@ export default {
     }
   },
 
+  beforeRouteLeave(to, from, next) {
+    if (this.mode === 'edit' && this.isDirty) {
+      this.$Modal.confirm({
+        title: this.$t('com.informationTips'),
+        content: this.$t('aiCache.exitConfirm'),
+        onOk: () => next(),
+        onCancel: () => next(false)
+      });
+      return;
+    }
+    next();
+  },
+
   methods: {
     buildRuleColumns() {
       const that = this;
@@ -406,6 +427,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'primary' },
+                  directives: [{ name: 'has' }],
                   style: { marginRight: '8px' },
                   on: { click: () => that.onEditRule(row) }
                 },
@@ -415,6 +437,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'error' },
+                  directives: [{ name: 'has' }],
                   on: { click: () => that.onDeleteRule(row) }
                 },
                 that.$t('com.del')
@@ -595,6 +618,16 @@ export default {
       });
     },
 
+    onRuleDragDrop(startIndex, endIndex) {
+      if (startIndex === endIndex) {
+        return;
+      }
+      const rules = cloneDeep(this.rules);
+      const [moved] = rules.splice(startIndex, 1);
+      rules.splice(endIndex, 0, moved);
+      this.rules = rules;
+    },
+
     onFormSubmit(data) {
       const excludeIndex = this.formMode === 'edit' ? this.currentRuleIndex : -1;
       const duplicated = this.rules.some((rule, index) => {
@@ -767,6 +800,12 @@ export default {
     flex: 1;
     color: #17233d;
     word-break: break-all;
+  }
+
+  .drag-tip {
+    margin-top: 8px;
+    color: #808695;
+    font-size: 12px;
   }
 }
 </style>

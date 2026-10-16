@@ -545,7 +545,7 @@ export default {
             if (!protocols.length) {
                 return false;
             }
-            const pool = this.activePool;
+            const pool = this.livePool.length ? this.livePool : this.instancePoolData;
             const schema = (this.formData.model_endpoint && this.formData.model_endpoint.schema) || 'https';
             const instances = formatInstancePoolForApi(pool, schema);
             return instances.some(item => String(item.addr || '').trim());

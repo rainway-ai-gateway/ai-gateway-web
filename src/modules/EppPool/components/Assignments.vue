@@ -246,6 +246,7 @@ export default {
               'Button',
               {
                 props: { type: 'primary', size: 'small' },
+                directives: [{ name: 'has' }],
                 on: {
                   click: () => this.openOverride(row.cluster),
                 },

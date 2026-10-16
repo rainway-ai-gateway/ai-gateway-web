@@ -26,6 +26,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var root = Layout.render({ pageId: 'BatchTask.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
         root.innerHTML = '<div id="batch-page"></div>';
 
         var PAGE_LIMIT = 5;
@@ -190,6 +191,7 @@
                 } },
               { title: '创建时间', key: 'created_at', minWidth: 165 },
               { title: '操作', key: 'action', width: 150, render: function (row, rowIndex) {
+                  if (isReadonly) return IvuUI.btn('详情', 'primary', 'small', '', 'data-batch-detail="' + rowIndex + '"');
                   var btns = IvuUI.btn('详情', 'primary', 'small', '', 'data-batch-detail="' + rowIndex + '"');
                   if (isTerminal(row.status)) {
                     btns += ' ' + IvuUI.btn('取消', 'default', 'small', '', 'disabled title="终态任务不可取消"');

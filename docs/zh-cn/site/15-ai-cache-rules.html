@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>15 功能增强：AI缓存规则</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a class="active" href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="15-功能增强ai缓存规则">15 功能增强：AI缓存规则</h1>
+<p>AI 缓存规则用来回答两个问题：<strong>哪些请求允许走应答缓存</strong>、<strong>用什么规则去算缓存键</strong>。命中缓存时网关直接返回上一次相同请求的应答，不再转发到后端模型服务，从而降低推理成本、压缩首字延迟。</p>
+<p>菜单路径：<strong>功能增强 → AI缓存规则</strong>（页面路由名 <code>AICacheRule.list</code>）。页面由两个页签组成，各管一块配置：</p>
+<table><thead><tr><th>页签</th><th>内容</th><th>如何生效</th></tr></thead><tbody><tr><td>缓存规则</td><td>规则列表（集合级，8 列）；支持「视图 / 编辑」双模式；页头右上角为「进入编辑模式」，或编辑态下的「退出编辑模式」+「提交并生效」</td><td>点「提交并生效」一次性整体下发全部规则</td></tr><tr><td>语义设置</td><td>语义缓存全局设置（单例，全局生效）；查看态为纯文案，编辑态为三字段表单；页头右上角为「编辑」，或编辑态下的「取消」+「保存」</td><td>点「保存」单独下发，与规则集合互不影响</td></tr></tbody></table>
+<p>两件事必须先记住：</p>
+<ul><li><strong>规则按列表顺序匹配，首条命中即生效</strong>，所以列表顺序本身就是优先级，界面不提供显式的「优先级」字段。</li><li>规则集合是<strong>整体替换</strong>的（没有单条启用开关，「不要这条规则」就是从列表里删掉它）；语义设置是<strong>单例覆盖</strong>的，清空规则不会影响语义设置，反之亦然。</li></ul>
+<blockquote>
+<p>只读视角：以「系统管理员（只读）」（<code>role = system_admin_readonly</code>）登录时，本页所有写入口整体隐藏——「添加规则」「进入编辑模式」「退出编辑模式」「提交并生效」「本地保存」「重置」「编辑」「删除」「保存」都不显示，页面恒停留在视图模式。只保留只读能力：规则列表「操作」列的「查看」按钮（可正常打开只读抽屉），以及「语义设置」页签的查看态文案行。列表的搜索、排序、分页仍可正常使用。</p>
+</blockquote>
+<h2 id="151-页面构成与规则列表">15.1 页面构成与规则列表</h2>
+<p>进入页面后默认停在「缓存规则」页签，页头左侧是页面标题「AI 缓存规则（集合级，按优先级顺序匹配，首条命中生效）」。</p>
+<p><img src="images/15-ai-cache-list.png" alt="AI缓存规则列表" loading="lazy" /></p>
+<p><strong>表格列说明</strong>：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>规则名</td><td>规则标识，用于可读性与审计（不是寻址键）；支持搜索</td></tr><tr><td>表达式</td><td>生效条件，命中该表达式的请求启用缓存；支持搜索</td></tr><tr><td>缓存键策略</td><td>标签展示：仅最后一个问题（<code>lastQuestion</code>）／全部问题（<code>allQuestions</code>）／缓存豁免（<code>disabled</code>）；<code>disabled</code> 为橙色标签，其余为蓝色标签；支持下拉筛选</td></tr><tr><td>缓存 TTL</td><td><code>0</code> 显示「不过期（0）」，其他值显示「<code>{值}</code> 秒」；空值显示 <code>-</code></td></tr><tr><td>最大请求体</td><td>按 <code>{值} B</code> 展示（如 <code>1048576 B</code>）；空值显示 <code>-</code></td></tr><tr><td>最大缓存值</td><td>按 <code>{值} B</code> 展示；空值显示 <code>-</code></td></tr><tr><td>语义缓存</td><td>标签「开启」（绿色）／「关闭」（灰色）</td></tr><tr><td>操作</td><td>视图模式仅「查看」；编辑模式为「编辑」「删除」</td></tr></tbody></table>
+<p><strong>行顺序</strong>：表格行顺序与接口返回的规则数组顺序完全一致（首行 = 数组第 1 项 = 最高优先级），列表不做任何自动重排。</p>
+<p><strong>搜索、排序与分页</strong>：</p>
+<ul><li>表头下方有一行搜索框，可对「规则名」「表达式」做关键字模糊查询，「缓存键策略」为下拉筛选（提示「请选择缓存键策略」）；搜索在前端对已加载的规则集合即时过滤，接口本身不接收分页与筛选参数。</li><li>点击「规则名」「表达式」「缓存键策略」「缓存 TTL」「最大请求体」「最大缓存值」的表头可排序，点击顺序为升序 → 降序 → 取消排序。「语义缓存」「操作」两列不支持排序。</li><li>底部分页默认每页 20 条，可切换每页 20 / 30 / 40 / 50 条。</li><li>加载失败时页面提示「加载 AI 缓存规则失败」，表格为空。</li></ul>
+<h2 id="152-视图--编辑双模式与提交并生效">15.2 视图 / 编辑双模式与「提交并生效」</h2>
+<p>规则的增、删、改必须在<strong>编辑模式</strong>下进行。同一个规则列表在两种模式下呈现不同的按钮：</p>
+<table><thead><tr><th>页面状态</th><th>页头左侧</th><th>页头右上角</th><th>行「操作」列</th></tr></thead><tbody><tr><td>视图模式（默认）</td><td>—</td><td>「进入编辑模式」</td><td>「查看」</td></tr><tr><td>编辑模式</td><td>「添加规则」</td><td>「退出编辑模式」「提交并生效」</td><td>「编辑」「删除」</td></tr></tbody></table>
+<p><strong>标准操作顺序（两步保存，缺一不可）</strong>：</p>
+<table><thead><tr><th>步骤</th><th>操作</th><th>作用</th><th>是否影响线上</th></tr></thead><tbody><tr><td>1</td><td>点击「进入编辑模式」</td><td>进入可编辑状态</td><td>不影响</td></tr><tr><td>2</td><td>添加 / 编辑 / 删除规则</td><td>修改规则内容</td><td>不影响</td></tr><tr><td>3</td><td>点击抽屉里的「本地保存」</td><td>把这条规则放进页面列表（本地草稿）</td><td><strong>仍不影响</strong></td></tr><tr><td>4</td><td>点击「提交并生效」</td><td>把整个规则集合真正下发到网关</td><td><strong>正式生效</strong></td></tr></tbody></table>
+<blockquote>
+<p>关键提醒：只有第 4 步「提交并生效」才会让规则生效。只点了「本地保存」就退出页面，改动会丢失。</p>
+</blockquote>
+<p><strong>退出编辑模式</strong>：若本次编辑产生了未提交的改动，点击「退出编辑模式」会弹出「信息提示」对话框，内容为「当前有未提交的改动，退出编辑模式将丢弃这些改动，确认退出？」。点「确定」回滚到进入编辑模式前的规则快照并提示「已退出编辑模式」；点「取消」留在编辑模式并提示「已取消退出」。没有改动时直接退出，不弹窗。</p>
+<p><strong>提交并生效</strong>：按钮带加载态，提交前先做集合内规则名查重，重名则中断并提示「规则名称已存在，集合内必须唯一」。提交以「整体替换」语义写入整个规则集合：不在提交列表中的规则即被删除，空列表 <code>{"rules": []}</code> 表示清空全部规则。成功后提示「提交并生效成功！」，自动回到视图模式并重新拉取集合；失败提示「提交失败!」。</p>
+<blockquote>
+<p>配置下发到数据面存在时延（依赖 conf-agent 轮询与网关热加载），通常为数秒到数十秒。提交成功后立即用 curl 压测未命中缓存属正常现象，可等待 10～30 秒再试。</p>
+</blockquote>
+<h2 id="153-添加--编辑缓存规则">15.3 添加 / 编辑缓存规则</h2>
+<p>编辑模式下有两种入口，都会从右侧滑出宽度 60% 的抽屉：</p>
+<ul><li>点击页头左侧「添加规则」，抽屉标题为「添加缓存规则」，字段为默认值；</li><li>点击行「操作」列的「编辑」，抽屉标题为「编辑缓存规则」，字段预填该规则当前值。</li></ul>
+<p><img src="images/15-ai-cache-rule-form.png" alt="添加缓存规则" loading="lazy" /></p>
+<p><strong>表单字段</strong>：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>规则名</td><td>是</td><td>空</td><td>去除首尾空白后不能为空；长度 1-128 字符；同一集合内不能重名</td><td>规则标识，仅用于可读性与审计；占位提示「请输入规则名称，1-128 字符，集合内唯一」</td></tr><tr><td>表达式</td><td>是</td><td>空</td><td>不能为空；须能通过网关条件编译校验（编译失败时优先展示编译错误）</td><td>生效条件，命中该表达式的请求按本规则启用缓存；由上方构造器点选生成或直接编辑</td></tr><tr><td>缓存键策略</td><td>否</td><td><code>lastQuestion</code>（仅最后一个问题）</td><td>只能是 <code>lastQuestion</code> / <code>allQuestions</code> / <code>disabled</code> 三值，下拉不提供其他取值</td><td>决定按请求中哪部分内容生成缓存键；选 <code>disabled</code> 时字段下方出现黄色提示「该规则命中时将跳过缓存（缓存豁免）。」</td></tr><tr><td>缓存 TTL（秒，0 表示不过期）</td><td>否</td><td><code>0</code></td><td>整数且 ≥ 0；表单不允许留空（留空按「缓存 TTL 不能小于 0」拦截）</td><td><code>0</code> = 缓存永不过期；列表按「不过期（0）」或「<code>{值}</code> 秒」展示</td></tr><tr><td>最大请求体（字节）</td><td>否</td><td><code>1048576</code>（1MB）</td><td>整数且 &gt; 0；表单不允许留空（留空提示「最大请求体必须大于 0」）</td><td>请求体超过该大小时不读不写缓存</td></tr><tr><td>最大缓存值（字节）</td><td>否</td><td><code>1048576</code>（1MB）</td><td>整数且 &gt; 0；表单不允许留空（留空提示「最大缓存值必须大于 0」）</td><td>应答（缓存值）超过该大小时不写缓存</td></tr><tr><td>语义缓存</td><td>否</td><td>关闭</td><td>布尔值，无额外校验</td><td>开启后，该规则命中且精确缓存未命中时，走向量相似度检索（详见 <a href="#156-语义设置单例">15.6</a>）；开关右侧提示「缓存键策略为 disabled 时忽略此项」</td></tr></tbody></table>
+<p><strong>缓存键策略三种取值的含义</strong>：</p>
+<table><thead><tr><th>取值</th><th>界面文案</th><th>含义</th></tr></thead><tbody><tr><td><code>lastQuestion</code></td><td>仅最后一个问题（lastQuestion）</td><td>以对话中<strong>最后一个问题</strong>为缓存键的取模来源（默认值）</td></tr><tr><td><code>allQuestions</code></td><td>全部问题（allQuestions）</td><td>以对话中<strong>全部问题</strong>为缓存键的取模来源；追问链不同则不复用缓存</td></tr><tr><td><code>disabled</code></td><td>缓存豁免（disabled）</td><td><strong>显式不缓存</strong>：该规则命中的请求不读也不写缓存，并且不再继续匹配后面的规则</td></tr></tbody></table>
+<blockquote>
+<p>缓存键的具体构成方式、命中响应模板、GJSON 提取路径等高级字段本期不开放，由网关按内置默认值处理。</p>
+</blockquote>
+<blockquote>
+<p>命名口径：列表与表单中这两个字段的界面文案为「规则名」「表达式」，校验提示的措辞是「请输入规则名称」「请填写生效条件」「规则名称长度应为 1-128 字符」，两者指同一字段。</p>
+</blockquote>
+<p><strong>抽屉底部按钮</strong>：</p>
+<ul><li><strong>本地保存</strong>：先做表单校验，通过后写入页面列表草稿并关闭抽屉——新增提示「添加成功！」，编辑提示「保存成功！」。此时未下发任何请求，必须再点「提交并生效」。校验失败时提示「请检查参数填写是否规范!」，抽屉保持打开。</li><li><strong>重置</strong>：把抽屉内字段恢复到打开抽屉时的状态（新增 = 恢复默认值，编辑 = 恢复该规则的当前值），抽屉不关闭。</li></ul>
+<p><strong>顺序规则</strong>：新增的规则会被插入列表<strong>最前面</strong>（优先级最高），已有规则的相对顺序不变；编辑规则不改变其所在位置。想调整优先级，就在编辑模式下用删除 + 新增的方式重排。</p>
+<h2 id="154-查看缓存规则">15.4 查看缓存规则</h2>
+<p>在<strong>视图模式</strong>下点击行「操作」列的「查看」（编辑模式下该按钮被「编辑」「删除」替代），右侧滑出只读抽屉，标题为「查看缓存规则」。</p>
+<p><img src="images/15-ai-cache-rule-view.png" alt="查看缓存规则" loading="lazy" /></p>
+<p>抽屉以纯文案逐行展示 7 项，值取自同一次列表请求的响应，与列表行完全一致：</p>
+<table><thead><tr><th>展示项</th><th>说明</th></tr></thead><tbody><tr><td>规则名</td><td>空值显示 <code>-</code></td></tr><tr><td>表达式</td><td>空值显示 <code>-</code>，以等宽字体展示</td></tr><tr><td>缓存键策略</td><td>中文等价文案（如「缓存豁免（disabled）」）</td></tr><tr><td>缓存 TTL</td><td>「不过期（0）」或「<code>{值}</code> 秒」</td></tr><tr><td>最大请求体</td><td><code>{值} B</code></td></tr><tr><td>最大缓存值</td><td><code>{值} B</code></td></tr><tr><td>语义缓存</td><td>「开启」/「关闭」；当缓存键策略为「缓存豁免（disabled）」时，后缀「（策略为 disabled，忽略）」</td></tr></tbody></table>
+<p>抽屉内没有任何输入控件、没有必填星号、没有底部操作按钮，纯查看。</p>
+<h2 id="155-删除规则与清空集合">15.5 删除规则与清空集合</h2>
+<p><strong>删除单条</strong>：编辑模式下点击行「操作」列的「删除」，弹出「信息提示」确认框，内容为「确认删除该缓存规则？删除后需提交并生效。」。点「确定」从页面集合中移除该行并提示「删除成功!」；点「取消」提示「取消删除」，集合不变。删除只作用于本地草稿，务必要点「提交并生效」才真正删除；若删完直接点「退出编辑模式」，删除会被回滚。</p>
+<p><strong>清空全部</strong>：界面没有单独的「清空」按钮。在编辑模式下逐条删除所有规则后点「提交并生效」，提交内容即为空集合 <code>{"rules": []}</code>，网关侧没有任何规则命中，所有请求都不走缓存。清空规则不会影响「语义设置」页签的配置。</p>
+<h2 id="156-语义设置单例">15.6 语义设置（单例）</h2>
+<p>切换到「语义设置」页签，页头副标题为「语义缓存全局设置（单例，全局生效）」，卡片标题为「语义缓存全局设置」。这一组调优参数全系统仅有一份，与该页的规则集合是两套独立配置。</p>
+<p><img src="images/15-ai-cache-semantic.png" alt="语义设置" loading="lazy" /></p>
+<p><strong>查看态</strong>：纯文案展示三行——Top K、相似度阈值、阈值比较关系（关系以中文等价文案展示，如 <code>lt</code> → 「小于（lt，&lt;）」）。页头右上角仅有「编辑」按钮。</p>
+<p><strong>编辑态</strong>：点「编辑」后三字段变为可编辑控件（标签前带红色 <code>*</code>），按钮变为「取消」「保存」：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>Top K（1-10，默认 1）</td><td>是（编辑态）</td><td><code>1</code></td><td>整数，取值 1-10（非整数、越界、留空均被拦截）</td><td>向量检索的近邻个数；仅取最优（最相似）的一条参与阈值判定</td></tr><tr><td>相似度阈值（0-2，默认 0.15）</td><td>是（编辑态）</td><td><code>0.15</code></td><td>数值，取值 0-2，步长 0.01</td><td>命中缓存的比较阈值；量纲由「阈值比较关系」决定。默认 <code>0.15</code> 是向量库 cosine distance 语境的保守值，上线前应按实际 embedding 模型校准</td></tr><tr><td>阈值比较关系（命中条件：相似度 &lt;关系&gt; 阈值）</td><td>是（编辑态）</td><td><code>lt</code>（小于）</td><td>只能是 <code>lt</code> / <code>lte</code> / <code>gt</code> / <code>gte</code> 四值，大小写敏感</td><td>阈值比较方向，见下表</td></tr></tbody></table>
+<p><strong>阈值比较关系取值</strong>：</p>
+<table><thead><tr><th>取值</th><th>界面文案</th><th>适用语义</th></tr></thead><tbody><tr><td><code>lt</code></td><td>小于（lt，&lt;）</td><td>距离（distance）语义，越小越相似；默认值</td></tr><tr><td><code>lte</code></td><td>小于等于（lte，≤）</td><td>距离语义，含等于</td></tr><tr><td><code>gt</code></td><td>大于（gt，&gt;）</td><td>相似度（similarity）语义，越大越相似</td></tr><tr><td><code>gte</code></td><td>大于等于（gte，≥）</td><td>相似度语义，含等于</td></tr></tbody></table>
+<p><strong>操作说明</strong>：</p>
+<ul><li><strong>保存</strong>：先做表单校验（失败提示「请检查参数填写是否规范!」并保持编辑态），通过后提交并提示「语义缓存设置保存成功！」，随后回到查看态并重新拉取设置。</li><li><strong>取消</strong>：丢弃未保存的改动，回到查看态，展示值恢复为修改前；<strong>不会发送任何保存请求</strong>。</li><li>只读管理员登录时，此处「编辑」「保存」入口不显示，恒为查看态。</li></ul>
+<blockquote>
+<p>接口与界面口径差异：接口层三个字段都是「非必填，未传时按 <code>1</code> / <code>0.15</code> / <code>lt</code> 处理」，界面编辑态则一律按必填渲染、不允许留空提交。二者不矛盾——程序化调用可以只传其中一个字段，控制台界面必须三项都填。</p>
+</blockquote>
+<h2 id="157-生效条件表达式与生效机制">15.7 生效条件表达式与生效机制</h2>
+<h3 id="表达式字段">表达式字段</h3>
+<p>「表达式」是网关的条件表达式，由字段上方的构造器分区点选生成（host、port、method、path、query、cookie、header、clientIP、proto、system、body 等维度，完整按钮清单见 <a href="10-route.html#104-添加--编辑规则">10.4 添加 / 编辑规则</a>），也可以直接在文本框中手写。表达式改动后会调用网关的条件编译校验：编译失败时在字段下方以单行红字展示编译错误，编译通过才能保存。</p>
+<p>常用示例：</p>
+<table><thead><tr><th>场景</th><th>表达式示例</th></tr></thead><tbody><tr><td>兜底匹配全部请求</td><td><code>default_t()</code></td></tr><tr><td>只缓存对话补全接口</td><td><code>req_path_in("/v1/chat/completions", false)</code></td></tr><tr><td>只缓存某个模型</td><td><code>req_body_json_in("model", "deepseek-chat", false)</code></td></tr><tr><td>路径 + 模型组合</td><td><code>req_path_in("/v1/chat/completions", false) &amp;&amp; req_body_json_in("model", "deepseek-chat", false)</code></td></tr></tbody></table>
+<blockquote>
+<p>表达式末尾的 <code>true</code> / <code>false</code> 表示是否忽略大小写，<code>false</code> 为区分大小写。</p>
+</blockquote>
+<h3 id="数据面生效逻辑">数据面生效逻辑</h3>
+<ul><li>请求到达后按规则列表<strong>从上到下逐条匹配表达式</strong>，首条命中的规则决定该请求的缓存行为，后续规则不再参与。</li><li>命中规则的策略为 <code>lastQuestion</code> / <code>allQuestions</code> 时，按对应缓存键读写缓存，并受「缓存 TTL」「最大请求体」「最大缓存值」三项限制：请求体超限不读不写、应答超限不写入。</li><li>命中规则的策略为 <code>disabled</code>（缓存豁免）时，该请求不读不写缓存，且<strong>阻断后续规则</strong>——这是「整体开启缓存、只排除个别模型或路径」的标准写法：把豁免规则放在前面，把兜底开启缓存的规则放在后面。</li><li>规则的「语义缓存」开关开启时，命中规则且精确缓存未命中，才会继续走 embedding + 向量相似度检索；检索参数取自「语义设置」页签。语义缓存依赖网关侧静态配置的 embedding / vector 服务，未配置时数据面自动降级为纯精确缓存，与本页设置无关。</li></ul>
+<h3 id="操作日志">操作日志</h3>
+<p>本页的写操作都会进入操作日志：规则集合提交的记录类型为 <code>ai_cache_rule</code>，语义设置的记录类型为 <code>ai_cache_semantic_settings</code>，变更前后内容为整份集合 / 整份设置的快照。校验失败（4xx）同样会记一条失败日志，其中变更前快照取自数据库现状。查询方式见 <a href="11-operation-logs.html">11 操作日志</a>。</p>
+<h2 id="158-注意事项">15.8 注意事项</h2>
+<ul><li><strong>默认值陷阱</strong>：<code>缓存 TTL</code> 默认 <code>0</code>，含义是<strong>永不过期</strong>（不是「不缓存」）；两个字节上限默认 1MB，超出即静默不缓存；「语义缓存」默认关闭。另外「缓存 TTL」「最大请求体」「最大缓存值」三个输入框<strong>清空后不会自动回落到默认值</strong>，而是被校验拦截（分别提示「缓存 TTL 不能小于 0」「最大请求体必须大于 0」「最大缓存值必须大于 0」）。</li><li><strong>顺序就是优先级</strong>：匹配首条命中即停止，更具体的规则（豁免、单模型）必须排在更宽泛的规则（整接口兜底）前面；新增规则会自动插到列表最前面，注意它可能抢走原本由老规则命中的流量。</li><li><strong>「从列表移除」≠「缓存豁免」</strong>：前者是控制面动作（这条规则不存在，请求继续匹配后面的规则）；后者是数据面动作（规则命中，明确不缓存，且阻断后续规则）。想临时停用一条规则，从列表删掉再提交；想永久排除某类流量，用「缓存豁免（disabled）」。</li><li><strong>两步保存</strong>：抽屉里的「本地保存」只写页面草稿，离开编辑模式会被丢弃；只有页头右上角的「提交并生效」才真正下发。规则集合与语义设置<strong>各自独立提交</strong>，保存规则不会顺带保存设置，反之亦然。</li><li><strong>规则名查重范围只在集合内</strong>，且提交前会再查一次；重名时既拦本地保存也拦提交并生效。</li><li><strong>界面与接口的必填口径不同</strong>：接口允许省略「Top K / 相似度阈值 / 阈值比较关系」并按默认值落库，但控制台界面不允许留空；只通过 API 做自动化时按接口契约传参即可。</li></ul>
+  </main>
+</div>
+</body>
+</html>

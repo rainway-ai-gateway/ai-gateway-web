@@ -576,6 +576,109 @@
             </li>
           </ul>
         </template>
+        <ul
+          v-if="balanceModeData.balance_mode === 'EPP' && displayEppRuntime"
+          class="clearFloat detail-row-block policy-row"
+        >
+          <li class="title">{{ $t('gatewayConfig.eppRuntime') }}:</li>
+          <li class="value">
+            <Card class="policy-card">
+              <Row :gutter="24" class="review-row">
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppCheckDisabled') }}:
+                    </div>
+                    <div class="review-value">
+                      {{
+                        displayEppRuntime.check.disabled
+                          ? $t('com.enable')
+                          : $t('com.deactivate')
+                      }}
+                    </div>
+                  </div>
+                </Col>
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppCheckInterval') }}:
+                    </div>
+                    <div class="review-value">
+                      {{ displayEppRuntime.check.check_interval }}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+              <Row :gutter="24" class="review-row">
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppFailThreshold') }}:
+                    </div>
+                    <div class="review-value">
+                      {{ displayEppRuntime.check.fail_threshold }}
+                    </div>
+                  </div>
+                </Col>
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppCooldown') }}:
+                    </div>
+                    <div class="review-value">
+                      {{ displayEppRuntime.check.cooldown }}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+              <Row :gutter="24" class="review-row">
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppSuccessThreshold') }}:
+                    </div>
+                    <div class="review-value">
+                      {{ displayEppRuntime.check.success_threshold }}
+                    </div>
+                  </div>
+                </Col>
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppConnectTimeout') }}:
+                    </div>
+                    <div class="review-value">
+                      {{ displayEppRuntime.timeout.connect }}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+              <Row :gutter="24" class="review-row">
+                <Col span="12">
+                  <div class="review-item">
+                    <div class="review-label">
+                      {{ $t('gatewayConfig.eppCallTimeout') }}:
+                    </div>
+                    <div class="review-value">
+                      {{ displayEppRuntime.timeout.call }}
+                    </div>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          </li>
+        </ul>
+        <ul
+          v-else-if="balanceModeData.balance_mode === 'EPP'"
+          class="clearFloat"
+        >
+          <li class="title">{{ $t('gatewayConfig.eppRuntime') }}:</li>
+          <li class="value">
+            <span class="empty-text">{{
+              $t('gatewayConfig.eppRuntimeUnset')
+            }}</span>
+          </li>
+        </ul>
       </div>
     </div>
   </div>
@@ -831,6 +934,45 @@ export default {
                 no_endpoint_queue_ttl: 60,
                 enable_eviction: false,
                 ...(epp.flow_control || {})
+            };
+        },
+        displayEppRuntime() {
+            const rt = this.balanceModeData && this.balanceModeData.epp_runtime;
+            if (!rt) {
+                return null;
+            }
+            const check = rt.check || null;
+            const timeout = rt.timeout || null;
+            // 未配置 check/timeout 视为未配置（GET 返回 null；空对象不展示为默认值已落盘）
+            if (!check && !timeout) {
+                return null;
+            }
+            const isTrue = value => value === true || value === 'true';
+            return {
+                check: {
+                    disabled: !!(check && isTrue(check.disabled)),
+                    check_interval:
+                        check && check.check_interval != null
+                            ? check.check_interval
+                            : '2s',
+                    fail_threshold:
+                        check && check.fail_threshold != null
+                            ? check.fail_threshold
+                            : 3,
+                    cooldown:
+                        check && check.cooldown != null ? check.cooldown : '45s',
+                    success_threshold:
+                        check && check.success_threshold != null
+                            ? check.success_threshold
+                            : 2
+                },
+                timeout: {
+                    connect:
+                        timeout && timeout.connect != null
+                            ? timeout.connect
+                            : '500ms',
+                    call: timeout && timeout.call != null ? timeout.call : '3s'
+                }
             };
         }
     },

@@ -59,6 +59,7 @@
         </FormItem>
         <div>
           <Button
+            v-has
             type="primary"
             :loading="triggering"
             @click="onTrigger"

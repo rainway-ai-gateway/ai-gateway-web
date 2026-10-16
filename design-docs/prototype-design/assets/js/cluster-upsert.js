@@ -92,6 +92,9 @@ window.ClusterUpsert = (function () {
       epp_config: row.epp_config
         ? JSON.parse(JSON.stringify(row.epp_config))
         : null,
+      epp_runtime: row.epp_runtime
+        ? JSON.parse(JSON.stringify(row.epp_runtime))
+        : null,
       baseConfigData: {
         name: row.name || '',
         description: row.description || '',
@@ -1043,7 +1046,7 @@ window.ClusterUpsert = (function () {
         '<span style="color:#999;margin-left:8px;font-size:12px;">当前不支持开启，保持关闭</span>';
 
       var flowControlHtml =
-        '<div class="llm-card"><div class="llm-card-title" id="proto-epp-flow-control-toggle" style="cursor:pointer;">流控配置 ▾</div><div class="llm-card-body" id="proto-epp-flow-control-body">' +
+        '<div class="llm-card"><div class="llm-card-title">流控配置</div><div class="llm-card-body" id="proto-epp-flow-control-body">' +
         IvuUI.formTop(
           IvuUI.formTopItem(
             '最大请求数' + helpIcon('大于 0 的整数或 -1 表示不限制；缺省表示不限'),
@@ -1092,6 +1095,67 @@ window.ClusterUpsert = (function () {
             fallbackHtml +
             metricsStalenessHtml,
         ) + flowControlHtml;
+
+      var rt = epp.epp_runtime || {};
+      var rtCheck = rt.check || {};
+      var rtTimeout = rt.timeout || {};
+
+      var checkDisabledSwitchHtml =
+        '<div class="ivu-switch' +
+        (rtCheck.disabled ? ' ivu-switch-checked' : '') +
+        '" id="proto-epp-check-disabled-switch">' +
+        '<span class="ivu-switch-inner"></span></div>';
+
+      var eppRuntimeHtml =
+        '<div class="llm-card"><div class="llm-card-title">EPP 运行时参数</div><div class="llm-card-body" id="proto-epp-runtime-body">' +
+        IvuUI.formTop(
+          IvuUI.formTopItem(
+            '关闭后台健康检查' +
+              helpIcon('开启后不进行 EPP 后台健康检查（不建议生产关闭），默认关闭'),
+            checkDisabledSwitchHtml,
+          ) +
+            IvuUI.formTopItem(
+              '健康检查间隔',
+              durationFieldHtml('epp.epp_runtime.check.check_interval', rtCheck.check_interval, 's'),
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '失败次数阈值',
+              '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_runtime.check.fail_threshold" value="' +
+                (rtCheck.fail_threshold != null ? rtCheck.fail_threshold : 3) +
+                '" min="1" /></div>',
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '冷却时长' +
+                helpIcon('冷却期内不切回已失败地址，合法 Go duration 且 > 0，默认 45s'),
+              durationFieldHtml('epp.epp_runtime.check.cooldown', rtCheck.cooldown, 's'),
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '成功次数阈值',
+              '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_runtime.check.success_threshold" value="' +
+                (rtCheck.success_threshold != null
+                  ? rtCheck.success_threshold
+                  : 2) +
+                '" min="1" /></div>',
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '连接超时',
+              durationFieldHtml('epp.epp_runtime.timeout.connect', rtTimeout.connect, 'ms'),
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '调用超时' +
+                helpIcon('首条消息收发超时，合法 Go duration 且 > 0，默认 3s'),
+              durationFieldHtml('epp.epp_runtime.timeout.call', rtTimeout.call, 's'),
+              true,
+            ),
+        ) +
+        '</div></div>';
+
+      eppConfigHtml = eppConfigHtml + eppRuntimeHtml;
     }
 
     return '<div class="epp-config">' + eppConfigHtml + '</div>';
@@ -1126,6 +1190,9 @@ window.ClusterUpsert = (function () {
     var balanceMode = data.balance_mode || 'WRR';
     var ec = data.epp_config || {};
     var fc = ec.flow_control || {};
+    var rt = data.epp_runtime || {};
+    var rtCheck = rt.check || {};
+    var rtTimeout = rt.timeout || {};
     var isEpp = balanceMode === 'EPP';
     var stickyEnabled =
       b.sticky_sessions && b.sticky_sessions.enabled === 'true';
@@ -1343,7 +1410,39 @@ window.ClusterUpsert = (function () {
         (fc.no_endpoint_queue_ttl != null && fc.no_endpoint_queue_ttl !== ''
           ? reviewRow('流控-无端点队列 TTL（秒）', fc.no_endpoint_queue_ttl)
           : '') +
-        reviewRow('流控-启用驱逐', '关闭（当前不支持开启）');
+        reviewRow('流控-启用驱逐', '关闭（当前不支持开启）') +
+        (rt.check || rt.timeout
+          ? reviewRow(
+              '关闭后台健康检查',
+              rtCheck.disabled ? '开启' : '关闭',
+            ) +
+            reviewRow(
+              '健康检查间隔',
+              rtCheck.check_interval != null ? rtCheck.check_interval : '2s',
+            ) +
+            reviewRow(
+              '失败次数阈值',
+              rtCheck.fail_threshold != null ? rtCheck.fail_threshold : 3,
+            ) +
+            reviewRow(
+              '冷却时长',
+              rtCheck.cooldown != null ? rtCheck.cooldown : '45s',
+            ) +
+            reviewRow(
+              '成功次数阈值',
+              rtCheck.success_threshold != null
+                ? rtCheck.success_threshold
+                : 2,
+            ) +
+            reviewRow(
+              '连接超时',
+              rtTimeout.connect != null ? rtTimeout.connect : '500ms',
+            ) +
+            reviewRow(
+              '调用超时',
+              rtTimeout.call != null ? rtTimeout.call : '3s',
+            )
+          : reviewRow('EPP 运行时参数', '未配置（BFE 补默认）'));
     } else {
       eppConfigRows = reviewRow('负载均衡模式', balanceMode);
     }
@@ -1391,6 +1490,17 @@ window.ClusterUpsert = (function () {
             ? null
             : Number(field.value)
           : field.value;
+      // duration 复合控件：数字输入 + 单位下拉拼成 duration 字符串（空输入归一为空串）
+      if (field.getAttribute('data-duration') === '1') {
+        var durationUnitEl = field.parentNode.querySelector(
+          '.proto-duration-unit',
+        );
+        value =
+          field.value === ''
+            ? ''
+            : String(field.value) +
+              (durationUnitEl ? durationUnitEl.value : 's');
+      }
       if (path.indexOf('base.') === 0)
         setNestedValue(data.baseConfigData, path.slice(5), value);
       else if (path.indexOf('health.') === 0)
@@ -1399,6 +1509,9 @@ window.ClusterUpsert = (function () {
         var eppKey = path.slice(4);
         if (eppKey === 'balance_mode') {
           data.balance_mode = value;
+        } else if (eppKey.indexOf('epp_runtime.') === 0) {
+          if (!data.epp_runtime) data.epp_runtime = {};
+          setNestedValue(data.epp_runtime, eppKey.slice(12), value);
         } else if (eppKey.indexOf('epp_config.') === 0) {
           if (!data.epp_config) data.epp_config = {};
           setNestedValue(data.epp_config, eppKey.slice(11), value);
@@ -1627,8 +1740,135 @@ window.ClusterUpsert = (function () {
     return null;
   }
 
+  // ---- duration 复合控件（与 UI 代码一致：数字输入 + 单位下拉 ms/s/m，单位区主色蓝底）----
+  var DURATION_UI_UNITS = ['ms', 's', 'm'];
+  var DURATION_UNIT_MS = {
+    ns: 1e-6,
+    us: 1e-3,
+    'µs': 1e-3,
+    ms: 1,
+    s: 1000,
+    m: 60000,
+    h: 3600000,
+  };
+  var DURATION_SIMPLE_RE = /^\+?(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)$/;
+
+  function formatDurationNum(num) {
+    return String(Number(num.toFixed(6)));
+  }
+
+  // duration 字符串拆成 数字 + 单位（ms/s/m）；组合写法（如 1m30s）标记为 raw 走纯文本输入
+  function durationParts(value, defaultUnit) {
+    var str = value == null ? '' : String(value);
+    if (str === '') return { raw: false, num: '', unit: defaultUnit };
+    var m = DURATION_SIMPLE_RE.exec(str);
+    if (!m) return { raw: true, text: str };
+    var num = parseFloat(m[1]);
+    var unit = m[2];
+    if (DURATION_UI_UNITS.indexOf(unit) === -1) {
+      var totalMs = num * DURATION_UNIT_MS[unit];
+      unit = totalMs < 1000 ? 'ms' : totalMs < 60000 ? 's' : 'm';
+      num = (num * DURATION_UNIT_MS[m[2]]) / DURATION_UNIT_MS[unit];
+    }
+    return { raw: false, num: formatDurationNum(num), unit: unit };
+  }
+
+  function durationFieldHtml(path, value, defaultUnit) {
+    var parts = durationParts(value, defaultUnit);
+    if (parts.raw) {
+      return (
+        '<div class="ivu-input-wrapper ivu-input-type-text"><input type="text" class="ivu-input proto-field" data-field="' +
+        path +
+        '" value="' +
+        IvuUI.escapeHtml(parts.text) +
+        '" /></div>'
+      );
+    }
+    return (
+      '<div class="ivu-input-wrapper ivu-input-group ivu-input-group-with-append">' +
+      '<input type="text" class="ivu-input proto-field" data-field="' +
+      path +
+      '" data-duration="1" value="' +
+      IvuUI.escapeHtml(parts.num) +
+      '" />' +
+      '<div class="ivu-input-group-append" style="background:#2d8cf0;border-color:#2d8cf0;padding:0;width:64px;">' +
+      '<select class="proto-duration-unit" data-prev-unit="' +
+      parts.unit +
+      '" style="width:100%;height:100%;border:none;background:transparent;color:#fff;">' +
+      DURATION_UI_UNITS.map(function (u) {
+        return (
+          '<option value="' +
+          u +
+          '"' +
+          (u === parts.unit ? ' selected' : '') +
+          '>' +
+          u +
+          '</option>'
+        );
+      }).join('') +
+      '</select></div></div>'
+    );
+  }
+
+  // 解析 Go duration 字符串：合法且 > 0 时返回毫秒数，否则返回 NaN
+  // 语法与 time.ParseDuration 对齐：允许前导 '+' 与 "1." / ".5" 形式的小数
+  function parseDurationMs(str) {
+    if (typeof str !== 'string') return NaN;
+    var source = str.charAt(0) === '+' ? str.slice(1) : str;
+    var re = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)/g;
+    var total = 0;
+    var matched = false;
+    var lastIndex = 0;
+    var m;
+    while ((m = re.exec(source)) !== null) {
+      if (m.index !== lastIndex) return NaN;
+      lastIndex = m.index + m[0].length;
+      total += parseFloat(m[1]) * DURATION_UNIT_MS[m[2]];
+      matched = true;
+    }
+    if (!matched || lastIndex !== source.length) return NaN;
+    return total;
+  }
+
+  function validateEppRuntime(rt) {
+    if (!rt) return null;
+    var check = rt.check || {};
+    var timeout = rt.timeout || {};
+    function badDuration(v) {
+      return v != null && v !== '' && !(parseDurationMs(v) > 0);
+    }
+    function badThreshold(v) {
+      return (
+        v != null &&
+        v !== '' &&
+        (!Number.isInteger(Number(v)) || Number(v) < 1)
+      );
+    }
+    if (badDuration(check.check_interval)) {
+      return '健康检查间隔须为合法的 Go duration 且 > 0（如 2s）';
+    }
+    if (badDuration(check.cooldown)) {
+      return '冷却时长须为合法的 Go duration 且 > 0（如 45s）';
+    }
+    if (badThreshold(check.fail_threshold)) {
+      return '失败次数阈值须为 >= 1 的整数';
+    }
+    if (badThreshold(check.success_threshold)) {
+      return '成功次数阈值须为 >= 1 的整数';
+    }
+    if (badDuration(timeout.connect)) {
+      return '连接超时须为合法的 Go duration 且 > 0（如 500ms）';
+    }
+    if (badDuration(timeout.call)) {
+      return '调用超时须为合法的 Go duration 且 > 0（如 3s）';
+    }
+    return null;
+  }
+
   function validateEpp(data) {
     var ec = data.epp_config;
+    var rtErr = validateEppRuntime(data.epp_runtime);
+    if (rtErr) return rtErr;
     // epp_config 非空即须通过字段校验（含 WRR 时休眠保留的配置）
     if (!ec) return null;
     if (
@@ -1825,6 +2065,11 @@ window.ClusterUpsert = (function () {
       if (submitBtn)
         submitBtn.addEventListener('click', function () {
           syncFromDom(bodyEl, state.data);
+          var err = validateEpp(state.data);
+          if (err) {
+            Prototype.toast(err, 'error');
+            return;
+          }
           if (typeof options.onSubmit === 'function')
             options.onSubmit(state.data);
         });
@@ -1872,6 +2117,19 @@ window.ClusterUpsert = (function () {
                 no_endpoint_queue_ttl: null,
                 enable_eviction: false,
               },
+            };
+          }
+          // 切换 WRR/EPP 时，若为 EPP 模式但无 epp_runtime 则初始化默认值
+          if (state.data.balance_mode === 'EPP' && !state.data.epp_runtime) {
+            state.data.epp_runtime = {
+              check: {
+                disabled: false,
+                check_interval: '2s',
+                fail_threshold: 3,
+                cooldown: '45s',
+                success_threshold: 2,
+              },
+              timeout: { connect: '500ms', call: '3s' },
             };
           }
           render();
@@ -2075,6 +2333,46 @@ window.ClusterUpsert = (function () {
           state.data.epp_config.fallback_on_empty =
             !state.data.epp_config.fallback_on_empty;
           render();
+        });
+
+      var eppCheckDisabledSwitch = bodyEl.querySelector(
+        '#proto-epp-check-disabled-switch',
+      );
+      if (eppCheckDisabledSwitch)
+        eppCheckDisabledSwitch.addEventListener('click', function () {
+          syncFromDom(bodyEl, state.data);
+          if (!state.data.epp_runtime) state.data.epp_runtime = {};
+          if (!state.data.epp_runtime.check)
+            state.data.epp_runtime.check = {};
+          state.data.epp_runtime.check.disabled =
+            !state.data.epp_runtime.check.disabled;
+          render();
+        });
+
+      // duration 复合控件切单位：换算数值保持物理时长不变（500ms → s = 0.5s）
+      bodyEl
+        .querySelectorAll('.proto-duration-unit')
+        .forEach(function (unitSelect) {
+          unitSelect.addEventListener('change', function () {
+            var wrapper = unitSelect.parentNode.parentNode;
+            var numInput = wrapper.querySelector('[data-duration="1"]');
+            var prevUnit = unitSelect.getAttribute('data-prev-unit');
+            var num = parseFloat(numInput ? numInput.value : '');
+            if (
+              numInput &&
+              isFinite(num) &&
+              DURATION_UNIT_MS[prevUnit] &&
+              DURATION_UNIT_MS[unitSelect.value]
+            ) {
+              numInput.value = formatDurationNum(
+                (num * DURATION_UNIT_MS[prevUnit]) /
+                  DURATION_UNIT_MS[unitSelect.value],
+              );
+            }
+            unitSelect.setAttribute('data-prev-unit', unitSelect.value);
+            syncFromDom(bodyEl, state.data);
+            render();
+          });
         });
 
       var keyAffinitySelect = bodyEl.querySelector(

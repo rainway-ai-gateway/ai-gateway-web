@@ -36,6 +36,8 @@
         var root = Layout.render({ pageId: 'IntentConfig.list', basePath: '../' });
         root.innerHTML = '<div id="intent-config-page"></div>';
 
+        var isReadonly = Prototype.isReadonly();
+
         var TYPE_LABELS = { choice: '枚举（choice）', score: '评分（score）' };
         var MAX_QUESTIONS = 10;
         var MAX_OPTIONS = 10;
@@ -115,10 +117,11 @@
             '<div class="ic-header">' +
               '<div class="ic-desc">意图配置（单例，全量覆盖式写入，无历史版本；问题数量 0-10，为空数组表示停用意图分类）</div>' +
               '<div class="ic-actions">' +
-                (state.mode === 'view'
-                  ? IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-ic-enter-edit"')
-                  : IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-ic-exit-edit"') + ' ' +
-                    IvuUI.btn('保存并发布', 'success', 'small', '', 'id="btn-ic-save"')) +
+                (isReadonly ? '' :
+                  state.mode === 'view'
+                    ? IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-ic-enter-edit"')
+                    : IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-ic-exit-edit"') + ' ' +
+                      IvuUI.btn('保存并发布', 'success', 'small', '', 'id="btn-ic-save"')) +
               '</div>' +
             '</div>' +
             (state.published ? '' :
@@ -136,7 +139,7 @@
               '<div class="ivu-card-head"><p>问题列表（当前 ' + state.questions.length + ' / ' + MAX_QUESTIONS + '）</p></div>' +
               '<div class="ivu-card-body">' +
                 '<div class="ic-list-toolbar"' + (state.mode === 'view' ? ' style="display:none;"' : '') + '>' +
-                  IvuUI.btn('添加问题', 'primary', 'small', '', 'id="btn-ic-add"') +
+                  (isReadonly ? '' : IvuUI.btn('添加问题', 'primary', 'small', '', 'id="btn-ic-add"')) +
                 '</div>' +
                 '<div id="ic-question-table"></div>' +
               '</div>' +
@@ -169,7 +172,7 @@
               {
                 title: '操作', key: 'action', width: 220,
                 render: function (row, rowIndex) {
-                  if (state.mode === 'view') {
+                  if (isReadonly || state.mode === 'view') {
                     return IvuUI.btn('查看', 'primary', 'small', '', 'data-ic-view="' + rowIndex + '"');
                   }
                   return IvuUI.btn('编辑', 'success', 'small', '', 'data-ic-edit="' + rowIndex + '"') + ' ' +
@@ -602,7 +605,7 @@
 
         Prototype.bindDrawerClose();
         loadConfig();
-        if (!state.published) {
+        if (!state.published && !isReadonly) {
           state.mode = 'edit';
           state.originalMinConfidence = state.minConfidence;
           state.originalQuestions = clone(state.questions);

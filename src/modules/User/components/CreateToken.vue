@@ -43,6 +43,7 @@
             <FormItem :label="$t('user.role')" prop="scope">
                 <RadioGroup v-model="formData.scope">
                     <Radio label="System">{{ $t('user.system') }}</Radio>
+                    <Radio label="SystemReadonly">{{ $t('user.systemReadonly') }}</Radio>
                     <Radio label="Support">{{ $t('user.support') }}</Radio>
                 </RadioGroup>
             </FormItem>

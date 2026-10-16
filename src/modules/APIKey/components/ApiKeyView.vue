@@ -138,6 +138,7 @@
         </div>
         <div style="margin-top: 16px;">
           <Button
+            v-has
             type="primary"
             size="small"
             @click="showResetModal"

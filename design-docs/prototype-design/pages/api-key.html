@@ -17,9 +17,10 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
           var root = Layout.render({ pageId: 'APIKey.list', basePath: '../' });
+          var isReadonly = Prototype.isReadonly();
           var listContent =
             '<div class="title api-key-page">' +
-              IvuUI.btn('创建', 'primary', 'small', '', 'id="btn-api-add"') +
+              (isReadonly ? '' : IvuUI.btn('创建', 'primary', 'small', '', 'id="btn-api-add"')) +
             '</div>' +
             '<div id="api-table"></div>';
 
@@ -149,9 +150,12 @@
             render: function (row, rowIndex) {
               var pageStart = (state.currentPage - 1) * state.pageSize;
               var globalIndex = pageStart + rowIndex;
-              return IvuUI.btn('管理路由规则', 'success', 'small', '', 'data-api-rules="' + globalIndex + '"') + ' ' +
-                IvuUI.btn('编辑', 'primary', 'small', '', 'data-api-edit="' + globalIndex + '"') + ' ' +
-                IvuUI.btn('删除', 'error', 'small', '', 'data-api-delete="' + globalIndex + '"');
+              var actions = IvuUI.btn('管理路由规则', 'success', 'small', '', 'data-api-rules="' + globalIndex + '"');
+              if (!isReadonly) {
+                actions += ' ' + IvuUI.btn('编辑', 'primary', 'small', '', 'data-api-edit="' + globalIndex + '"') + ' ' +
+                  IvuUI.btn('删除', 'error', 'small', '', 'data-api-delete="' + globalIndex + '"');
+              }
+              return actions;
             }
           }
               ],
@@ -329,7 +333,8 @@
             if (resetBtn) resetBtn.onclick = openResetQuotaModal;
           }
 
-          document.getElementById('btn-api-add').addEventListener('click', function () {
+          var addBtn = document.getElementById('btn-api-add');
+          if (addBtn) addBtn.addEventListener('click', function () {
             openDrawer('add');
           });
 

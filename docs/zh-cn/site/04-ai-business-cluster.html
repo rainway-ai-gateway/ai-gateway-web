@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>04 资源管理：AI 业务集群</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a class="active" href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="04-资源管理ai-业务集群">04 资源管理：AI 业务集群</h1>
+<p>业务集群是<strong>流量转发与治理策略</strong>在网关内的抽象：在已创建的模型服务商之上，配置协议、会话保持、超时重试、被动健康检查，并选择转发模型与 Key 权重。路由规则的目标即为「集群 + 模型」，请求经集群转发到<strong>所属服务商</strong>的实例池。</p>
+<blockquote>
+<p><strong>前置条件</strong>：须先在 <a href="03-model-provider.html">03 章 模型服务商</a> 中创建好服务商（实例池、协议、模型、Keys），再在集群向导中选择「所属服务商」。</p>
+</blockquote>
+<h2 id="首次接入最小配置">首次接入最小配置</h2>
+<table><thead><tr><th>向导步骤</th><th>必填项</th></tr></thead><tbody><tr><td>1 基础配置</td><td>集群名称、协议（http / https，与后端实际一致）</td></tr><tr><td>4 大模型配置</td><td>所属服务商、转发模型（至少 1 个）；多 Key 时配置权重</td></tr><tr><td>2 / 3 / 5</td><td>保持默认，直接下一步</td></tr></tbody></table>
+<h2 id="41-集群列表">4.1 集群列表</h2>
+<p>进入 资源管理 → AI业务集群，展示当前已创建的集群列表。</p>
+<p><img src="images/04-cluster-list.png" alt="集群列表" loading="lazy" /></p>
+<p><strong>表格列说明</strong>：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>名称</td><td>集群名称，支持按名称搜索和排序</td></tr><tr><td>描述</td><td>集群说明</td></tr><tr><td>操作</td><td>详情、编辑、删除</td></tr></tbody></table>
+<p>列表上方有「添加集群」按钮。</p>
+<h3 id="查看详情">查看详情</h3>
+<p>点击「详情」，右侧弹出抽屉，以只读方式展示全部配置（基础配置、超时和重传、被动健康检查、大模型配置），与 <a href="#47-步骤-5复查检查">4.7 步骤 5：复查&amp;检查</a> 汇总面板一致。<strong>不展示</strong>服务商实例池（实例池归属服务商资源）。</p>
+<h3 id="删除集群">删除集群</h3>
+<p>点击「删除」，弹出确认框。确认后删除成功并刷新列表。</p>
+<p><strong>被路由规则引用时</strong>：弹出失败提示，说明被哪张路由表、哪条规则引用，并提供「前往处理」链接。需先在路由表中解除引用。</p>
+<h2 id="42-创建--编辑集群">4.2 创建 / 编辑集群</h2>
+<p>点击「添加集群」，右侧弹出 <strong>5 步向导</strong>：</p>
+<ol><li>基础配置 → 2. 超时和重传 → 3. 被动健康检查 → 4. 大模型配置 → 5. 复查&amp;检查</li></ol>
+<blockquote>
+<p><strong>与 0.0.7 及更早版本的区别</strong>：向导已移除「实例配置」步骤；实例池改在模型服务商模块维护。</p>
+</blockquote>
+<p>编辑已有集群时，同样抽屉以编辑模式打开，字段预填充。集群名称创建后不可修改。</p>
+<h2 id="43-步骤-1基础配置">4.3 步骤 1：基础配置</h2>
+<p><img src="images/04-cluster-wizard-base.png" alt="基础配置" loading="lazy" /></p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>集群名称</td><td>是</td><td>空</td><td>1-64 字符；仅允许字母、数字、点、下划线、中划线；不能以点、下划线、中划线开头或结尾；不能与已有集群重名</td><td>唯一标识，创建后不可修改</td></tr><tr><td>集群说明</td><td>否</td><td>空</td><td>不超过 256 字符；不能包含控制字符</td><td>描述用途</td></tr><tr><td>协议</td><td>是</td><td><code>https</code></td><td>—</td><td>http / https，按后端实际选择</td></tr><tr><td>单个后端最大空闲连接数</td><td>否</td><td><code>0</code></td><td>非负整数；不超过 99999999</td><td>每个后端实例维持的空闲长连接数；0 表示不特别维持</td></tr><tr><td>会话保持</td><td>否</td><td>停用</td><td>—</td><td>启用 / 停用</td></tr><tr><td>哈希策略</td><td>条件必填</td><td><code>CLIENT_IP_ONLY</code></td><td>—</td><td>会话保持启用时显示</td></tr><tr><td>哈希头部</td><td>条件必填</td><td>空</td><td>策略为 CLIENT_ID_ONLY / CLIENT_ID_PREFERED 时必填</td><td>Header 名称或 <code>Cookie:{key}</code></td></tr><tr><td>请求写缓存大小（Byte）</td><td>否</td><td><code>512</code></td><td>正整数</td><td>向后端写请求时的缓存大小</td></tr><tr><td>后端连接随客户端连接关闭</td><td>否</td><td>停用</td><td>—</td><td>启用后客户端断开时同步关闭后端连接</td></tr></tbody></table>
+<p><strong>哈希策略</strong>（会话保持启用后可选）：</p>
+<table><thead><tr><th>策略</th><th>含义</th><th>哈希头部</th></tr></thead><tbody><tr><td>CLIENT_IP_ONLY</td><td>仅根据客户端 IP 做会话保持</td><td>不需要</td></tr><tr><td>CLIENT_ID_ONLY</td><td>仅根据哈希头部做会话保持</td><td>必填</td></tr><tr><td>CLIENT_ID_PREFERED</td><td>优先哈希头部，无头部时回退到客户端 IP</td><td>必填</td></tr></tbody></table>
+<p><img src="images/04-cluster-hash-options.png" alt="哈希策略选项" loading="lazy" /></p>
+<h2 id="44-步骤-2超时和重传">4.4 步骤 2：超时和重传</h2>
+<p><img src="images/04-cluster-wizard-timeout.png" alt="超时和重传" loading="lazy" /></p>
+<table><thead><tr><th>字段</th><th>默认值(ms)</th><th>说明</th></tr></thead><tbody><tr><td>客户端连接空闲超时</td><td><code>30000</code></td><td>长连接空闲回收</td></tr><tr><td>读客户端请求Body超时</td><td><code>30000</code></td><td>读 body + 等待后端 + 写响应的总超时</td></tr><tr><td>连接后端超时</td><td><code>50000</code></td><td>建连超时</td></tr><tr><td>读后端响应头部超时</td><td><code>50000</code></td><td>首包超时，流式场景关键</td></tr><tr><td>写响应超时</td><td><code>60000</code></td><td>向客户端写完全部响应的超时</td></tr><tr><td>集群内重试次数</td><td><code>2</code></td><td>同集群内转发失败重试次数</td></tr></tbody></table>
+<blockquote>
+<p>大模型推理首包耗时较长，「读后端响应头部超时」建议按服务商 SLA 放宽。</p>
+</blockquote>
+<h2 id="45-步骤-3被动健康检查">4.5 步骤 3：被动健康检查</h2>
+<p><img src="images/04-cluster-wizard-healthcheck.png" alt="被动健康检查" loading="lazy" /></p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>故障阈值</td><td>否</td><td><code>3</code></td><td>连续转发失败超过该值后实例置为不健康并启动探测</td></tr><tr><td>健康检查间隔(ms)</td><td>否</td><td><code>1000</code></td><td>探测间隔</td></tr><tr><td>健康检查Host</td><td>否</td><td>空</td><td>留空时使用<strong>所属服务商首个实例</strong>地址</td></tr><tr><td>健康检查Uri</td><td>否</td><td><code>/</code></td><td>必须以 <code>/</code> 开头</td></tr><tr><td>健康检查期望的状态码</td><td>否</td><td><code>0</code></td><td>0 表示忽略状态码，有响应即健康</td></tr></tbody></table>
+<h2 id="46-步骤-4大模型配置">4.6 步骤 4：大模型配置</h2>
+<p>选择所属服务商后，系统加载该服务商的模型列表与 Key 名称，集群侧只配置<strong>选用哪些模型、各 Key 权重及转发策略</strong>。</p>
+<p><img src="images/04-cluster-wizard-model.png" alt="大模型配置" loading="lazy" /></p>
+<h3 id="模型服务配置">模型服务配置</h3>
+<table><thead><tr><th>字段</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>所属服务商</td><td>是</td><td>下拉选择已创建的服务商；集群引用其实例池、协议与 Keys</td></tr><tr><td>转发模型</td><td>是</td><td>多选，仅能选所属服务商已配置的模型；下拉首项提供「全选」</td></tr><tr><td>裁剪前缀</td><td>否</td><td>开关；用于 OpenRouter 等聚合场景</td></tr><tr><td>匹配前缀</td><td>条件必填</td><td>开启裁剪前缀时必填，须以 <code>/</code> 结尾，如 <code>openrouter/</code></td></tr></tbody></table>
+<h3 id="模型重定向">模型重定向</h3>
+<p>将客户端请求的模型名映射为转发到后端的模型名。选择「转发的后端模型名称」后，若「原请求的模型名称」为空，会自动填入同名，之后仍可修改。原模型名不能重复；目标模型须从「转发模型」已选项中选择。</p>
+<blockquote>
+<p>与 API-Key 允许/禁止模型的组合：Key 的模型访问控制按<strong>重定向后</strong>的目标模型判定。例如原模型名 <code>glm-5.2-abc</code>、目标模型 <code>glm-5.2</code> 时，Key 允许模型配置 <code>glm-5.2</code> 即可放行客户端发送的 <code>model=glm-5.2-abc</code> 请求（详见 <a href="09-api-key.html#97-运行时生效机制">9.7 运行时生效机制</a>）。</p>
+</blockquote>
+<h3 id="服务鉴权-keys">服务鉴权 Keys</h3>
+<table><thead><tr><th>字段</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>Key</td><td>否</td><td>从所属服务商已配置的 Key <strong>名称</strong>中选择（<strong>不填写 Key 明文</strong>）</td></tr><tr><td>权重</td><td>条件必填</td><td>0-100；有配置 Key 时所有行权重之和须等于 100</td></tr></tbody></table>
+<ul><li>非必填：不配置时由网关按服务商 Keys 默认策略处理。</li><li>空行不参与校验；有值的 Key 名称须属于所选服务商。</li><li>同一 Key 不可选两次：已选名称会从其他行的下拉中过滤掉。</li></ul>
+<h3 id="key-路由策略">Key 路由策略</h3>
+<table><thead><tr><th>字段</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>策略</td><td><code>weighted_random</code></td><td>本版仅支持加权随机</td></tr><tr><td>最大重试次数</td><td><code>0</code></td><td>请求失败后的 Key 级重试</td></tr><tr><td>退避初始值(ms)</td><td><code>500</code></td><td>重试退避初始等待</td></tr><tr><td>退避最大值(ms)</td><td><code>5000</code></td><td>须 ≥ 退避初始值</td></tr></tbody></table>
+<h3 id="key-亲和性">Key 亲和性</h3>
+<table><thead><tr><th>字段</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>是否启用</td><td>启用</td><td>开启后同一会话请求绑定同一 Key，避免会话内 Key 漂移</td></tr><tr><td>空闲超时(秒)</td><td>—</td><td>启用时必填，须为大于 0 的整数</td></tr><tr><td>Key 惩罚</td><td>停用</td><td>开启后失败 Key 被临时降权</td></tr><tr><td>Redis Key 前缀</td><td><code>bfe:ai:key_affinity</code></td><td>启用时必填；依赖数据面 Redis 配置</td></tr></tbody></table>
+<blockquote>
+<p>Key 亲和性需数据面配置可用 Redis；Redis 不可用时自动降级为加权随机。</p>
+</blockquote>
+<h3 id="均衡模式配置">均衡模式配置</h3>
+<p>位于「Key 亲和性」卡片之后，用于选择集群的<strong>后端负载均衡模式</strong>。</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>负载均衡模式</td><td>否</td><td><code>WRR（加权轮询）</code></td><td>枚举：<code>WRR</code> / <code>EPP</code></td><td><code>WRR</code>：BFE 本地加权轮询；<code>EPP</code>：由 EPP 调度器接管后端选择（实例分配见 <a href="05-epp-schedule.html">05 章 EPP 调度</a>）</td></tr></tbody></table>
+<p><img src="images/04-cluster-epp-config.png" alt="EPP 模式下的均衡模式配置" loading="lazy" /></p>
+<ul><li>选 <code>EPP</code> 时 <code>epp_config</code> <strong>必填</strong>：只把模式切到 <code>EPP</code>、不带均衡配置提交会被拒绝（<code>422</code>）。</li><li>选 <code>WRR</code> 时 <code>epp_config</code> 可选；传入的配置仅保留（休眠），不编译、不下发。</li></ul>
+<p>选择 <code>EPP</code> 时展示以下配置项（<code>epp_config</code>）：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>实例负载画像</td><td>否</td><td><code>balanced（均衡）</code></td><td>枚举：<code>queue-first</code> / <code>balanced</code> / <code>kv-first</code></td><td>多个后端都可用时的偏向：<code>queue-first</code> 排队优先（通常更低延迟）/ <code>balanced</code> 均衡 / <code>kv-first</code> KV 空闲优先（通常更高吞吐）；只调节「排队」与「KV」两个基础 scorer 的权重</td></tr><tr><td>亲和强度</td><td>否</td><td><code>medium（0.6）</code></td><td>枚举：<code>off</code> / <code>low</code> / <code>medium</code> / <code>high</code></td><td>把「相同前缀 / 同一会话」的请求往同一后端聚的力度：<code>off</code> 不注入亲和 scorer（前缀缓存亲和、会话亲和即使开着也不注入）/ <code>low</code> 权重 <code>0.3</code> / <code>medium</code> <code>0.6</code> / <code>high</code> <code>1.0</code></td></tr><tr><td>前缀缓存亲和性</td><td>否</td><td>启用</td><td>布尔</td><td>相同 prompt 前缀的请求经前缀哈希匹配<strong>尽力收敛</strong>到同一后端，提升 KV cache 复用；软亲和，不保证命中</td></tr><tr><td>会话亲和性</td><td>否</td><td>停用</td><td>布尔</td><td>同一会话的请求<strong>尽力粘住</strong>同一后端；绑定端点摘除后自动迁移重粘</td></tr><tr><td>会话亲和性 Header</td><td>条件必填</td><td>空</td><td>非空 Header 名</td><td>启用会话亲和性时必填，如 <code>x-session-id</code>；关闭时保留但不生效</td></tr><tr><td>KV 缓存利用率上限</td><td>否</td><td><code>0.9</code></td><td>大于 0 且 ≤ 1</td><td>KV cache 利用率超过该值的端点被过滤；该值是 <strong>KV 阈值单一来源</strong></td></tr><tr><td>排队长度过滤阈值</td><td>否</td><td><code>0</code></td><td>≥ 0 的数</td><td>后端排队长度超过该值的端点被过滤；<code>0</code> = <strong>不启用</strong>该项过滤（不是「上限为 0」），大于 0 时该值是队列阈值单一来源</td></tr><tr><td>在飞请求数过滤阈值</td><td>否</td><td><code>0</code></td><td>≥ 0 的数</td><td>后端运行中请求数超过该值的端点被过滤；<code>0</code> = 不启用该项过滤</td></tr><tr><td>无端点时回退派发</td><td>否</td><td>关闭</td><td>布尔</td><td>所有端点都被过滤时的行为：关闭 = 无端点可选、不派发；开启 = 回退派给「最不差」的端点</td></tr><tr><td>指标失效剔除阈值（ms）</td><td>否</td><td><code>200</code></td><td>大于 0 的整数</td><td>后端指标超过该时长未更新即从调度候选剔除，直到恢复抓取；EPP 约每 50ms 抓取一次后端 <code>/metrics</code>，<code>200</code> 约等于连续 4 次抓取失败，建议 100–500</td></tr><tr><td>流控配置</td><td>否</td><td>见下表</td><td>—</td><td>普通卡片（无折叠交互），见下表</td></tr></tbody></table>
+<p><strong>流控配置</strong>（<code>flow_control</code>）：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>最大请求数</td><td>否</td><td><code>不限</code></td><td><code>不限</code> / <code>限制</code>（大于 0 的整数）</td><td>全局并发上限；选「限制」后须填写大于 0 的整数，选「不限」按 <code>-1</code> 提交</td></tr><tr><td>队列 TTL（秒）</td><td>否</td><td><code>60</code></td><td>≥ 0 的整数</td><td>池有端点时的排队预算，超期以可重试背压错误拒绝；<code>0</code> 为显式禁用驱逐</td></tr><tr><td>无端点队列 TTL（秒）</td><td>否</td><td>跟随队列 TTL</td><td>≥ 0 的整数</td><td>池无端点（冷启动扩容）时的排队预算</td></tr><tr><td>启用驱逐</td><td>否</td><td>关闭</td><td>仅允许 <code>false</code>，提交 <code>true</code> 被拒绝</td><td>高优先级请求被饱和阻塞时终止低优先级在飞请求、回收容量。<strong>当前 EPP 未接线</strong>，界面为禁用态只读开关，并提示「当前不支持开启，保持关闭」</td></tr></tbody></table>
+<h3 id="epp-运行时参数">EPP 运行时参数</h3>
+<p>选择 <code>EPP</code> 时，除 <code>epp_config</code> 外，还可配置 BFE 访问 EPP 调度器时的<strong>健康检查与调用超时</strong>参数（<code>epp_runtime</code>）；不配置时由 BFE 补默认值。</p>
+<p><img src="images/04-cluster-epp-runtime.png" alt="EPP 运行时参数" loading="lazy" /></p>
+<p><strong>健康检查</strong>（<code>check</code>）：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>关闭后台健康检查</td><td>否</td><td>停用</td><td>布尔</td><td>启用后 BFE 不再对 EPP 端点做主动健康检查；不建议生产关闭</td></tr><tr><td>健康检查间隔</td><td>否</td><td><code>2s</code></td><td>合法且大于 0 的时长</td><td>两次探测的间隔</td></tr><tr><td>失败次数阈值</td><td>否</td><td><code>3</code></td><td>整数且 ≥ 1</td><td>连续失败达到该值判定端点不健康</td></tr><tr><td>冷却时长</td><td>否</td><td><code>45s</code></td><td>合法且大于 0 的时长</td><td>端点被判定不健康后的冷却时间</td></tr><tr><td>成功次数阈值</td><td>否</td><td><code>2</code></td><td>整数且 ≥ 1</td><td>连续探测成功达到该值恢复为健康</td></tr></tbody></table>
+<p><strong>调用超时</strong>（<code>timeout</code>）：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>校验规则</th><th>说明</th></tr></thead><tbody><tr><td>连接超时</td><td>否</td><td><code>500ms</code></td><td>合法且大于 0 的时长</td><td>与 EPP 建连超时</td></tr><tr><td>调用超时</td><td>否</td><td><code>3s</code></td><td>合法且大于 0 的时长</td><td>单次调用 EPP 的超时</td></tr></tbody></table>
+<p><strong>时长字段的输入控件</strong>：</p>
+<ul><li>健康检查间隔、冷却时长、连接超时、调用超时这 4 个字段是「数字框 + 单位下拉（<code>ms</code> / <code>s</code> / <code>m</code>）」复合控件；健康检查间隔、冷却时长、调用超时默认单位为 <code>s</code>，连接超时默认单位为 <code>ms</code>。</li><li>切换单位时会换算数值、保持物理时长不变（<code>500ms</code> 切到 <code>s</code> 显示 <code>0.5s</code>）。</li><li>存量值若为无法拆分的组合写法（如 <code>1m30s</code>），该字段回退为纯文本输入框并原样展示，不做换算。</li><li>校验：须为大于 0 的合法 Go duration（<code>+1s</code>、<code>1.s</code>、<code>.5s</code> 等写法合法）；填 <code>0</code> 会在提交时被拦截报错，<strong>不会静默回落为默认值</strong>；清空数字框表示未设置，提交时按默认值补齐。</li></ul>
+<blockquote>
+<ul><li><code>tls</code> 与 <code>breaker</code> <strong>不对外暴露</strong>：由后端固定下发（<code>EPPTLS</code> 为明文、<code>EPPBreaker</code> 关闭），界面不提供配置入口。</li><li>未配置时展示为「未配置（BFE 补默认）」，由 BFE 按上表默认值运行，与「已落盘一组默认值」不同。</li><li>7 个字段中只有 3 个带 <code>?</code> 提示图标：关闭后台健康检查、冷却时长、调用超时；其余字段无提示。</li></ul>
+</blockquote>
+<blockquote>
+<p><strong>WRR ↔ EPP 切换</strong>：<code>epp_config</code> 与 <code>epp_runtime</code> 仅在 <code>EPP</code> 模式下生效；切回 <code>WRR</code> 时配置<strong>保留但不生效</strong>（休眠），再切回 <code>EPP</code> 继续生效，来回切换不丢配置。</p>
+</blockquote>
+<h2 id="47-步骤-5复查检查">4.7 步骤 5：复查&amp;检查</h2>
+<p>汇总展示前 4 步配置，确认后点「提交」。</p>
+<p><img src="images/04-cluster-wizard-review.png" alt="复查汇总" loading="lazy" /></p>
+<table><thead><tr><th>面板</th><th>展示内容</th></tr></thead><tbody><tr><td>基础配置</td><td>名称、说明、协议、连接与会话保持相关项</td></tr><tr><td>超时和重传</td><td>各项超时与集群内重试</td></tr><tr><td>被动健康检查</td><td>阈值、间隔、Host（空时展示「为空时使用所属服务商首个实例地址」）、Uri、状态码</td></tr><tr><td>大模型配置</td><td>所属服务商、转发模型、裁剪前缀、模型重定向、Keys 权重、Key 路由策略、Key 亲和性、均衡模式配置（EPP 模式含 <a href="#epp-运行时参数">EPP 运行时参数</a>，未配置时显示「未配置（BFE 补默认）」）</td></tr></tbody></table>
+<h2 id="48-注意事项">4.8 注意事项</h2>
+<ul><li>集群名称创建后不可修改。</li><li>修改集群会影响所有引用该集群的路由规则，建议低峰期操作。</li><li>健康检查 Host 留空时，使用所属服务商实例池首个实例地址。</li><li>转发模型必须是所属服务商模型列表的子集；更换服务商后须重新选择模型与 Keys。</li><li>删除集群前须解除路由规则引用。</li><li>只读管理员登录时，本模块的「添加集群」按钮、列表操作列的「编辑」「删除」以及向导页脚的「提交」按钮均不显示，仅保留「详情」与向导的只读查看。</li><li>EPP 模式集群的后端选择由 EPP 调度器接管；若实例池中无有效分配（未分配态），该集群导出配置时会<strong>降级为 WRR</strong>。分配关系在「EPP调度」页查看与覆写，见 <a href="05-epp-schedule.html">05 章</a>。</li></ul>
+  </main>
+</div>
+</body>
+</html>

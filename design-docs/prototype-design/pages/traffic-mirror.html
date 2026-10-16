@@ -33,6 +33,8 @@
         var root = Layout.render({ pageId: 'TrafficMirrorRule.list', basePath: '../' });
         root.innerHTML = '<div id="traffic-mirror-page"></div>';
 
+        var isReadonly = Prototype.isReadonly();
+
         var DEFAULT_REMOVE_HEADERS = ['Authorization', 'Cookie', 'X-Api-Key'];
         var HEADER_MODE_LABELS = {
           default: '使用服务端默认黑名单',
@@ -130,13 +132,15 @@
         // ======= Header =======
         function renderHeader() {
           var editing = state.mode === 'edit';
-          var addHtml = editing
+          var addHtml = !isReadonly && editing
             ? IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-tm-add"')
             : '';
-          var submitHtml = editing
-            ? IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-tm-exit"') +
-              IvuUI.btn('提交并生效', 'success', 'small', '', 'id="btn-tm-submit"')
-            : IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-tm-enter"');
+          var submitHtml = isReadonly
+            ? ''
+            : (editing
+              ? IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-tm-exit"') +
+                IvuUI.btn('提交并生效', 'success', 'small', '', 'id="btn-tm-submit"')
+              : IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-tm-enter"'));
           return '<div class="route-editor-header">' +
             '<div class="route-owner-label">流量镜像规则（集合级，按优先级顺序匹配，首条命中生效）</div>' +
             '<div class="route-header-actions">' + addHtml + '</div>' +
@@ -169,6 +173,9 @@
                 render: function (row, rowIndex) {
                   var pageStart = (state.currentPage - 1) * state.pageSize;
                   var globalIndex = pageStart + rowIndex;
+                  if (isReadonly) {
+                    return IvuUI.btn('查看', 'primary', 'small', '', 'data-tm-view="' + globalIndex + '"');
+                  }
                   if (state.mode === 'edit') {
                     return IvuUI.btn('编辑', 'primary', 'small', '', 'data-tm-edit="' + globalIndex + '"') + ' ' +
                       IvuUI.btn('删除', 'error', 'small', '', 'data-tm-delete="' + globalIndex + '"');

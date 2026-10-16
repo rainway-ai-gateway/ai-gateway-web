@@ -14,6 +14,8 @@
 * limitations under the License.
 */
 import Vue from 'vue';
+import store from './store';
+
 const preventReClick = Vue.directive('preventReClick', {
     inserted: function (el, binding) {
         el.addEventListener('click', () => {
@@ -28,4 +30,22 @@ const preventReClick = Vue.directive('preventReClick', {
     }
 });
 
-export default {preventReClick};
+// 只读管理员视角：v-has 用于隐藏写操作元素（新增/编辑/删除/改密/重置配额等）。
+// 通过添加 CSS 类（.v-has-hidden 使用 display:none !important）隐藏，
+// 避免与 v-show 写入的内联 display 相互覆盖。
+const HIDDEN_CLASS = 'v-has-hidden';
+
+function applyHas(el) {
+    if (store.isReadonly()) {
+        el.classList.add(HIDDEN_CLASS);
+    } else {
+        el.classList.remove(HIDDEN_CLASS);
+    }
+}
+
+const has = Vue.directive('has', {
+    inserted: applyHas,
+    update: applyHas,
+});
+
+export default { preventReClick, has };

@@ -12,7 +12,7 @@
 
 匹配语义：同一路由表内，规则按列表顺序依次匹配表达式，**命中第一条即停止**，请求按该规则的目标权重转发；全部规则未命中时回落下一优先级路由表 / 走系统默认转发。因此更具体的规则应排在前面。
 
-## 11.1 路由表列表
+## 10.1 路由表列表
 
 进入 路由管理 → 路由表，展示所有路由表列表。
 
@@ -31,7 +31,7 @@
 
 **自动创建**：API-Key 创建后会自动生成属主为该 Key 的 apikey 路由表（见 [09 章](09-api-key.md)）。
 
-## 11.2 路由规则页面
+## 10.2 路由规则页面
 
 点击路由表行「查看」按钮，进入该路由表的路由规则编辑页面。页面顶部显示当前路由表信息：
 
@@ -68,7 +68,7 @@
 
 ![未提交离开提示](images/06-unsaved-leave-confirm.png)
 
-## 11.3 规则列表
+## 10.3 规则列表
 
 规则列表展示当前路由表下的所有规则，按列表顺序依次匹配。
 
@@ -79,9 +79,12 @@
 | 规则名称 | 规则标识，支持搜索 |
 | 表达式 | 匹配条件表达式，支持搜索 |
 | 目标集群和模型 | 命中后转发的目标，鼠标悬停可查看完整内容 |
-| 操作 | 查看（查看模式）或 编辑/删除（编辑模式） |
+| 备用集群和模型 | 目标全部不可用时的降级目标，鼠标悬停可查看完整内容；无备用时显示 - |
+| 操作 | 查看（查看模式）或 复制/编辑/删除（编辑模式） |
 
-## 11.4 添加 / 编辑规则
+**调整顺序**：编辑模式下可直接**拖拽规则行**调整次序（列表下方有「拖动表格可修改生效次序」提示），被拖拽的规则会插入到目标行的位置。规则次序就是匹配优先级，排在前面先匹配，**更具体的规则应排在前面**。调整顺序后同样需要点击「提交并生效」才会改变线上的匹配次序；查看模式下不能拖拽。
+
+## 10.4 添加 / 编辑规则
 
 编辑模式下点击「添加规则」，或在操作列点击「编辑」，右侧弹出规则抽屉：
 
@@ -112,22 +115,27 @@
 | `\|\|` | `\|\|` |
 | `!` | `!` |
 
-**条件维度与操作符**：
+**条件维度与操作符**（路由规则在请求阶段匹配，构造器不展示响应维度 `res_*` 原语）：
 
 | 维度 | 操作符 | 生成表达式示例 |
 | --- | --- | --- |
-| host | in | `req_host_in("www.a.com\|www.b.com")` |
-| port | in | `req_port_in("80\|8080")` |
-| method | in | `req_method_in("GET")` |
-| path | in / prefix_in / suffix_in | `req_path_prefix_in("/v1/", false)` |
-| query | exist / key_in / key_prefix_in / value_in / value_prefix_in / value_suffix_in / value_hash_in | `req_query_value_in("search", "flower", false)` |
-| cookie | key_in / value_in / value_prefix_in / value_suffix_in / value_hash_in | `req_cookie_value_in("ssp-web-version", "v0", true)` |
-| header | key_in / value_in / value_prefix_in / value_suffix_in / value_hash_in | `req_header_value_in("api_version", "v1\|v2", true)` |
-| clientIP | range / trusted / hash_in | `req_cip_range("1.1.1.1", "2.2.2.2")` |
-| proto | secure | `req_proto_secure()` |
-| system | bfe_time_range / bfe_cluster_in | `bfe_time_range("20190204203000H", "20190204204500H")` |
-| body | req_body_json_in | `req_body_json_in("level1.level2.level3", "pat1\|pat2", false)` |
-| body | req_body_json_prefix_in | `req_body_json_prefix_in("level1.level2", "prefix1\|prefix2", false)` |
+| 域名 host | in / suffix_in / regmatch / tag_in | `req_host_in("www.a.com\|www.b.com")` |
+| 端口 port | in | `req_port_in("80\|8080")` |
+| 方法 method | in | `req_method_in("GET")` |
+| 路径 path | in / contain / prefix_in / element_prefix_in / suffix_in / regmatch | `req_path_prefix_in("/v1/", false)` |
+| 查询参数 query | exist / key_in / key_prefix_in / value_in / value_prefix_in / value_suffix_in / value_contain / value_regmatch / value_hash_in | `req_query_value_in("search", "flower", false)` |
+| Cookie | key_in / value_in / value_prefix_in / value_suffix_in / value_contain / value_hash_in | `req_cookie_value_in("ssp-web-version", "v0", true)` |
+| 请求头 header | key_in / value_in / value_prefix_in / value_suffix_in / value_contain / value_regmatch / value_hash_in / ua_regmatch | `req_header_value_in("api_version", "v1\|v2", true)` |
+| 客户端IP clientIP | range / trusted / hash_in | `req_cip_range("1.1.1.1", "2.2.2.2")` |
+| VIP | in / range | `req_vip_in("10.0.0.1\|10.0.0.2")` |
+| 协议 proto | match / secure | `req_proto_secure()` |
+| 上下文 context | value_in | `req_context_value_in("cmd", "add\|del\|list", true)` |
+| 标签 tag | match | `req_tag_match("clientIP", "blocklist")` |
+| URL | regmatch | `req_url_regmatch("/s.*word=123")` |
+| 意图 intent | in | `req_ai_intent_in("task_type", "test_writing\|doc_writing", 0.9)` |
+| 请求体 body | req_body_json_in / req_body_json_prefix_in / req_body_larger_than / req_body_less_than | `req_body_json_in("model", "gpt-4o", false)` |
+| 会话 session | sip_range / vip_range / tls_sni_in / tls_client_auth / tls_client_ca_in | `ses_tls_sni_in("example.com\|example.org")` |
+| 系统 system | bfe_time_range / bfe_periodic_time_range / time_weekday_in | `time_weekday_in("0\|6", "H")`（周末；`0`=周日…`6`=周六，`zone` 省略时按 UTC） |
 
 > **参数说明**：表达式末尾的 `true` 或 `false` 表示"是否忽略大小写"。
 >
@@ -185,7 +193,7 @@
 | 模型 | 否 | 空 | 下拉选择该集群下的模型；留空表示透传请求中的模型名 |
 | 操作 | — | — | 删除该备用集群 |
 
-- 点击「+ 添加备用集群」增加行；备用集群列表可为空。
+- 点击「+ 添加备用」增加行；备用集群列表可为空。
 - 同一规则内，备用集群之间、备用集群与目标集群之间的 **「集群 + 模型」组合均不能重复**。
 
 ### 查看规则
@@ -199,7 +207,7 @@
 - **本地保存**：校验规则名称、表达式、目标权重和重复性，校验通过后保存到规则列表
 - **重置**：清空当前规则内容，恢复到打开抽屉前的状态
 
-## 11.5 校验规则
+## 10.5 校验规则
 
 保存和提交时系统会进行以下校验：
 
@@ -210,11 +218,12 @@
 - 表达式语法错误会在保存时提示
 - 规则至少包含 1 项目标
 
-## 11.6 注意事项
+## 10.6 注意事项
 
 - 修改规则后需「提交并生效」才会下发到数据面生效。
 - 停用路由表前请确认回落路径可用，避免流量中断。
 - 路由表停用或表达式不匹配时，请求回落下一优先级路由表（API-Key > Entity > Global）。
 - 同一路由表内规则按列表顺序匹配，命中第一条即停止，更具体的规则应排在前面。
+- **规则次序就是匹配优先级**：列表中点击列头排序**只改变展示顺序**，不影响提交内容与匹配次序；**只有编辑模式下拖拽规则行才会改变生效次序**（拖拽后仍需「提交并生效」）。
 - 目标模型留空表示透传请求中的模型名，请求会携带原始模型名称转发到目标集群。
 - 路由表列表和规则列表均支持搜索和排序。

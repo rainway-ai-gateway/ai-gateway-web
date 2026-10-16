@@ -298,7 +298,7 @@ export default {
         {
           title: this.$t('report.duration'),
           key: 'all_time',
-          width: 90,
+          width: 100,
           renderHeader: (h) => h('span', { style: thStyle }, this.$t('report.duration')),
           render: (h, params) => {
             const v = params.row.all_time;
@@ -316,14 +316,14 @@ export default {
         {
           title: this.$t('report.ttft'),
           key: 'ai_ttft_us',
-          width: 90,
+          width: 100,
           renderHeader: (h) => h('span', { style: thStyle }, this.$t('report.ttft')),
           render: (h, params) => h('span', { style: tdStyle }, this.fmtUs(params.row.ai_ttft_us))
         },
         {
           title: this.$t('report.logCost'),
           key: 'ai_cost_value',
-          width: 100,
+          width: 110,
           renderHeader: (h) => h('span', { style: thStyle }, this.$t('report.logCost')),
           render: (h, params) => {
             const row = params.row;
@@ -366,14 +366,33 @@ export default {
           render: (h, params) => {
             const msg = params.row.err_msg;
             if (!msg) return h('span', { style: tdStyle }, '-');
-            const display = msg.length > 20 ? msg.substring(0, 20) + '\u2026' : msg;
-            return h('span', { style: { ...tdStyle, color: '#ed4014' } }, display);
+            const display = msg.length > 20 ? msg.substring(0, 20) + '…' : msg;
+            const span = h('span', {
+              style: {
+                ...tdStyle,
+                color: '#ed4014',
+                display: 'inline-block',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                verticalAlign: 'middle'
+              }
+            }, display);
+            return h('Tooltip', {
+              props: { placement: 'top', transfer: true, maxWidth: 600 },
+              style: 'display: block; width: 100%;'
+            }, [
+              span,
+              h('div', { slot: 'content', style: 'white-space: pre-wrap; word-break: break-all;' }, msg)
+            ]);
           }
         },
         {
           key: 'action',
           title: this.$t('com.operation'),
           width: 80,
+          fixed: 'right',
           render: (h, params) => h('Button', {
             props: { type: 'primary', size: 'small' },
             on: {

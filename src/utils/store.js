@@ -30,7 +30,11 @@
  */
 import Vue from 'vue';
 
-const ADMIN_NAV_KEY = 'admin';
+const DEFAULT_NAV_KEY = 'admin';
+const NAV_KEY_BY_ROLE = {
+  system_admin: 'admin',
+  system_admin_readonly: 'admin_readonly',
+};
 
 export default {
   state: Vue.observable({
@@ -60,7 +64,12 @@ export default {
   },
   getNavRoot() {
     const nav = this.getNav();
-    return nav ? nav[ADMIN_NAV_KEY] : null;
+    if (!nav) {
+      return null;
+    }
+    const user = this.getUser();
+    const navKey = NAV_KEY_BY_ROLE[(user && user.role)] || DEFAULT_NAV_KEY;
+    return nav[navKey] || nav[DEFAULT_NAV_KEY] || null;
   },
   findNav(routeName) {
     return findNav(this.getNavRoot(), routeName);
@@ -72,9 +81,13 @@ export default {
     this.state.user = {
       name: newVal.user_name,
       sessionKey: newVal.session_key,
-      is_admin: newVal.is_admin,
+      role: newVal.role,
     };
     localStorage.setItem('user', JSON.stringify(this.state.user));
+  },
+  isReadonly() {
+    const user = this.getUser();
+    return !!(user && user.role === 'system_admin_readonly');
   },
   removeUserData() {
     this.state.user = null;

@@ -508,7 +508,10 @@
               :label="$t('gatewayConfig.balanceMode')"
               prop="balance_mode"
             >
-              <Select v-model="formData.balance_mode">
+              <Select
+                v-model="formData.balance_mode"
+                @on-change="onBalanceModeChange"
+              >
                 <Option value="WRR">{{ $t('gatewayConfig.wrr') }}</Option>
                 <Option value="EPP">{{ $t('gatewayConfig.epp') }}</Option>
               </Select>
@@ -817,6 +820,118 @@
               </Col>
             </Row>
           </Card>
+
+          <Card
+            :title="$t('gatewayConfig.eppRuntime')"
+            class="llm-section-card"
+            style="margin-top:12px;"
+          >
+            <Row :gutter="24">
+              <Col span="12">
+                <FormItem prop="epp_runtime.check.disabled">
+                  <span slot="label" class="provider-label">
+                    {{ $t('gatewayConfig.eppCheckDisabled') }}
+                    <Tooltip placement="top" transfer max-width="320">
+                      <div slot="content" class="provider-tip-content">
+                        {{ $t('gatewayConfig.eppCheckDisabledTip') }}
+                      </div>
+                      <Icon
+                        type="ios-help-circle-outline"
+                        class="provider-help-icon"
+                      />
+                    </Tooltip>
+                  </span>
+                  <i-switch v-model="formData.epp_runtime.check.disabled" />
+                </FormItem>
+              </Col>
+            </Row>
+            <Row :gutter="24">
+              <Col span="12">
+                <FormItem prop="epp_runtime.check.check_interval">
+                  <span slot="label">{{ $t('gatewayConfig.eppCheckInterval') }}</span>
+                  <DurationInput
+                    v-model="formData.epp_runtime.check.check_interval"
+                    default-unit="s"
+                  />
+                </FormItem>
+              </Col>
+              <Col span="12">
+                <FormItem prop="epp_runtime.check.fail_threshold">
+                  <span slot="label">{{ $t('gatewayConfig.eppFailThreshold') }}</span>
+                  <InputNumber
+                    v-model="formData.epp_runtime.check.fail_threshold"
+                    :min="1"
+                    :precision="0"
+                    style="width: 100%;"
+                  />
+                </FormItem>
+              </Col>
+            </Row>
+            <Row :gutter="24">
+              <Col span="12">
+                <FormItem prop="epp_runtime.check.cooldown">
+                  <span slot="label" class="provider-label">
+                    {{ $t('gatewayConfig.eppCooldown') }}
+                    <Tooltip placement="top" transfer max-width="320">
+                      <div slot="content" class="provider-tip-content">
+                        {{ $t('gatewayConfig.eppCooldownTip') }}
+                      </div>
+                      <Icon
+                        type="ios-help-circle-outline"
+                        class="provider-help-icon"
+                      />
+                    </Tooltip>
+                  </span>
+                  <DurationInput
+                    v-model="formData.epp_runtime.check.cooldown"
+                    default-unit="s"
+                  />
+                </FormItem>
+              </Col>
+              <Col span="12">
+                <FormItem prop="epp_runtime.check.success_threshold">
+                  <span slot="label">{{ $t('gatewayConfig.eppSuccessThreshold') }}</span>
+                  <InputNumber
+                    v-model="formData.epp_runtime.check.success_threshold"
+                    :min="1"
+                    :precision="0"
+                    style="width: 100%;"
+                  />
+                </FormItem>
+              </Col>
+            </Row>
+            <Row :gutter="24">
+              <Col span="12">
+                <FormItem prop="epp_runtime.timeout.connect">
+                  <span slot="label">{{ $t('gatewayConfig.eppConnectTimeout') }}</span>
+                  <DurationInput
+                    v-model="formData.epp_runtime.timeout.connect"
+                    default-unit="ms"
+                  />
+                </FormItem>
+              </Col>
+              <Col span="12">
+                <FormItem prop="epp_runtime.timeout.call">
+                  <span slot="label" class="provider-label">
+                    {{ $t('gatewayConfig.eppCallTimeout') }}
+                    <Tooltip placement="top" transfer max-width="320">
+                      <div slot="content" class="provider-tip-content">
+                        {{ $t('gatewayConfig.eppCallTimeoutTip') }}
+                      </div>
+                      <Icon
+                        type="ios-help-circle-outline"
+                        class="provider-help-icon"
+                      />
+                    </Tooltip>
+                  </span>
+                  <DurationInput
+                    v-model="formData.epp_runtime.timeout.call"
+                    default-unit="s"
+                  />
+                </FormItem>
+              </Col>
+            </Row>
+          </Card>
         </template>
       </Card>
     </Form>
@@ -825,6 +940,7 @@
 
 <script>
 import { cloneDeep } from 'lodash';
+import DurationInput from '@/components/DurationInput';
 
 const SELECT_ALL_MODELS_VALUE = '__SELECT_ALL_MODELS__';
 
@@ -877,6 +993,60 @@ function defaultNormalizeUpstreamError() {
     };
 }
 
+function defaultEppRuntime() {
+    return {
+        check: {
+            disabled: false,
+            check_interval: '2s',
+            fail_threshold: 3,
+            cooldown: '45s',
+            success_threshold: 2
+        },
+        timeout: {
+            connect: '500ms',
+            call: '3s'
+        }
+    };
+}
+
+// 解析 Go duration 字符串：合法且 > 0 时返回毫秒数，否则返回 NaN
+// 语法与 time.ParseDuration 对齐：允许前导 '+'，允许 "1." / ".5" 形式的小数
+function parseDurationMs(str) {
+    if (typeof str !== 'string') {
+        return NaN;
+    }
+    let source = str;
+    if (source.charAt(0) === '+') {
+        source = source.slice(1);
+    }
+    const re = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)/g;
+    const unitMs = {
+        ns: 1e-6,
+        us: 1e-3,
+        'µs': 1e-3,
+        ms: 1,
+        s: 1000,
+        m: 60000,
+        h: 3600000
+    };
+    let total = 0;
+    let matched = false;
+    let lastIndex = 0;
+    let m;
+    while ((m = re.exec(str)) !== null) {
+        if (m.index !== lastIndex) {
+            return NaN;
+        }
+        lastIndex = m.index + m[0].length;
+        total += parseFloat(m[1]) * unitMs[m[2]];
+        matched = true;
+    }
+    if (!matched || lastIndex !== str.length) {
+        return NaN;
+    }
+    return total;
+}
+
 function toBoolean(value, defaultValue) {
     if (value === true || value === 'true' || value === 1 || value === '1') {
         return true;
@@ -889,6 +1059,10 @@ function toBoolean(value, defaultValue) {
 
 export default {
     name: 'GatewayConfig',
+
+    components: {
+        DurationInput
+    },
 
     props: {
         reportFlag: {
@@ -1192,6 +1366,31 @@ export default {
             callback();
         };
 
+        const validateEppRuntimeDuration = invalidKey => (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            if (!(parseDurationMs(value) > 0)) {
+                callback(new Error(that.$t(invalidKey)));
+                return;
+            }
+            callback();
+        };
+
+        const validateEppRuntimeThreshold = invalidKey => (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            const n = Number(value);
+            if (!Number.isInteger(n) || n < 1) {
+                callback(new Error(that.$t(invalidKey)));
+                return;
+            }
+            callback();
+        };
+
         return {
             selectAllModelsMarker: SELECT_ALL_MODELS_VALUE,
             providerNames: [],
@@ -1211,7 +1410,8 @@ export default {
                 key_affinity: defaultKeyAffinity(),
                 normalize_upstream_error: defaultNormalizeUpstreamError(),
                 balance_mode: 'WRR',
-                epp_config: defaultEppConfig()
+                epp_config: defaultEppConfig(),
+                epp_runtime: defaultEppRuntime()
             },
             ruleValidate: {
                 provider: [{ validator: validateProvider, trigger: 'change', required: true }],
@@ -1253,6 +1453,42 @@ export default {
                 ],
                 'normalize_upstream_error.max_body_bytes': [
                     { validator: validateNormalizeMaxBodyBytes, trigger: 'change' }
+                ],
+                'epp_runtime.check.check_interval': [
+                    {
+                        validator: validateEppRuntimeDuration('gatewayConfig.eppCheckIntervalInvalid'),
+                        trigger: 'blur'
+                    }
+                ],
+                'epp_runtime.check.cooldown': [
+                    {
+                        validator: validateEppRuntimeDuration('gatewayConfig.eppCooldownInvalid'),
+                        trigger: 'blur'
+                    }
+                ],
+                'epp_runtime.check.fail_threshold': [
+                    {
+                        validator: validateEppRuntimeThreshold('gatewayConfig.eppFailThresholdInvalid'),
+                        trigger: 'change'
+                    }
+                ],
+                'epp_runtime.check.success_threshold': [
+                    {
+                        validator: validateEppRuntimeThreshold('gatewayConfig.eppSuccessThresholdInvalid'),
+                        trigger: 'change'
+                    }
+                ],
+                'epp_runtime.timeout.connect': [
+                    {
+                        validator: validateEppRuntimeDuration('gatewayConfig.eppConnectTimeoutInvalid'),
+                        trigger: 'blur'
+                    }
+                ],
+                'epp_runtime.timeout.call': [
+                    {
+                        validator: validateEppRuntimeDuration('gatewayConfig.eppCallTimeoutInvalid'),
+                        trigger: 'blur'
+                    }
                 ]
             }
         };
@@ -1436,6 +1672,7 @@ export default {
             const src = val || {};
             this.$set(this.formData, 'balance_mode', src.balance_mode || 'WRR');
             this.sourceHasEppConfig = !!src.epp_config;
+            this.sourceHasEppRuntime = !!src.epp_runtime;
             const eppSrc = src.epp_config || {};
             const maxRequests = (eppSrc.flow_control || {}).max_requests != null
                 ? Number((eppSrc.flow_control || {}).max_requests)
@@ -1468,6 +1705,36 @@ export default {
                     enable_eviction: false
                 }
             };
+            // epp_runtime 回读：GET 返回 null 时按默认展示（不误判为已落盘）
+            const rtSrc = src.epp_runtime || {};
+            const rtCheck = rtSrc.check || {};
+            const rtTimeout = rtSrc.timeout || {};
+            const rtDefault = defaultEppRuntime();
+            this.$set(this.formData, 'epp_runtime', {
+                check: {
+                    disabled: toBoolean(rtCheck.disabled, rtDefault.check.disabled),
+                    check_interval: rtCheck.check_interval != null
+                        ? rtCheck.check_interval
+                        : rtDefault.check.check_interval,
+                    fail_threshold: rtCheck.fail_threshold != null
+                        ? Number(rtCheck.fail_threshold)
+                        : rtDefault.check.fail_threshold,
+                    cooldown: rtCheck.cooldown != null
+                        ? rtCheck.cooldown
+                        : rtDefault.check.cooldown,
+                    success_threshold: rtCheck.success_threshold != null
+                        ? Number(rtCheck.success_threshold)
+                        : rtDefault.check.success_threshold
+                },
+                timeout: {
+                    connect: rtTimeout.connect != null
+                        ? rtTimeout.connect
+                        : rtDefault.timeout.connect,
+                    call: rtTimeout.call != null
+                        ? rtTimeout.call
+                        : rtDefault.timeout.call
+                }
+            });
         },
         syncFormWithProvider() {
             const allowedModels = this.providerModels;
@@ -1699,6 +1966,85 @@ export default {
             }
             return null;
         },
+        buildEppRuntime(rt) {
+            const src = rt || {};
+            const check = src.check || {};
+            const timeout = src.timeout || {};
+            const dft = defaultEppRuntime();
+            return {
+                check: {
+                    disabled: toBoolean(check.disabled, dft.check.disabled),
+                    check_interval:
+                        check.check_interval != null && check.check_interval !== ''
+                            ? String(check.check_interval)
+                            : dft.check.check_interval,
+                    fail_threshold:
+                        check.fail_threshold != null && check.fail_threshold !== ''
+                            ? Number(check.fail_threshold)
+                            : dft.check.fail_threshold,
+                    cooldown:
+                        check.cooldown != null && check.cooldown !== ''
+                            ? String(check.cooldown)
+                            : dft.check.cooldown,
+                    success_threshold:
+                        check.success_threshold != null && check.success_threshold !== ''
+                            ? Number(check.success_threshold)
+                            : dft.check.success_threshold
+                },
+                timeout: {
+                    connect:
+                        timeout.connect != null && timeout.connect !== ''
+                            ? String(timeout.connect)
+                            : dft.timeout.connect,
+                    call:
+                        timeout.call != null && timeout.call !== ''
+                            ? String(timeout.call)
+                            : dft.timeout.call
+                }
+            };
+        },
+        validateEppRuntime(rt) {
+            if (!rt) {
+                return null;
+            }
+            const check = rt.check || {};
+            const timeout = rt.timeout || {};
+            const badDuration = value =>
+                value != null && value !== '' && !(parseDurationMs(value) > 0);
+            const badThreshold = value =>
+                value != null &&
+                value !== '' &&
+                (!Number.isInteger(Number(value)) || Number(value) < 1);
+            if (badDuration(check.check_interval)) {
+                return this.$t('gatewayConfig.eppCheckIntervalInvalid');
+            }
+            if (badDuration(check.cooldown)) {
+                return this.$t('gatewayConfig.eppCooldownInvalid');
+            }
+            if (badThreshold(check.fail_threshold)) {
+                return this.$t('gatewayConfig.eppFailThresholdInvalid');
+            }
+            if (badThreshold(check.success_threshold)) {
+                return this.$t('gatewayConfig.eppSuccessThresholdInvalid');
+            }
+            if (badDuration(timeout.connect)) {
+                return this.$t('gatewayConfig.eppConnectTimeoutInvalid');
+            }
+            if (badDuration(timeout.call)) {
+                return this.$t('gatewayConfig.eppCallTimeoutInvalid');
+            }
+            return null;
+        },
+        onBalanceModeChange(value) {
+            if (value !== 'EPP') {
+                return;
+            }
+            // 切到 EPP 且运行时参数未初始化时补一组默认值
+            const rt = this.formData.epp_runtime;
+            if (!rt || !rt.check || !rt.timeout) {
+                this.$set(this.formData, 'epp_runtime', defaultEppRuntime());
+            }
+        },
         handleSubmit() {
             this.validateKeysState();
             this.$refs.formData.validate(valid => {
@@ -1750,6 +2096,19 @@ export default {
                     tmpData.epp_config = this.buildEppConfig(tmpData.epp_config);
                 } else {
                     delete tmpData.epp_config;
+                }
+                // epp_runtime 非空即校验；纯 WRR 且原未配置时不提交（整体替换语义）
+                const hasEppRuntime =
+                    tmpData.balance_mode === 'EPP' || this.sourceHasEppRuntime;
+                if (hasEppRuntime) {
+                    const rtError = this.validateEppRuntime(tmpData.epp_runtime);
+                    if (rtError) {
+                        this.$Message.error(rtError);
+                        return;
+                    }
+                    tmpData.epp_runtime = this.buildEppRuntime(tmpData.epp_runtime);
+                } else {
+                    delete tmpData.epp_runtime;
                 }
                 this.$emit('submitData', {
                     topic: 'llmConfigData',

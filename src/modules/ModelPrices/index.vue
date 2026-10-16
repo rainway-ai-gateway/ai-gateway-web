@@ -15,7 +15,7 @@
 */
 <template>
   <div class="model-prices">
-    <div class="action-bar">
+    <div v-has class="action-bar">
       <Button type="primary" size="small" @click="onCreate">
         + {{ $t('modelPrices.create') }}
       </Button>
@@ -86,6 +86,7 @@
 
 <script>
 import pageTable from '@/components/table/pageTable';
+import store from '@/utils/store';
 import ModelPriceUpsert from './components/ModelPriceUpsert.vue';
 import ModelPriceView from './components/ModelPriceView.vue';
 import ModelPriceImport from './components/ModelPriceImport.vue';
@@ -167,22 +168,28 @@ export default {
                     width: 240,
                     render: (h, params) => {
                         const row = params.row;
-                        return h('div', [
+                        const buttons = [
                             h('Button', {
                                 props: { size: 'small', type: 'primary' },
                                 style: { marginRight: '8px' },
                                 on: { click: () => this.onView(row) }
-                            }, this.$t('com.see') || '详情'),
-                            h('Button', {
-                                props: { size: 'small', type: 'success' },
-                                style: { marginRight: '8px' },
-                                on: { click: () => this.onEdit(row) }
-                            }, this.$t('com.edit') || '编辑'),
-                            h('Button', {
-                                props: { size: 'small', type: 'error' },
-                                on: { click: () => this.onDelete(row) }
-                            }, this.$t('com.del') || '删除')
-                        ]);
+                            }, this.$t('com.see') || '详情')
+                        ];
+                        // 只读管理员隐藏写操作按钮（与 v-has 同规则）
+                        if (!store.isReadonly()) {
+                            buttons.push(
+                                h('Button', {
+                                    props: { size: 'small', type: 'success' },
+                                    style: { marginRight: '8px' },
+                                    on: { click: () => this.onEdit(row) }
+                                }, this.$t('com.edit') || '编辑'),
+                                h('Button', {
+                                    props: { size: 'small', type: 'error' },
+                                    on: { click: () => this.onDelete(row) }
+                                }, this.$t('com.del') || '删除')
+                            );
+                        }
+                        return h('div', buttons);
                     }
                 }
             ];

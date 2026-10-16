@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>05 资源管理：EPP 调度</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a class="active" href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="05-资源管理epp-调度">05 资源管理：EPP 调度</h1>
+<p>EPP（Endpoint Picker）是独立于 BFE 的<strong>后端调度器</strong>。集群将「负载均衡模式」设为 <code>EPP</code> 后，后端实例的选择不再由 BFE 本地加权轮询完成，而是交给 EPP 调度器接管（模式与调度参数在集群向导步骤 4 的「均衡模式配置」卡片中设置，见 <a href="04-ai-business-cluster.html#均衡模式配置">4.6 节</a>）。</p>
+<p>入口：资源管理 → EPP调度。页面分为两个页签：</p>
+<ul><li><strong>EPP 实例池</strong>：登记 EPP 调度器自身的部署实例（按组组织，组内主备）；</li><li><strong>EPP 调度分配</strong>：查看 / 覆写「EPP 模式集群 ↔ 实例组」的分配关系。</li></ul>
+<h2 id="51-epp-实例池">5.1 EPP 实例池</h2>
+<h3 id="查看模式">查看模式</h3>
+<p><img src="images/06-epp-pool-list.png" alt="EPP 实例池" loading="lazy" /></p>
+<p>页面顶部显示统计：<strong>池名称</strong>（如 <code>EPP.pool</code>，由服务端配置提供）、<strong>实例组数</strong>、<strong>实例总数</strong>。</p>
+<p>主体为树形表格，按「实例组」一行一组：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>实例组</td><td>组名</td></tr><tr><td>实例数</td><td>组内实例数量，显示格式 <code>N / 2</code>（如 <code>1 / 2</code>、<code>2 / 2</code>）</td></tr><tr><td>实例列表</td><td>摘要展示 <code>实例ID(host:port)</code>，灰色小字</td></tr></tbody></table>
+<p>点击行首箭头展开组，内嵌表格显示每个实例的<strong>实例 ID / 主机 / 端口</strong>。</p>
+<h3 id="编辑模式">编辑模式</h3>
+<p>点击右上角「编辑」进入行内编辑。「保存」全量提交（<strong>全量替换</strong>语义，未列出的组与实例会被删除），「取消」还原本次全部修改。</p>
+<table><thead><tr><th>操作</th><th>说明</th></tr></thead><tbody><tr><td>编辑组名</td><td>行内输入，组名非空且<strong>池内唯一</strong></td></tr><tr><td>+ 添加组</td><td>在表格下方新增空组（须至少添加 1 个实例才能保存）</td></tr><tr><td>删除组</td><td>需确认「删除实例组及其所有实例」；至少保留 1 个组（仅剩 1 组时按钮禁用）</td></tr><tr><td>+添加实例</td><td>在展开区内添加实例行，端口默认 <code>9002</code>；组内实例 ≥ 2 时按钮禁用，右侧灰色提示"每组最多 2 个（主+备）"</td></tr><tr><td>删除</td><td>移除组内实例行</td></tr></tbody></table>
+<p><strong>校验规则</strong>：</p>
+<table><thead><tr><th>规则</th><th>说明</th></tr></thead><tbody><tr><td>组</td><td>至少 1 个组；组名非空、池内唯一；每组 1–2 个实例（拒绝空组与 3+ 实例）</td></tr><tr><td>实例 ID</td><td>非空且<strong>池内全局唯一</strong>；对应 EPP 启动参数 <code>-instance-id</code>（K8s StatefulSet 部署时取 Pod 名，如 <code>epp-0</code>）</td></tr><tr><td>主机</td><td>合法主机名或 IPv4 / IPv6 地址</td></tr><tr><td>端口</td><td>1-65535 整数</td></tr><tr><td>地址唯一</td><td><code>主机:端口</code> 组合池内全局唯一</td></tr></tbody></table>
+<blockquote>
+<p><strong>部署形态</strong>：生产环境每组通常为 <strong>2 个实例（主备）</strong>；测试环境允许单实例组（仅主、无备）。</p>
+</blockquote>
+<h3 id="保存后的自动修复">保存后的自动修复</h3>
+<p>实例池保存为全量替换。若既有分配的<strong>主实例已被移出池</strong>，系统自动修复悬空分配：组仍存在时，在同组剩余实例中重选主实例；组已不存在时，对整个实例池重跑分配器重新选组；池内无可分配候选组时，清除该分配（集群进入「未分配」态，见下节）。</p>
+<h2 id="52-epp-调度分配">5.2 EPP 调度分配</h2>
+<p>「集群 ↔ 实例组」的分配由<strong>分配器自动生成</strong>：集群切入 EPP 模式时自动选择实例组与主实例；实例池变更后自动修复悬空分配。本页签提供<strong>查询视图</strong>与<strong>手工覆写</strong>（运维干预入口）。</p>
+<h3 id="统计与分配视图">统计与分配视图</h3>
+<p><img src="images/06-epp-assignments.png" alt="EPP 调度分配" loading="lazy" /></p>
+<p>页面顶部显示统计：<strong>已分配集群</strong> / <strong>未分配集群</strong>（数量大于 0 时红色告警）/ <strong>空闲实例组</strong>。</p>
+<p>分配视图表格：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>集群名称</td><td>支持搜索、排序</td></tr><tr><td>实例组</td><td>分配到的组名；未分配时显示 <code>-</code></td></tr><tr><td>主实例</td><td>主实例 ID；未分配或降级时显示 <code>-</code></td></tr><tr><td>备实例</td><td>同组内除主实例外的实例（查询时实时展开）；单实例组显示「无」</td></tr><tr><td>状态</td><td><code>正常</code> / <code>降级</code>（主实例已被移出池或组不存在）</td></tr><tr><td>操作</td><td>「编辑」打开手动覆写抽屉</td></tr></tbody></table>
+<h3 id="未分配集群--空闲实例组">未分配集群 / 空闲实例组</h3>
+<ul><li><strong>未分配集群</strong>（红色卡片）：EPP 模式但无有效分配的集群，提示「服务降级为 WRR」。这些集群导出配置时会<strong>降级为 WRR</strong> 转发，属需尽快处理的异常态。</li><li><strong>空闲实例组</strong>：实例池中未承担任何集群分配的组（如扩容新组后、完成分配前）。</li></ul>
+<blockquote>
+<p>实例在多个集群间互为主备是<strong>合法</strong>的——分配以集群为单位，不做组与集群的一对一约束。</p>
+</blockquote>
+<h3 id="手动覆写">手动覆写</h3>
+<p>点击行内「编辑」打开抽屉：</p>
+<table><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody><tr><td>实例组</td><td>下拉选择，选项来自当前实例池中的组</td></tr><tr><td>主实例 ID</td><td>下拉选择该组内的实例</td></tr></tbody></table>
+<p>确认后仅覆写该集群的分配：主实例取所选实例，备实例自动为同组内另一实例。</p>
+<h2 id="53-注意事项">5.3 注意事项</h2>
+<ul><li>手工覆写要求：实例组存在于实例池中；主实例存在于该组内，且与备实例不同地址。</li><li>集群由 <code>EPP</code> 切回 <code>WRR</code> 后，分配记录<strong>休眠保留</strong>，再切回 <code>EPP</code> 时继续生效。</li><li>EPP 模式生效前提：已部署 EPP 调度器并在实例池登记实例。未分配集群会降级为 WRR，请在「EPP 调度分配」页签巡检未分配告警。</li><li>实例池「保存」为<strong>全量替换</strong>语义，未列出的组与实例会被删除，请整表核对后提交。</li></ul>
+  </main>
+</div>
+</body>
+</html>

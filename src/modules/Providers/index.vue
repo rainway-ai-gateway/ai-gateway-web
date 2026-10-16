@@ -15,7 +15,7 @@
 */
 <template>
   <div class="providers">
-    <Button type="primary" size="small" @click="onAdd">
+    <Button v-has type="primary" size="small" @click="onAdd">
       {{ $t('com.createX', { obj: $t('provider.name') }) }}
     </Button>
     <pageTable
@@ -144,7 +144,7 @@ export default {
                     key: 'action',
                     width: 430,
                     render(h, params) {
-                        return h('div', [
+                        const buttons = [
                             h(
                                 'Button',
                                 {
@@ -162,34 +162,44 @@ export default {
                                     on: { click: () => that.onViewModelPrices(params.row) }
                                 },
                                 that.$t('provider.viewModelPrices')
-                            ),
+                            )
+                        ];
+                        buttons.push(
                             h(
                                 'Button',
                                 {
                                     props: { type: 'warning', size: 'small' },
+                                    directives: [{ name: 'has' }],
                                     style: { marginRight: '5px' },
                                     on: { click: () => that.onPricingTiers(params.row) }
                                 },
                                 that.$t('provider.pricingTiers')
-                            ),
+                            )
+                        );
+                        buttons.push(
                             h(
                                 'Button',
                                 {
                                     props: { type: 'primary', size: 'small' },
+                                    directives: [{ name: 'has' }],
                                     style: { marginRight: '5px' },
                                     on: { click: () => that.onEdit(params.row) }
                                 },
                                 that.$t('com.edit')
-                            ),
+                            )
+                        );
+                        buttons.push(
                             h(
                                 'Button',
                                 {
                                     props: { type: 'error', size: 'small' },
+                                    directives: [{ name: 'has' }],
                                     on: { click: () => that.onDel(params.row) }
                                 },
                                 that.$t('com.del')
                             )
-                        ]);
+                        );
+                        return h('div', buttons);
                     }
                 }
             ];

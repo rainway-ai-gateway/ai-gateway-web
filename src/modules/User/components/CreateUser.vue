@@ -58,10 +58,13 @@
                         class="com-create-input"
                     />
                 </FormItem>
-                <FormItem :label="$t('user.role')" prop="is_admin">
-                    <Checkbox v-model="formItem.is_admin" disabled>{{
-                        $t('com.sysAdmin')
-                    }}</Checkbox>
+                <FormItem :label="$t('user.role')" prop="role">
+                    <RadioGroup v-model="formItem.role">
+                        <Radio label="system_admin">{{ $t('com.sysAdmin') }}</Radio>
+                        <Radio label="system_admin_readonly">{{
+                            $t('com.sysAdminReadonly')
+                        }}</Radio>
+                    </RadioGroup>
                 </FormItem>
             </Form>
             <div class="drawer-footer">
@@ -136,12 +139,19 @@ export default {
                 user_name: '',
                 password: '',
                 confirmPass: '',
-                is_admin: true
+                role: 'system_admin'
             },
             ruleValidate: {
                 user_name: [{ required: true, validator: validateName, trigger: 'blur' }],
                 password: [{ required: true, validator: validatePass, trigger: 'blur' }],
-                confirmPass: [{ required: true, validator: validatePassCheck, trigger: 'blur' }]
+                confirmPass: [{ required: true, validator: validatePassCheck, trigger: 'blur' }],
+                role: [
+                    {
+                        required: true,
+                        message: this.$t('user.tipSelectRole'),
+                        trigger: 'change'
+                    }
+                ]
             }
         };
     },

@@ -95,23 +95,38 @@
         </div>
       </div>
       <div class="chart-card">
-        <h4>{{ $t('report.modelRanking') }}</h4>
+        <h4>
+          {{ $t('report.rankingTitle') }}
+          <Select v-model="chartDims.ranking" size="small" transfer style="float:right;width:110px" @on-change="loadRanking">
+            <Option v-for="o in rankingDimOptions" :key="o.value" :value="o.value">{{ o.label }}</Option>
+          </Select>
+        </h4>
         <div class="chart-box tall">
-          <Echarts v-if="modelRankingOption.series" :option="modelRankingOption" height="100%" />
+          <Echarts v-if="rankingOption.series" :option="rankingOption" height="100%" />
           <div v-else class="chart-empty">{{ $t('report.noData') }}</div>
         </div>
       </div>
       <div class="chart-card">
-        <h4>{{ $t('report.providerDist') }}</h4>
+        <h4>
+          {{ $t('report.shareTitle') }}
+          <Select v-model="chartDims.pieProvider" size="small" transfer style="float:right;width:110px" @on-change="loadPie('pieProvider')">
+            <Option v-for="o in pieDimOptions('protocol')" :key="o.value" :value="o.value">{{ o.label }}</Option>
+          </Select>
+        </h4>
         <div class="chart-box">
-          <Echarts v-if="providerDistOption.series" :option="providerDistOption" height="100%" />
+          <Echarts v-if="shareOption.series" :option="shareOption" height="100%" />
           <div v-else class="chart-empty">{{ $t('report.noData') }}</div>
         </div>
       </div>
       <div class="chart-card">
-        <h4>{{ $t('report.statusDist') }}</h4>
+        <h4>
+          {{ $t('report.distTitle') }}
+          <Select v-model="chartDims.pieStatus" size="small" transfer style="float:right;width:110px" @on-change="loadPie('pieStatus')">
+            <Option v-for="o in pieDimOptions('status')" :key="o.value" :value="o.value">{{ o.label }}</Option>
+          </Select>
+        </h4>
         <div class="chart-box">
-          <Echarts v-if="statusDistOption.series" :option="statusDistOption" height="100%" />
+          <Echarts v-if="distOption.series" :option="distOption" height="100%" />
           <div v-else class="chart-empty">{{ $t('report.noData') }}</div>
         </div>
       </div>
@@ -145,10 +160,11 @@ export default {
     return {
       loading: false,
       overviewData: null,
+      filterParams: null,
       timeseriesData: {},
       rankingData: {},
       distData: {},
-      providerDistData: null
+      chartDims: { ranking: 'model', pieProvider: 'protocol', pieStatus: 'status', tsSplit: '' }
     };
   },
 
@@ -158,9 +174,32 @@ export default {
     fmtMs() { return this.helpers.fmtMs; },
     formatTs() { return this.helpers.formatTs; },
 
+    rankingDimOptions() {
+      return [
+        { value: 'model', label: this.$t('report.models') },
+        { value: 'provider', label: this.$t('report.provider') },
+        { value: 'apikey', label: this.$t('report.apikeyIds') },
+        { value: 'host', label: this.$t('report.hosts') },
+        { value: 'status', label: this.$t('report.statusCodes') },
+        { value: 'protocol', label: this.$t('report.protocol') },
+        { value: 'mode', label: this.$t('report.mode') },
+        { value: 'ai_cache_status', label: this.$t('report.cacheStatus') },
+        { value: 'mirror_hit', label: this.$t('report.mirrorHit') },
+        { value: 'ai_intent_answer', label: this.$t('report.intentAnswer') }
+      ];
+    },
+
     qpsOption() {
       const series = (this.timeseriesData.qps || {}).series || [];
       if (!series.length) return {};
+      if (this.chartDims.tsSplit) {
+        const split = this.buildSplitSeries(series, ['value']);
+        return this.chartOptionsLine(
+          split.times.map(t => this.formatTs(t)),
+          split.groups.map(g => ({ name: g.name, data: g.data[0].data })),
+          'req/s'
+        );
+      }
       return this.chartOptionsLine(
         series.map(p => this.formatTs(p.time)),
         [{ name: 'QPS', data: series.map(p => p.value) }],
@@ -171,6 +210,18 @@ export default {
     tokensOption() {
       const series = (this.timeseriesData.tokens || {}).series || [];
       if (!series.length) return {};
+      if (this.chartDims.tsSplit) {
+        const split = this.buildSplitSeries(series, ['input', 'output', 'total']);
+        const fieldNames = { input: this.$t('report.input'), output: this.$t('report.output'), total: this.$t('report.total') };
+        return this.chartOptionsLine(
+          split.times.map(t => this.formatTs(t)),
+          split.groups.flatMap(g => g.data.map((d, i) => ({
+            name: g.name + ' ' + fieldNames[['input', 'output', 'total'][i]],
+            data: d.data
+          }))),
+          'tokens/s'
+        );
+      }
       return this.chartOptionsLine(
         series.map(p => this.formatTs(p.time)),
         [
@@ -185,6 +236,19 @@ export default {
     latencyOption() {
       const series = (this.timeseriesData.latency || {}).series || [];
       if (!series.length) return {};
+      if (this.chartDims.tsSplit) {
+        // 带 dimension 时接口只返回 avg/max（见 report.md §2.2）
+        const split = this.buildSplitSeries(series, ['avg', 'max']);
+        const fieldNames = { avg: this.$t('report.avg'), max: this.$t('report.max') };
+        return this.chartOptionsLine(
+          split.times.map(t => this.formatTs(t)),
+          split.groups.flatMap(g => g.data.map((d, i) => ({
+            name: g.name + ' ' + fieldNames[['avg', 'max'][i]],
+            data: d.data
+          }))),
+          'ms'
+        );
+      }
       return this.chartOptionsLine(
         series.map(p => this.formatTs(p.time)),
         [
@@ -195,29 +259,29 @@ export default {
       );
     },
 
-    modelRankingOption() {
+    rankingOption() {
       const items = ((this.rankingData || {}).items || []).slice(0, 10);
       if (!items.length) return {};
       return this.chartOptionsBar(
-        items.map(i => i.name),
+        items.map(i => this.dimBucketName(this.chartDims.ranking, i.name)),
         [{ name: this.$t('report.requestCount'), data: items.map(i => i.request_count) }],
         true
       );
     },
 
-    providerDistOption() {
-      const items = ((this.providerDistData || {}).items || []);
+    shareOption() {
+      const items = ((this.distData[this.chartDims.pieProvider] || {}).items || []);
       if (!items.length) return {};
       return this.chartOptionsPie(
-        items.map(i => ({ name: i.name, value: i.request_count }))
+        items.map(i => ({ name: this.dimBucketName(this.chartDims.pieProvider, i.name), value: i.request_count }))
       );
     },
 
-    statusDistOption() {
-      const items = ((this.distData.status || {}).items || []);
+    distOption() {
+      const items = ((this.distData[this.chartDims.pieStatus] || {}).items || []);
       if (!items.length) return {};
       return this.chartOptionsPie(
-        items.map(i => ({ name: i.name, value: i.request_count }))
+        items.map(i => ({ name: this.dimBucketName(this.chartDims.pieStatus, i.name), value: i.request_count }))
       );
     },
 
@@ -247,37 +311,30 @@ export default {
   },
 
   methods: {
-    load(filterParams) {
+    load(filterParams, tsSplit) {
+      this.filterParams = filterParams || this.filterParams;
+      if (!this.filterParams) return;
+      // 拆分维度由父组件过滤栏传入，随「查询」一并生效（与过滤栏其他控件行为一致）
+      if (tsSplit !== undefined) this.chartDims.tsSplit = tsSplit || '';
       this.loading = true;
 
+      const pieDims = [this.chartDims.pieProvider];
+      if (this.chartDims.pieStatus !== this.chartDims.pieProvider) pieDims.push(this.chartDims.pieStatus);
+
       Promise.all([
-        this.$request({ url: 'report/overview', method: 'get', params: filterParams, openapi: true }),
-        this.$request({ url: 'report/timeseries', method: 'get', params: { ...filterParams, metric: 'qps' }, openapi: true }),
-        this.$request({ url: 'report/timeseries', method: 'get', params: { ...filterParams, metric: 'tokens' }, openapi: true }),
-        this.$request({ url: 'report/timeseries', method: 'get', params: { ...filterParams, metric: 'latency' }, openapi: true }),
-        this.$request({ url: 'report/timeseries', method: 'get', params: { ...filterParams, metric: 'cache_tokens' }, openapi: true }),
-        this.$request({ url: 'report/rankings', method: 'get', params: { ...filterParams, dimension: 'model', limit: 10 }, openapi: true }),
-        this.$request({ url: 'report/distribution', method: 'get', params: { ...filterParams, dimension: 'status' }, openapi: true }),
-        this.$request({ url: 'report/rankings', method: 'get', params: { ...filterParams, dimension: 'provider', limit: 10 }, openapi: true })
-      ]).then(([overviewRes, qpsRes, tokensRes, latencyRes, cacheTokensRes, rankingRes, statusRes, providerRankingRes]) => {
+        this.$request({ url: 'report/overview', method: 'get', params: this.filterParams, openapi: true }),
+        this.$request({ url: 'report/timeseries', method: 'get', params: { ...this.filterParams, metric: 'cache_tokens' }, openapi: true }),
+        this.loadTs('qps'),
+        this.loadTs('tokens'),
+        this.loadTs('latency'),
+        this.loadRanking(),
+        ...pieDims.map(dim => this.loadDistribution(dim))
+      ]).then(([overviewRes, cacheTokensRes]) => {
         if (overviewRes.status === 200) {
           this.overviewData = overviewRes.data.Data || {};
         }
-        const tsData = {};
-        if (qpsRes.status === 200) tsData.qps = qpsRes.data.Data || {};
-        if (tokensRes.status === 200) tsData.tokens = tokensRes.data.Data || {};
-        if (latencyRes.status === 200) tsData.latency = latencyRes.data.Data || {};
-        if (cacheTokensRes.status === 200) tsData.cache_tokens = cacheTokensRes.data.Data || {};
-        this.timeseriesData = tsData;
-
-        if (rankingRes.status === 200) {
-          this.rankingData = rankingRes.data.Data || {};
-        }
-        if (statusRes.status === 200) {
-          this.distData = { ...this.distData, status: statusRes.data.Data || {} };
-        }
-        if (providerRankingRes.status === 200) {
-          this.providerDistData = providerRankingRes.data.Data || null;
+        if (cacheTokensRes.status === 200) {
+          this.$set(this.timeseriesData, 'cache_tokens', cacheTokensRes.data.Data || {});
         }
       }).catch(err => {
         console.error('Failed to load overview data:', err);
@@ -285,6 +342,90 @@ export default {
       }).finally(() => {
         this.loading = false;
       });
+    },
+
+    // ==================== Chart Dimension Drilldown ====================
+    pieDimOptions(first) {
+      // distribution 的 dimension 枚举见 report.md §2.4（与 rankings 不同，不含 provider/model 等）
+      const opts = [
+        { value: 'status', label: this.$t('report.statusCodes') },
+        { value: 'protocol', label: this.$t('report.protocol') },
+        { value: 'mode', label: this.$t('report.mode') },
+        { value: 'stream', label: this.$t('report.stream') },
+        { value: 'ai_cache_status', label: this.$t('report.cacheStatus') },
+        { value: 'mirror_hit', label: this.$t('report.mirrorHit') },
+        { value: 'ai_intent_answer', label: this.$t('report.intentAnswer') }
+      ];
+      const idx = opts.findIndex(o => o.value === first);
+      if (idx > 0) opts.unshift(opts.splice(idx, 1)[0]);
+      return opts;
+    },
+
+    // 维度桶名展示映射：mirror_hit 的 "0"/"1" 归一为未命中/命中，空值为未知
+    dimBucketName(dim, name) {
+      if (name === '' || name == null) return this.$t('report.unknownBucket');
+      if (dim === 'mirror_hit') {
+        if (String(name) === '1') return this.$t('report.mirrorHitYes');
+        if (String(name) === '0') return this.$t('report.mirrorHitNo');
+      }
+      return String(name);
+    },
+
+    // 带拆分维度时各点携带 name（维度值），按 name 分组拆成多条序列
+    buildSplitSeries(series, fields) {
+      const groups = {};
+      series.forEach(p => {
+        const key = p.name == null ? '' : String(p.name);
+        if (!groups[key]) groups[key] = {};
+        groups[key][p.time] = p;
+      });
+      const times = Object.values(groups).reduce((acc, m) => {
+        Object.keys(m).forEach(t => acc.add(Number(t)));
+        return acc;
+      }, new Set());
+      const sortedTimes = Array.from(times).sort((a, b) => a - b);
+      return {
+        times: sortedTimes,
+        groups: Object.keys(groups).map(key => ({
+          name: this.dimBucketName(this.chartDims.tsSplit, key),
+          data: fields.map(f => ({
+            data: sortedTimes.map(t => {
+              const p = groups[key][t];
+              return p && p[f] != null ? p[f] : '-';
+            })
+          }))
+        }))
+      };
+    },
+
+    loadRanking() {
+      if (!this.filterParams) return Promise.resolve();
+      return this.$request({ url: 'report/rankings', method: 'get', params: { ...this.filterParams, dimension: this.chartDims.ranking, limit: 10 }, openapi: true })
+        .then(res => {
+          if (res.status === 200) this.rankingData = res.data.Data || {};
+        }).catch(() => {});
+    },
+
+    loadPie(dimKey) {
+      return this.loadDistribution(this.chartDims[dimKey]);
+    },
+
+    loadDistribution(dim) {
+      if (!this.filterParams) return Promise.resolve();
+      return this.$request({ url: 'report/distribution', method: 'get', params: { ...this.filterParams, dimension: dim }, openapi: true })
+        .then(res => {
+          if (res.status === 200) this.$set(this.distData, dim, res.data.Data || {});
+        }).catch(() => {});
+    },
+
+    loadTs(metric) {
+      if (!this.filterParams) return Promise.resolve();
+      const params = { ...this.filterParams, metric };
+      if (this.chartDims.tsSplit) params.dimension = this.chartDims.tsSplit;
+      return this.$request({ url: 'report/timeseries', method: 'get', params, openapi: true })
+        .then(res => {
+          if (res.status === 200) this.$set(this.timeseriesData, metric, res.data.Data || {});
+        }).catch(() => {});
     },
 
     chartOptionsLine(xData, seriesArr, yLabel) {
@@ -399,7 +540,27 @@ export default {
       font-size: 14px;
       color: #17233d;
       margin: 0 0 8px 0;
+      // 容纳标题右侧浮动的维度下拉；下拉经 transfer 挂到 body，不受 overflow 裁剪
+      overflow: hidden;
+      line-height: 24px;
     }
+  }
+
+  .ts-split-bar {
+    grid-column: span 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e8eaec;
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+
+  .ts-split-label {
+    font-size: 12px;
+    color: #808695;
   }
 
   .chart-box {

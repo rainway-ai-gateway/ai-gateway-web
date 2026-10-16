@@ -294,6 +294,14 @@ body {
   white-space: nowrap;
 }
 
+/* 登录页原型角色提示：仅原型演示用，说明只读登录方式 */
+.bfe-login .login-role-tip {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #808695;
+}
+
 /* 侧栏标题：对齐 navBar.less .bfe-sidebar .header .text */
 .bfe-sidebar .header .text {
   font-size: 18px;

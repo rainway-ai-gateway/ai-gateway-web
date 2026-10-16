@@ -17,6 +17,7 @@
   <div>
     <div class="title">
       <Button
+        v-has
         size="small"
         type="primary"
         @click="onAdd"
@@ -120,6 +121,7 @@ export default {
                                         type: 'primary',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     style: {
                                         marginRight: '5px'
                                     },
@@ -138,6 +140,7 @@ export default {
                                         type: 'error',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     on: {
                                         click: () => {
                                             that.onDel(params.row);

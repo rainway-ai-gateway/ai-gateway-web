@@ -19,14 +19,15 @@
     <script>
                 document.addEventListener('DOMContentLoaded', function () {
                   var root = Layout.render({ pageId: 'Entity.list', basePath: '../' });
+                  var isReadonly = Prototype.isReadonly();
                   var orgContent =
                     '<div class="title entity-page">' +
-                      IvuUI.btn('创建Entity', 'primary', 'small', '', 'id="btn-entity-add"') +
+                      (isReadonly ? '' : IvuUI.btn('创建Entity', 'primary', 'small', '', 'id="btn-entity-add"')) +
                     '</div>' +
                     '<div id="entity-table"></div>';
                   var typeContent =
                     '<div class="title entity-page">' +
-                      IvuUI.btn('创建类型', 'primary', 'small', '', 'id="btn-entity-type-add"') +
+                      (isReadonly ? '' : IvuUI.btn('创建类型', 'primary', 'small', '', 'id="btn-entity-type-add"')) +
                     '</div>' +
                     '<div id="entity-type-table"></div>';
 
@@ -173,6 +174,9 @@
                     title: '操作', key: 'action', width: 300,
                     render: function (row, rowIndex) {
                       var pageStart = (entityState.currentPage - 1) * entityState.pageSize;
+                      if (isReadonly) {
+                        return IvuUI.btn('管理路由规则', 'success', 'small', '', 'data-entity-manage-rules="' + (pageStart + rowIndex) + '"');
+                      }
                       return IvuUI.btn('管理路由规则', 'success', 'small', '', 'data-entity-manage-rules="' + (pageStart + rowIndex) + '"') + ' ' +
                         IvuUI.btn('编辑', 'primary', 'small', '', 'data-entity-edit="' + (pageStart + rowIndex) + '"') + ' ' +
                         IvuUI.btn('删除', 'error', 'small', '', 'data-entity-delete="' + (pageStart + rowIndex) + '"');
@@ -219,6 +223,7 @@
                           title: '操作', key: 'action', width: 200,
                           render: function (row, rowIndex) {
                             var pageStart = (typeState.currentPage - 1) * typeState.pageSize;
+                            if (isReadonly) return '';
                             return IvuUI.btn('编辑', 'primary', 'small', '', 'data-entity-type-edit="' + (pageStart + rowIndex) + '"') + ' ' +
                               IvuUI.btn('删除', 'error', 'small', '', 'data-entity-type-delete="' + (pageStart + rowIndex) + '"');
                           }
@@ -482,10 +487,12 @@
       }
                   }
 
-                  document.getElementById('btn-entity-add').addEventListener('click', function () {
+                  var addBtn = document.getElementById('btn-entity-add');
+                  if (addBtn) addBtn.addEventListener('click', function () {
                     openEntityDrawer('add');
                   });
-                  document.getElementById('btn-entity-type-add').addEventListener('click', function () {
+                  var typeAddBtn = document.getElementById('btn-entity-type-add');
+                  if (typeAddBtn) typeAddBtn.addEventListener('click', function () {
                     openTypeDrawer('add');
                   });
 

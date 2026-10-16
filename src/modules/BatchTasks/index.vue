@@ -362,6 +362,7 @@ export default {
                                     'Button',
                                     {
                                         props: { size: 'small', disabled: true },
+                                        directives: [{ name: 'has' }],
                                         attrs: {
                                             title: this.$t(
                                                 'batchTasks.cancelDisabledTip'
@@ -377,6 +378,7 @@ export default {
                                     'Button',
                                     {
                                         props: { size: 'small', type: 'error' },
+                                        directives: [{ name: 'has' }],
                                         on: { click: () => this.onCancel(row) }
                                     },
                                     this.$t('batchTasks.cancel')

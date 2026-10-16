@@ -356,6 +356,7 @@ window.ApiKeyUpsert = {
     });
     var tpmRules = (policy.rules && policy.rules.tpm) || [];
     var rpmRules = (policy.rules && policy.rules.rpm) || [];
+    var batchLimits = (policy.rules && policy.rules.batch_limits) || null;
     var models =
       data.models && data.models.length ? data.models.slice() : ['*'];
     var expiredTime = data.expire_time;
@@ -1407,15 +1408,17 @@ window.ApiKeyUpsert = {
             percent +
             '%"></div></div>' +
             '</div>' +
-            '<div style="margin-top:16px;">' +
-            IvuUI.btn(
-              '重置配额',
-              'primary',
-              'small',
-              '',
-              'type="button" id="btn-api-reset-quota"',
-            ) +
-            '</div>'
+            (Prototype.isReadonly()
+              ? ''
+              : '<div style="margin-top:16px;">' +
+                IvuUI.btn(
+                  '重置配额',
+                  'primary',
+                  'small',
+                  '',
+                  'type="button" id="btn-api-reset-quota"',
+                ) +
+                '</div>')
           : ''),
     );
 

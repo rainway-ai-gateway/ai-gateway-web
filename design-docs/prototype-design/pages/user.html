@@ -17,14 +17,15 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var root = Layout.render({ pageId: 'user.list', basePath: '../' });
+  var isReadonly = Prototype.isReadonly();
   var userContent =
     '<div class="title user-page">' +
-      IvuUI.btn('添加用户', 'primary', 'small', 'add-button', 'id="btn-user-add"') +
+      (isReadonly ? '' : IvuUI.btn('添加用户', 'primary', 'small', 'add-button', 'id="btn-user-add"')) +
     '</div>' +
     '<div id="user-table"></div>';
   var tokenContent =
     '<div class="title user-page">' +
-      IvuUI.btn('创建', 'primary', 'small', 'add-button', 'id="btn-token-add"') +
+      (isReadonly ? '' : IvuUI.btn('创建', 'primary', 'small', 'add-button', 'id="btn-token-add"')) +
     '</div>' +
     '<div class="ivu-alert ivu-alert-info ivu-alert-with-icon user-token-alert">' +
       '<span class="ivu-alert-icon"><i class="ivu-icon ivu-icon-ios-information-circle"></i></span>' +
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var userState = {
     rows: cloneRows(MockData.users),
     filteredRows: [],
-    search: { user_name: '', is_admin: '' },
+    search: { user_name: '', role: '' },
     pageSize: 20,
     currentPage: 1,
     sortKey: '',
@@ -72,13 +73,13 @@ document.addEventListener('DOMContentLoaded', function () {
   function filterUserRows() {
     userState.filteredRows = userState.rows.filter(function (row) {
       var nameKw = String(userState.search.user_name || '').trim().toUpperCase();
-      var roleKw = String(userState.search.is_admin || '').trim();
+      var roleKw = String(userState.search.role || '').trim();
       if (nameKw && String(row.user_name || '').toUpperCase().indexOf(nameKw) === -1) return false;
-      if (roleKw && String(!!row.is_admin) !== roleKw) return false;
+      if (roleKw && String(row.role || '') !== roleKw) return false;
       return true;
     });
     userState.filteredRows = Prototype.sortRows(userState.filteredRows, userState.sortKey, userState.sortOrder, function (row, key) {
-      if (key === 'is_admin') return UserUpsert.roleLabel(!!row.is_admin);
+      if (key === 'role') return UserUpsert.roleLabel(row.role);
       return Prototype.cellText(row, key);
     });
   }
@@ -116,14 +117,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function setUserDrawerTitle(mode) {
     var titleEl = document.querySelector('#drawer-user .ivu-drawer-header-inner');
-    if (titleEl) titleEl.textContent = mode === 'create' ? '添加用户' : '修改密码';
+    if (titleEl) {
+      titleEl.textContent = mode === 'create' ? '添加用户' : (mode === 'changeRole' ? '变更角色' : '修改密码');
+    }
   }
 
   function toggleUserDrawerFooter(mode) {
     var createFooter = document.getElementById('user-drawer-footer-create');
     var passwordFooter = document.getElementById('user-drawer-footer-password');
+    var roleFooter = document.getElementById('user-drawer-footer-rolechange');
     if (createFooter) createFooter.classList.toggle('proto-hidden', mode !== 'create');
     if (passwordFooter) passwordFooter.classList.toggle('proto-hidden', mode !== 'updatePassword');
+    if (roleFooter) roleFooter.classList.toggle('proto-hidden', mode !== 'changeRole');
   }
 
   function fillCreateUserForm() {
@@ -180,6 +185,12 @@ document.addEventListener('DOMContentLoaded', function () {
       var bodyEl = document.querySelector('#drawer-user .ivu-drawer-body');
       if (bodyEl) bodyEl.innerHTML = UserUpsert.createUserBody();
       fillCreateUserForm();
+    } else if (mode === 'changeRole') {
+      var roleRow = userState.filteredRows[filteredIndex];
+      if (!roleRow) return;
+      userState.currentRow = userState.rows[findUserRowIndex(roleRow)] || roleRow;
+      var roleBodyEl = document.querySelector('#drawer-user .ivu-drawer-body');
+      if (roleBodyEl) roleBodyEl.innerHTML = UserUpsert.roleChangeBody(userState.currentRow);
     } else {
       var row = userState.filteredRows[filteredIndex];
       if (!row) return;
@@ -199,20 +210,22 @@ document.addEventListener('DOMContentLoaded', function () {
       columns: [
         { title: '用户', key: 'user_name', minWidth: 160, searchable: true, sortable: true, searchPlaceholder: '请输入用户查询' },
         {
-          title: '角色', key: 'is_admin', minWidth: 120, searchable: true, sortable: true,
+          title: '角色', key: 'role', minWidth: 120, searchable: true, sortable: true,
           searchType: 'select',
           searchPlaceholder: '请选择角色',
           searchFilters: [
-            { label: '管理员', value: 'true' },
-            { label: '普通用户', value: 'false' }
+            { label: '系统管理员', value: 'system_admin' },
+            { label: '系统管理员（只读）', value: 'system_admin_readonly' }
           ],
-          render: function (row) { return UserUpsert.roleLabel(!!row.is_admin); }
+          render: function (row) { return UserUpsert.roleLabel(row.role); }
         },
         {
-          title: '操作', key: 'action', width: 220,
+          title: '操作', key: 'action', width: 280,
           render: function (row, rowIndex) {
+            if (isReadonly) return '';
             var pageStart = (userState.currentPage - 1) * userState.pageSize;
-            return IvuUI.btn('修改密码', 'primary', 'small', '', 'data-user-password="' + (pageStart + rowIndex) + '"') + ' ' +
+            return IvuUI.btn('变更角色', 'primary', 'small', '', 'data-user-role="' + (pageStart + rowIndex) + '"') + ' ' +
+              IvuUI.btn('修改密码', 'primary', 'small', '', 'data-user-password="' + (pageStart + rowIndex) + '"') + ' ' +
               IvuUI.btn('删除', 'error', 'small', '', 'data-user-delete="' + (pageStart + rowIndex) + '"');
           }
         }
@@ -275,6 +288,12 @@ document.addEventListener('DOMContentLoaded', function () {
       };
     }
 
+    tableRoot.querySelectorAll('[data-user-role]').forEach(function (btn) {
+      btn.onclick = function () {
+        openUserDrawer('changeRole', parseInt(btn.getAttribute('data-user-role'), 10));
+      };
+    });
+
     tableRoot.querySelectorAll('[data-user-password]').forEach(function (btn) {
       btn.onclick = function () {
         openUserDrawer('updatePassword', parseInt(btn.getAttribute('data-user-password'), 10));
@@ -318,6 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
           searchPlaceholder: '请选择 scope',
           searchFilters: [
             { label: 'System', value: 'System' },
+            { label: 'SystemReadonly', value: 'SystemReadonly' },
             { label: 'Support', value: 'Support' }
           ],
           render: function (row) { return UserUpsert.scopeLabel(row.scope); }
@@ -326,7 +346,9 @@ document.addEventListener('DOMContentLoaded', function () {
           title: '操作', key: 'action', width: 180,
           render: function (row, rowIndex) {
             var pageStart = (tokenState.currentPage - 1) * tokenState.pageSize;
-            return IvuUI.btn('详情', 'primary', 'small', '', 'data-token-detail="' + (pageStart + rowIndex) + '"') + ' ' +
+            var detailBtn = IvuUI.btn('详情', 'primary', 'small', '', 'data-token-detail="' + (pageStart + rowIndex) + '"');
+            if (isReadonly) return detailBtn;
+            return detailBtn + ' ' +
               IvuUI.btn('删除', 'error', 'small', '', 'data-token-delete="' + (pageStart + rowIndex) + '"');
           }
         }
@@ -436,11 +458,13 @@ document.addEventListener('DOMContentLoaded', function () {
     Prototype.openDrawer('drawer-token-create');
   }
 
-  document.getElementById('btn-user-add').addEventListener('click', function () {
+  var userAddBtn = document.getElementById('btn-user-add');
+  if (userAddBtn) userAddBtn.addEventListener('click', function () {
     openUserDrawer('create');
   });
 
-  document.getElementById('btn-token-add').addEventListener('click', function () {
+  var tokenAddBtn = document.getElementById('btn-token-add');
+  if (tokenAddBtn) tokenAddBtn.addEventListener('click', function () {
     openTokenCreateDrawer();
   });
 
@@ -476,7 +500,12 @@ document.addEventListener('DOMContentLoaded', function () {
       Prototype.toast('用户名已存在', 'error');
       return;
     }
-    userState.rows.unshift({ user_name: userName, is_admin: true });
+    var roleInput = document.querySelector('input[name="user-role"]:checked');
+    if (!roleInput) {
+      Prototype.toast('请选择角色', 'error');
+      return;
+    }
+    userState.rows.unshift({ user_name: userName, role: roleInput.value });
     Prototype.closeDrawer('drawer-user');
     renderUserTable();
     Prototype.toast('添加成功！');
@@ -531,6 +560,29 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('btn-user-password-cancel').addEventListener('click', function () {
+    Prototype.closeDrawer('drawer-user');
+  });
+
+  document.getElementById('btn-user-role-submit').addEventListener('click', function () {
+    var row = userState.currentRow;
+    if (!row) return;
+    if (String(row.user_name || '').toLowerCase() === 'admin') {
+      Prototype.toast('内置账号 admin 角色固定为系统管理员，不可变更', 'error');
+      return;
+    }
+    var roleInput = document.querySelector('#drawer-user input[name="user-role"]:checked');
+    if (!roleInput) {
+      Prototype.toast('请选择角色', 'error');
+      return;
+    }
+    var rowIndex = findUserRowIndex(row);
+    if (rowIndex >= 0) userState.rows[rowIndex].role = roleInput.value;
+    Prototype.closeDrawer('drawer-user');
+    renderUserTable();
+    Prototype.toast('角色变更成功！');
+  });
+
+  document.getElementById('btn-user-role-cancel').addEventListener('click', function () {
     Prototype.closeDrawer('drawer-user');
   });
 

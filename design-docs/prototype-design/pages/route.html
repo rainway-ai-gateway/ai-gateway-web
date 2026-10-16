@@ -83,6 +83,7 @@
 
             var pageTitle = '路由规则 - ' + (TYPE_LABELS[tableType] || tableType) + ' / ' + getOwnerLabel();
             var root = Layout.render({ pageId: 'AdvanceRouteRule.list', basePath: '../', breadcrumb: '路由表' });
+            var isReadonly = Prototype.isReadonly();
             document.title = pageTitle + ' - AI网关';
             // 面包屑改为两级：路由表 / 路由规则 - Type / Owner
             var breadcrumbEl = document.querySelector('.bfe-breadcrumb');
@@ -109,7 +110,7 @@
                     '</div>') +
                 '</div>' +
                 '<div>' +
-                  IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-route-add"') +
+                  (isReadonly ? '' : IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-route-add"')) +
                   '<div id="route-table" class="forwardRule"></div>' +
                 '</div>' +
               '</div>' +
@@ -164,10 +165,10 @@
                 '</strong> / ' + IvuUI.escapeHtml(getOwnerLabel()) + '</div>';
               var actions = IvuUI.btn('< 返回', 'default', 'small', '', 'id="btn-route-back" style="margin-right:8px;"') + ' ';
               if (state.mode === 'view') {
-                actions += IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-route-edit-mode"');
+                actions += isReadonly ? '' : IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-route-edit-mode"');
               } else {
-                actions += IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-route-exit-edit" style="margin-right:8px;"') + ' ' +
-                  IvuUI.btn('提交并生效', 'primary', 'small', 'submit', 'id="btn-route-submit"');
+                actions += isReadonly ? '' : (IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-route-exit-edit" style="margin-right:8px;"') + ' ' +
+                  IvuUI.btn('提交并生效', 'primary', 'small', 'submit', 'id="btn-route-submit"'));
               }
               html += '<div class="route-header-actions">' + actions + '</div>';
               document.getElementById('route-header').innerHTML = html;
@@ -192,6 +193,7 @@
             }
 
             function enterEditMode() {
+              if (isReadonly) return;
               state.mode = 'edit';
               state.originalRows = cloneRules(state.rows);
               renderHeader();
@@ -346,7 +348,7 @@
                     render: function (row, rowIndex) {
                       var pageStart = (state.currentPage - 1) * state.pageSize;
                       var globalIndex = pageStart + rowIndex;
-                      if (state.mode === 'view') {
+                      if (isReadonly || state.mode === 'view') {
                         return IvuUI.btn('查看', 'primary', 'small', '', 'data-route-view="' + globalIndex + '"');
                       }
                       return IvuUI.btn('编辑', 'primary', 'small', '', 'data-route-edit="' + globalIndex + '"') + ' ' +
@@ -908,7 +910,8 @@
               fillEditDrawerForm(state.drawerMode === 'edit' && state.editIndex >= 0 ? state.rows[state.editIndex] : null);
             }
 
-            document.getElementById('btn-route-add').addEventListener('click', function () {
+            var addBtnEl = document.getElementById('btn-route-add');
+            if (addBtnEl) addBtnEl.addEventListener('click', function () {
               openDrawer('add');
             });
 

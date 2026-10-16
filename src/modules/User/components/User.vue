@@ -30,7 +30,7 @@
 */
 <template>
     <div>
-        <Button class="add-button" type="primary" size="small" @click="onAdd">{{
+        <Button v-has class="add-button" type="primary" size="small" @click="onAdd">{{
             $t('com.createX', { obj: $t('user.name') })
         }}</Button>
         <Drawer
@@ -50,6 +50,35 @@
                 @submit="submitPassword"
                 @cancel="isHiden = false"
             />
+        </Drawer>
+        <Drawer
+            v-model="roleDrawerVisible"
+            :title="$t('user.changeRole')"
+            width="30"
+            :mask-closable="false"
+        >
+            <Form ref="roleForm" :model="roleForm" label-position="top">
+                <FormItem :label="$t('com.userName')">
+                    <Input v-model="roleForm.user_name" disabled />
+                </FormItem>
+                <FormItem :label="$t('user.role')">
+                    <div v-if="isBuiltinAdmin">{{ $t('user.tipRoleFixedBuiltin') }}</div>
+                    <RadioGroup v-else v-model="roleForm.role">
+                        <Radio label="system_admin">{{ $t('com.sysAdmin') }}</Radio>
+                        <Radio label="system_admin_readonly">{{
+                            $t('com.sysAdminReadonly')
+                        }}</Radio>
+                    </RadioGroup>
+                </FormItem>
+            </Form>
+            <div class="drawer-footer">
+                <Button size="small" type="primary" @click="submitRole">{{
+                    $t('com.submit')
+                }}</Button>
+                <Button size="small" @click="roleDrawerVisible = false">{{
+                    $t('com.cancel')
+                }}</Button>
+            </div>
         </Drawer>
         <pageTable ref="pageTable" :tableData="tableData" :columns="columns" :loading="loading" />
     </div>
@@ -75,6 +104,11 @@ export default {
             isHiden: false,
             handleType: '',
             currentData: {},
+            roleDrawerVisible: false,
+            roleForm: {
+                user_name: '',
+                role: 'system_admin'
+            },
             tableData: [],
             associatedUseList: [],
             columns: [
@@ -85,20 +119,16 @@ export default {
                     sortable: 'custom'
                 },
                 {
-                    key: 'is_admin',
+                    key: 'role',
                     title: this.$t('user.role'),
+                    searchable: true,
+                    searchType: 'select',
+                    searchFilters: [
+                        { label: this.$t('com.sysAdmin'), value: 'system_admin' },
+                        { label: this.$t('com.sysAdminReadonly'), value: 'system_admin_readonly' }
+                    ],
                     render(h, params) {
-                        return (
-                            <div>
-                                {
-                                    <span>
-                                        {params.row.is_admin
-                                            ? that.$t('com.sysAdmin')
-                                            : that.$t('com.ordinaryUser')}
-                                    </span>
-                                }
-                            </div>
-                        );
+                        return h('span', that.roleLabel(params.row.role));
                     }
                 },
                 {
@@ -113,6 +143,26 @@ export default {
                                         type: 'primary',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
+                                    style: {
+                                        marginRight: '10px'
+                                    },
+                                    on: {
+                                        click: () => {
+                                            that.onChangeRole(params);
+                                        }
+                                    }
+                                },
+                                that.$t('user.changeRole')
+                            ),
+                            h(
+                                'Button',
+                                {
+                                    props: {
+                                        type: 'primary',
+                                        size: 'small'
+                                    },
+                                    directives: [{ name: 'has' }],
                                     style: {
                                         marginRight: '10px'
                                     },
@@ -131,6 +181,7 @@ export default {
                                         type: 'error',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     on: {
                                         click: () => {
                                             that.onDel(params);
@@ -145,7 +196,51 @@ export default {
             ]
         };
     },
+    computed: {
+        isBuiltinAdmin() {
+            return String((this.roleForm && this.roleForm.user_name) || '').toLowerCase() === 'admin';
+        }
+    },
     methods: {
+        roleLabel(role) {
+            if (role === 'system_admin_readonly') {
+                return this.$t('com.sysAdminReadonly');
+            }
+            if (role === 'system_admin') {
+                return this.$t('com.sysAdmin');
+            }
+            return this.$t('com.ordinaryUser');
+        },
+        onChangeRole(params) {
+            this.roleForm = {
+                user_name: params.row.user_name,
+                role: params.row.role || 'system_admin'
+            };
+            this.roleDrawerVisible = true;
+        },
+        submitRole() {
+            if (this.isBuiltinAdmin) {
+                this.$Message.error({ content: this.$t('user.tipRoleFixedBuiltin') });
+                return;
+            }
+            if (!this.roleForm.role) {
+                this.$Message.error({ content: this.$t('user.tipSelectRole') });
+                return;
+            }
+            this.$request({
+                url: this.$urlFormat('auth/users/{user_name}/role', {
+                    user_name: this.roleForm.user_name
+                }),
+                method: 'patch',
+                data: { role: this.roleForm.role }
+            }).then(data => {
+                if (data.status === 200) {
+                    this.$Message.success({ content: this.$t('com.tipEditSuccX', { obj: this.$t('user.role') }) });
+                    this.roleDrawerVisible = false;
+                    this.getUserList();
+                }
+            });
+        },
         submitPassword(data, self) {
             this.upsertPassWord(data, self);
         },

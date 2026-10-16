@@ -87,6 +87,7 @@
     <div class="com-btn-box drawer-footer">
       <Button
         v-show="currentStepIndex === reviewStepIndex"
+        v-has
         size="small"
         type="primary"
         @click="submitNextSteps"
@@ -393,7 +394,8 @@ export default {
             if (data.topic === 'llmConfigData') {
                 this.balanceModeData = {
                     balance_mode: data.data.balance_mode,
-                    epp_config: data.data.epp_config
+                    epp_config: data.data.epp_config,
+                    epp_runtime: data.data.epp_runtime
                 };
                 this.llmConfigData = data.data;
             } else {
@@ -418,6 +420,9 @@ export default {
                 data.balance_mode = this.balanceModeData.balance_mode || 'WRR';
                 if (this.balanceModeData.epp_config) {
                     data.epp_config = this.balanceModeData.epp_config;
+                }
+                if (this.balanceModeData.epp_runtime) {
+                    data.epp_runtime = this.balanceModeData.epp_runtime;
                 }
             }
             this.changeObj(data);
@@ -484,7 +489,8 @@ export default {
             };
             this.balanceModeData = {
                 balance_mode: tmpData.balance_mode,
-                epp_config: tmpData.epp_config || null
+                epp_config: tmpData.epp_config || null,
+                epp_runtime: tmpData.epp_runtime || null
             };
         },
         back() {

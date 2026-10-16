@@ -123,6 +123,13 @@ window.Prototype = {
     );
   },
 
+  // 只读管理员判定：登录态带 role，system_admin_readonly 为只读视角。
+  // 与 src/store.js 的 isReadonly() 语义一致（不做 is_admin 回退）。
+  isReadonly() {
+    var user = this.getUser();
+    return !!(user && user.role === 'system_admin_readonly');
+  },
+
   removeUser() {
     localStorage.removeItem(this.USER_KEY);
   },

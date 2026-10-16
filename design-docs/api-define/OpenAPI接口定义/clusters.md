@@ -77,7 +77,8 @@
         "strip_prefix": true
     },
     "balance_mode": "WRR",
-    "epp_config": null
+    "epp_config": null,
+    "epp_runtime": null
 }
 ```
 
@@ -106,6 +107,19 @@
             "enable_eviction": false
         }
     },
+    "epp_runtime": {
+        "check": {
+            "disabled": false,
+            "check_interval": "2s",
+            "fail_threshold": 3,
+            "cooldown": "45s",
+            "success_threshold": 2
+        },
+        "timeout": {
+            "connect": "500ms",
+            "call": "3s"
+        }
+    },
     "llm_config": {
         "models": ["deepseek-chat"],
         "provider": "deepseek"
@@ -125,6 +139,7 @@
 | `llm_config` | object | AI LLM 服务配置 | 见下方 表：LLM配置 | 必填 |
 | `balance_mode` | string | 集群均衡模式 | `WRR`、`EPP` | 非必填；默认值为 `WRR`；有效枚举：`WRR`、`EPP` |
 | `epp_config` | object | EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队，见下方 表：EPP调度配置）。仅 `balance_mode=EPP` 时生效；`WRR` 时保留但不生效（休眠），便于 EPP ↔ WRR 来回切换不丢配置 | - | 条件必填：`balance_mode=EPP` 时必填且通过字段校验；`balance_mode=WRR` 时可选（传入则保留并做格式校验，但不生效） |
+| `epp_runtime` | object | EPP 运行时参数（BFE 访问 EPP 的健康检查与超时，见下方 表：EPP运行时配置）。仅 `balance_mode=EPP` 时导出到 BFE；`WRR` 时保留但不生效（休眠） | - | 非必填；传入即整体替换并做字段校验（`check`/`timeout` 未设置的子字段按默认补齐）；`tls`/`breaker` 不接受（携带则 422） |
 
 **表：连接设置**
 
@@ -256,6 +271,29 @@
 | no_endpoint_queue_ttl | int | 池**无端点**（冷启动扩容）时的排队预算（**单位：秒**），regime 切换时重新起算 | N | 默认值为跟随 `queue_ttl` | 非必填；同 `queue_ttl` |
 | enable_eviction | bool | 需求驱动驱逐：高优先级被饱和阻塞时终止负优先级在飞请求回收容量 | N | **当前 EPP 未接线，请保持 `false`**；编译产物不下发该字段 | 非必填；默认值为 `false`；**建议仅允许 `false`（`true` 拒绝）** |
 
+**表：EPP运行时配置（`epp_runtime`）**
+
+> 控制面 → BFE `GslbBasic` 运行时参数映射。仅 `balance_mode=EPP` 时导出到 `server_data_conf`；`WRR` 时保留但不生效（休眠）。`tls`（`EPPTLS`）与 `breaker`（`EPPBreaker`）不在本表中，由 api 固定下发（见下方说明），不接受用户配置。
+
+| 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
+| - | - | - | - | - | - |
+| check | object | EPP 后台健康检查与失败滞回 | N | 对应 BFE `GslbBasic.EPPCheck` | 非必填；若传入，子字段见本表 |
+| check.disabled | bool | 是否关闭后台健康检查 | N | 不建议生产关闭 | 非必填；默认 `false` |
+| check.check_interval | string | 健康检查探活间隔，duration 字符串 | N | 对应 `EPPCheck.CheckInterval` | 非必填；默认 `2s`；须为 `>0` 的合法 duration |
+| check.fail_threshold | int | 主地址连续失败次数阈值（达到后触发切换） | N | 对应 `EPPCheck.FailThreshold` | 非必填；默认 `3`；须为 `>=1` 的整数 |
+| check.cooldown | string | 冷却期，duration 字符串，期内不切回已失败地址 | N | 对应 `EPPCheck.Cooldown` | 非必填；默认 `45s`；须为 `>0` 的合法 duration |
+| check.success_threshold | int | 连续成功次数阈值（达到后切回高优先级地址） | N | 对应 `EPPCheck.SuccessThreshold` | 非必填；默认 `2`；须为 `>=1` 的整数 |
+| timeout | object | EPP 调用超时 | N | 对应 BFE `GslbBasic.EPPTimeout` | 非必填；若传入，子字段见本表 |
+| timeout.connect | string | 建立 gRPC 连接/流超时，duration 字符串 | N | 对应 `EPPTimeout.Connect` | 非必填；默认 `500ms`；须为 `>0` 的合法 duration |
+| timeout.call | string | 首条消息（RequestHeaders 收发）超时，duration 字符串 | N | 对应 `EPPTimeout.Call` | 非必填；默认 `3s`；须为 `>0` 的合法 duration |
+
+> **固定下发（不可配置）**：
+> - `EPPTLS`：恒为 `{ "Plaintext": true }`（统一明文接入 EPP），取代 BFE legacy `{Insecure:true}` 默认。
+> - `EPPBreaker`：恒为 `{ "Disabled": true }`（关闭熔断）；`window_size` / `min_volume` / `error_rate_percent` / `open_timeout` 暂不开放。
+> - 请求中携带 `epp_runtime.tls` 或 `epp_runtime.breaker` 会因**未知字段**返回 `422`。
+> - `check` / `timeout` 整体未配置时不下发，由 BFE 加载期补同样的默认值。
+> - EPP cluster 分配缺失导致导出降级为 `WRR` 时，不导出任何 `epp_runtime` 字段。
+
 
 **约束**
 
@@ -291,6 +329,9 @@
 - `epp_config` 条件必填：`balance_mode=EPP` 时必填且通过字段校验（简化字段校验：`load_profile`/`affinity` 枚举、`kv_cache_utilization_max` ∈ `(0,1]`、`waiting_queue_max`/`running_requests_max` ≥ 0、`metrics_staleness_threshold_ms` > 0、`flow_control` 秒数取值范围及 `enable_eviction=false`，全部 api 侧强制，不合法拒绝提交）；`balance_mode=WRR` 时可选——传入则保留并做格式校验，但不编译、不导出（休眠）。
 - `balance_mode` 更新规则：允许 `WRR → EPP`（须同时提供合法 `epp_config`）；`EPP → WRR` 仅改 `balance_mode` 即可，`epp_config` 与分配记录保留（休眠，不编译/不导出），再切回 `EPP` 时原配置与原分配继续生效（分配如已悬空由 `/epp-pool` 变更时的自动修复处理）。**任一写入中 `epp_config` 非空即须通过字段校验，与 `balance_mode` 无关**（含 `EPP → WRR` 时随请求一并携带或休眠保留的配置）。
 - 生效语义：`epp_config` 仅在 `balance_mode=EPP` 时生效；停用 EPP 调度 = 将 `balance_mode` 改回 `WRR`（无需清空 `epp_config`）。
+- `epp_runtime` 非必填；传入即**整体替换**（`check`/`timeout` 未设置的子字段按 §1 表：EPP运行时配置 的默认值补齐后落盘），不传则保留存储值。校验：`check.check_interval`/`check.cooldown`/`timeout.connect`/`timeout.call` 须为 >0 的合法 duration，`check.fail_threshold`/`check.success_threshold` 须 >=1。
+- `epp_runtime` 仅在 `balance_mode=EPP` 时导出到 BFE；`balance_mode=WRR` 时保留但不生效（休眠），**非空即校验**（与 `epp_config` 一致）。校验规则与 BFE `EPPCheckConfCheck`/`EPPTimeoutConfCheck` 逐条对齐。
+- `epp_runtime.tls`、`epp_runtime.breaker` **不接受**（属未知字段，携带返回 `422`）：`EPPTLS` 固定 `{ "Plaintext": true }`、`EPPBreaker` 固定 `{ "Disabled": true }`，由 api 下发，用户不可配置。
 - `basic`、`sticky_sessions`、`passive_health_check` 若未传则使用 AI 网关场景默认值。
 - `basic.protocol` 有效值为 `http`、`https`。
 - `basic.connection.max_idle_conn_per_rs` 须为 >=0 的整数。
@@ -328,6 +369,7 @@
 | llm_config| object |  AI LLM服务配置| Y | 见 1 数据模型中表：LLM配置 | 必填；`provider` 必填且引用已存在 provider；`models` 至少1个非空元素且不能重复；子字段合法性见 1 中各表 |
 | balance_mode| string |  集群均衡模式| N | `WRR`：BFE 本地加权轮询；`EPP`：由 EPP 调度器接管后端选择 | 非必填；默认值为 `WRR`；有效枚举：`WRR`、`EPP` |
 | epp_config| object |  EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队）| N | 见 1 数据模型中表：EPP调度配置 | 条件必填：`balance_mode=EPP` 时必填且通过字段校验；`balance_mode=WRR` 时可选（传入则保留并做格式校验，不生效）；子字段合法性见 1 中各表 |
+| epp_runtime| object |  EPP 运行时参数（健康检查 + 超时）| N | 见 1 数据模型中表：EPP运行时配置；`check`/`timeout` 未设置的子字段按默认补齐；`tls`/`breaker` 不可配置 | 非必填；传入即整体替换并做字段校验；子字段合法性见 1 中各表 |
 
 **HTTP BODY参数示例**
 
@@ -445,6 +487,19 @@
             "no_endpoint_queue_ttl": 600,
             "enable_eviction": false
         }
+    },
+    "epp_runtime": {
+        "check": {
+            "disabled": false,
+            "check_interval": "2s",
+            "fail_threshold": 3,
+            "cooldown": "45s",
+            "success_threshold": 2
+        },
+        "timeout": {
+            "connect": "500ms",
+            "call": "3s"
+        }
     }
 }
 ```
@@ -473,6 +528,7 @@
 | passive_health_check | object | 被动健康检查 |
 | balance_mode | string | 集群均衡模式；默认 `WRR` |
 | epp_config | object \| null | EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队）；未配置过时为 `null`。**原样返回存储值**：`balance_mode=WRR` 时若创建/更新中传入过 `epp_config`，仍原样返回（休眠保留、不生效），切回 `EPP` 后继续生效 |
+| epp_runtime | object \| null | EPP 运行时参数（健康检查 + 超时）；未配置过时为 `null`。**原样返回存储值**（含默认补齐值）：`balance_mode=WRR` 时若传入过仍原样返回（休眠保留、不生效），切回 `EPP` 后继续生效 |
 
 > **注意**：返回数据中不再包含 `instance_pool`；实例池信息通过 `llm_config.provider` 关联到 provider 获取。
 
@@ -489,7 +545,8 @@
         "sticky_sessions": { "...": "..." },
         "passive_health_check": { "...": "..." },
         "balance_mode": "WRR",
-        "epp_config": null
+        "epp_config": null,
+        "epp_runtime": null
     }
 }
 ```
@@ -563,6 +620,7 @@
 | - | -  | - | - | - | - |
 | balance_mode | string | 集群均衡模式 | N | 允许 `WRR → EPP`（须同时提供合法 `epp_config`）与 `EPP → WRR`（`epp_config` 与分配记录保留休眠） | 非必填；有效枚举：`WRR`、`EPP` |
 | epp_config | object | EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队） | N | `WRR → EPP` 时须同时提供合法 `epp_config`；`EPP → WRR` 无需清空（保留休眠）；变更后即时 bump server_data_conf version | 条件必填与字段校验同创建接口；`balance_mode=WRR` 时可选（传入保留、不生效）；**非空一律做字段校验，与 balance_mode 无关** |
+| epp_runtime | object | EPP 运行时参数（健康检查 + 超时） | N | **整体替换**语义：传入即整体替换存储值（`check`/`timeout` 未设置的子字段按默认补齐），不传则保留原值；与 `balance_mode`、`epp_config` 相互独立；变更后即时 bump server_data_conf version | 非必填；传入即按创建接口同规则校验；`tls`/`breaker` 携带则 `422`；`balance_mode=WRR` 时可选（传入保留、不生效） |
 
 > **注意：**
 > - `sub_clusters` 与 `scheduler` 为系统内部自动生成，更新时不支持手动修改。

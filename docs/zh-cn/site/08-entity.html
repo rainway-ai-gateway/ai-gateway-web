@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>08 消费者管理：Entity 组织</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a class="active" href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="08-消费者管理entity-组织">08 消费者管理：Entity 组织</h1>
+<p><strong>Entity 组织</strong>是调用方的分组抽象（公司 / 部门 / 团队 / 个人）。简单说，就是你要把调用方按什么维度分组管理——可以按部门、按团队、甚至按个人。API Key 可挂载到某个 Entity 组织，继承其治理策略。</p>
+<p>进入 消费者管理 → Entity管理（组织管理），默认进入 <strong>Entity 组织管理</strong> 页签。</p>
+<h2 id="81-组织列表">8.1 组织列表</h2>
+<p><img src="images/05-org-list.png" alt="组织列表" loading="lazy" /></p>
+<p><strong>表格列说明</strong>：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>ID</td><td>组织唯一标识</td></tr><tr><td>名称</td><td>组织名称，支持搜索和排序</td></tr><tr><td>描述</td><td>组织说明，支持搜索和排序；未填写时显示 <code>-</code></td></tr><tr><td>类型</td><td>所属 Entity 类型，支持搜索</td></tr><tr><td>父Entity</td><td>父组织名称，无父级时显示 <code>-</code></td></tr><tr><td>配额</td><td>有限配额时显示 <code>已用 / 总量</code>，后接单位（<code>tokens</code> 或 <code>RMB</code>）；无限配额时显示 <code>-</code></td></tr><tr><td>限流状态</td><td>已启用 / 未启用，支持下拉筛选</td></tr><tr><td>操作</td><td>管理路由规则、编辑、删除；只读视角下隐藏「编辑」「删除」，仅保留「管理路由规则」</td></tr></tbody></table>
+<p>点击列表中任意一行可查看组织详情。列表上方有「创建Entity」按钮（右上角）。</p>
+<blockquote>
+<p><strong>只读视角</strong>（见 <a href="01-login-and-user.html#126-只读视角">1.2.6 只读视角</a>）：隐藏「创建Entity」「创建类型」「编辑」「删除」及详情中的「重置配额」；「管理路由规则」保留，点击行仍可查看详情。</p>
+</blockquote>
+<h3 id="查看详情">查看详情</h3>
+<p>点击组织行，右侧弹出详情抽屉，以只读方式展示组织全部配置：</p>
+<p><img src="images/05-org-detail.png" alt="组织详情" loading="lazy" /></p>
+<ul><li><strong>基本信息</strong>：名称、描述、类型、父Entity、创建时间、更新时间、允许模型、禁止模型</li><li><strong>配额信息</strong>：配额类型（无限/有限）、配额总量、已使用、剩余量、使用进度条、重置周期。<code>total_token</code> 模式下显示 <code>xxx tokens</code>，<code>RMB</code> 模式下显示 <code>¥xxx</code>（保留 4 位小数）。有限配额时可点击「重置配额」按钮重置（只读视角下隐藏，见下文「重置配额」）。</li><li><strong>限流配置</strong>：限流状态、最大并发、TPM 规则列表、RPM 规则列表</li></ul>
+<h3 id="重置配额">重置配额</h3>
+<p><img src="images/05-org-reset-quota.png" alt="重置配额" loading="lazy" /></p>
+<p>在详情抽屉的配额信息区域，有限配额时显示「重置配额」按钮（<strong>只读视角下隐藏</strong>）。点击后弹出重置弹窗：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td>新的配额总量</td><td>是</td><td>非负数；<code>total_token</code> 模式下为整数，取值范围 0 ~ 9,999,999,999；<code>RMB</code> 模式下取值范围 0 ~ 90,000,000.00，最多保留 4 位小数</td></tr><tr><td>重置原因</td><td>否</td><td>选填，记录重置原因</td></tr></tbody></table>
+<blockquote>
+<p>重置后已使用量归零，配额总量更新为新设置的值。</p>
+</blockquote>
+<h2 id="82-创建组织">8.2 创建组织</h2>
+<p>点击列表上方的「创建Entity」按钮，右侧弹出创建抽屉。表单分为三个区域：基本信息、配额信息、限流配置。</p>
+<p><img src="images/05-org-create.png" alt="创建组织" loading="lazy" /></p>
+<h3 id="基本信息">基本信息</h3>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>格式要求</th><th>说明</th></tr></thead><tbody><tr><td>名称</td><td>是</td><td>空</td><td>1-64 字符；仅小写字母、数字、<code>_</code>、<code>-</code>、<code>@</code>（支持 <code>用户名@项目名</code>）；不能以 <code>_</code>、<code>-</code>、<code>@</code> 开头或结尾；不能包含前导或尾随空格；不能包含控制字符</td><td>全局唯一，创建后不可修改</td></tr><tr><td>描述</td><td>否</td><td>空</td><td>最多 255 字符；不能包含控制字符</td><td>组织说明，可留空；表单中无必填星号，也无提示小字</td></tr><tr><td>类型</td><td>是</td><td>空</td><td>—</td><td>下拉选择，选项来自 Entity 类型管理。创建后不可修改</td></tr><tr><td>父Entity</td><td>否</td><td>无</td><td>父 Entity 的类型级别必须小于当前类型的级别</td><td>下拉选择，可筛选。选择后当前组织成为其子组织</td></tr><tr><td>允许模型</td><td>否</td><td><code>*</code>（全部模型）</td><td>—</td><td>允许访问的模型列表。选 <code>*</code> 表示<strong>允许所有模型</strong>（最宽松）；选具体模型表示<strong>只允许这些模型</strong>（更严格）。二者只能二选一：选了 <code>*</code> 就不能再选具体模型；选了具体模型，<code>*</code> 自动取消</td></tr><tr><td>禁止模型</td><td>否</td><td>空</td><td>—</td><td>禁止访问的模型列表，命中即拒绝，优先级高于允许模型</td></tr></tbody></table>
+<blockquote>
+<p>提示：父Entity 的级别必须小于当前类型的级别（数字更小）。例如当前类型级别为 3，则只能选择级别为 1 或 2 的组织作为父级。</p>
+</blockquote>
+<h3 id="配额信息">配额信息</h3>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>无限配额</td><td>—</td><td>是</td><td>选「否」后展开以下字段</td></tr><tr><td>配额不足时放行</td><td>否</td><td>否</td><td>选"是"时，即使配额用完，请求仍然会被放行（不会被拒绝），但系统会继续统计用量。适合"先观察实际消耗、暂不拦截"的试运行阶段。选"否"时，配额用完则直接拒绝请求（返回配额不足错误）</td></tr><tr><td>配额单位</td><td>—</td><td><code>total_token</code></td><td>可选 <code>total_token</code>（按 Token 计数）或 <code>RMB</code>（按金额计费）</td></tr><tr><td>配额总量</td><td>是</td><td><code>100000000</code></td><td>非负数；<code>total_token</code> 模式下必须为整数，取值范围 0 ~ 9,999,999,999；<code>RMB</code> 模式下取值范围 0 ~ 90,000,000.00，最多保留 4 位小数</td></tr><tr><td>重置周期</td><td>—</td><td>永不重置</td><td>永不重置 / 每周 / 每月</td></tr></tbody></table>
+<p><img src="images/05-org-quota.png" alt="配额配置" loading="lazy" /></p>
+<h3 id="限流配置">限流配置</h3>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>启用限流</td><td>—</td><td>否</td><td>选「是」后展开以下规则区域</td></tr></tbody></table>
+<p><img src="images/05-org-ratelimit.png" alt="限流规则" loading="lazy" /></p>
+<p>启用限流后，可配置 TPM 规则、RPM 规则和最大并发，需至少配置一项有效规则。</p>
+<blockquote>
+<p><strong>注意</strong>：TPM/RPM 规则的「适用模型」按<strong>转发后的目标模型</strong>匹配——即经路由「指定模型」覆盖、集群「裁剪前缀」、集群「模型重定向」依次解析后的最终模型名（与后端实际收到的模型一致），而非请求体原始模型名。仅当未启用上述机制时，填客户端请求模型名才与旧行为等价；启用重定向/裁剪/目标覆盖后，须填转发后的模型名。</p>
+</blockquote>
+<table><thead><tr><th>类型</th><th>适用场景</th></tr></thead><tbody><tr><td>TPM</td><td>控制 Token 消耗（长文本、推理成本高的场景）</td></tr><tr><td>RPM</td><td>控制请求次数（防刷接口、限制 QPS）</td></tr><tr><td>最大并发</td><td>控制同时处理的请求数（防止压垮后端）</td></tr></tbody></table>
+<h4 id="tpm-规则">TPM 规则</h4>
+<p><strong>TPM（每分钟 Token 数）限流</strong>：采用滑动窗口机制，平滑统计一段时间内的 Token 用量。每项最多 3 条规则。</p>
+<p><strong>通俗理解</strong>：</p>
+<ul><li><strong>时间窗口</strong>：你看多久范围内的用量。比如窗口 10 分钟，就是看过去 10 分钟用了多少 Token。</li><li><strong>滑动步长</strong>：统计窗口多久向前"滑"一次。比如步长 1 分钟，就是每分钟重新计算一次过去 10 分钟的总量。</li><li><strong>最大 Token 数</strong>：这个时间窗口内允许的 Token 上限。超过就限流（返回 429）。</li></ul>
+<p><strong>举例</strong>：时间窗口 = 10 分钟，滑动步长 = 1 分钟，最大 Token 数 = 10000。表示"检查过去 10 分钟内的 Token 用量，每 1 分钟检查一次，超过 10000 就拒绝"。</p>
+<blockquote>
+<p><strong>建议</strong>：如无特殊需求，保持默认值即可（窗口 1 分钟，步长 1 分钟）。</p>
+</blockquote>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>格式要求</th><th>说明</th></tr></thead><tbody><tr><td>规则名称</td><td>是</td><td>空</td><td>1-128 字符；同类型内不能重复</td><td>规则标识</td></tr><tr><td>适用模型</td><td>是</td><td><code>*</code>（全部模型）</td><td>—</td><td><code>*</code> 或指定模型；按<strong>转发后的目标模型</strong>匹配</td></tr><tr><td>时间窗口(分)</td><td>是</td><td><code>1</code></td><td>1-360 的整数</td><td>统计的时间范围</td></tr><tr><td>最大Token数</td><td>是</td><td><code>10000</code></td><td>非负整数</td><td>窗口内允许的最大 Token 数</td></tr><tr><td>滑动步长(分)</td><td>是</td><td><code>1</code></td><td>1-360 的整数；不超过时间窗口</td><td>滑动窗口的步长</td></tr></tbody></table>
+<h4 id="rpm-规则">RPM 规则</h4>
+<p>RPM（Request Per Minute）采用<strong>固定窗口</strong>机制，以时间窗口为周期计数。每项最多 3 条规则。</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>格式要求</th><th>说明</th></tr></thead><tbody><tr><td>规则名称</td><td>是</td><td>空</td><td>1-128 字符；同类型内不能重复</td><td>规则标识</td></tr><tr><td>适用模型</td><td>是</td><td><code>*</code>（全部模型）</td><td>—</td><td><code>*</code> 或指定模型；按<strong>转发后的目标模型</strong>匹配</td></tr><tr><td>时间窗口(分)</td><td>是</td><td><code>1</code></td><td>1-360 的整数</td><td>统计的时间范围</td></tr><tr><td>最大请求数</td><td>是</td><td><code>100</code></td><td>非负整数</td><td>窗口内允许的最大请求数</td></tr></tbody></table>
+<blockquote>
+<p>注意：RPM 规则没有滑动步长字段，与 TPM 的区别在此。</p>
+</blockquote>
+<h4 id="最大并发">最大并发</h4>
+<table><thead><tr><th>模式</th><th>说明</th></tr></thead><tbody><tr><td>不限制</td><td>不限制并发数（值为 -1），单独使用不会触发限流</td></tr><tr><td>封禁</td><td>禁止所有并发请求（值为 0）</td></tr><tr><td>限制并发数</td><td>限制最大并发数，需填写具体数值（正整数）</td></tr></tbody></table>
+<blockquote>
+<p><strong>说明</strong>：最大并发是"辅助选项"。</p>
+<ul><li>如果你想<strong>只做请求速率控制</strong>（如每分钟 100 次），选"不限制"并发，只配 RPM 规则即可。</li><li>如果你想<strong>同时控制并发数</strong>（如最多 10 个请求同时处理），选"限制并发数"并配合 TPM/RPM 使用。</li><li>"封禁"（0）是一个快捷选项，用于紧急停止所有请求。</li></ul>
+<p>因此"不限制"不是"无效"，而是表示"不限并发，让 TPM/RPM 单独发挥作用"。</p>
+</blockquote>
+<h2 id="83-编辑组织">8.3 编辑组织</h2>
+<p>点击操作列的「编辑」按钮，右侧弹出编辑抽屉。字段预填充，其中名称和类型为灰色禁用状态不可修改，其余字段均可编辑。</p>
+<blockquote>
+<p>描述为非必填：留空提交不影响其他字段；清空已有描述后保存，会显式提交空字符串，描述被清空。</p>
+<p>只读视角下「编辑」入口隐藏，无法编辑组织。</p>
+</blockquote>
+<h2 id="84-删除组织">8.4 删除组织</h2>
+<p>点击操作列的「删除」按钮，弹出确认框「是否删除Entity {名称}？」。确认后立即删除，提示「删除成功!」，列表自动刷新。</p>
+<blockquote>
+<p>注意：组织存在子组织或被 API-Key 挂载时无法删除，需先清理关联数据。</p>
+<p>只读视角下「删除」入口隐藏，无法删除组织。</p>
+</blockquote>
+<h2 id="85-模型访问控制">8.5 模型访问控制</h2>
+<p>组织可配置允许模型和禁止模型列表，控制挂载到该组织的 API-Key 能访问哪些模型。</p>
+<ul><li><strong>允许模型</strong>：允许列表，<code>*</code> 表示全部模型；多层组织运行时取交集。</li><li><strong>禁止模型</strong>：禁止列表，命中即 403，优先级高于允许列表。</li></ul>
+<p>请求模型不在允许列表或在禁止列表时，数据面直接返回 403，不转发后端。</p>
+<h2 id="86-运行时生效机制">8.6 运行时生效机制</h2>
+<p>请求进入网关后，按固定顺序执行三道检查：<strong>模型访问控制 → 限流检查 → 配额扣减</strong>，任一环节失败立即拒绝。</p>
+<p><strong>模型访问控制</strong></p>
+<ol><li>先检查 API-Key 自身的「允许模型」：不含 <code>*</code> 且请求模型不在列表 → 拒绝。</li><li>若 Key 挂载了组织，从该组织开始向上遍历全部祖先（含自身），逐个检查：
+<ul><li>禁止模型优先：命中 <code>*</code> 或请求模型 → 拒绝。</li><li>允许模型取交集：任一层的允许列表不含请求模型 → 拒绝。</li></ul></li></ol>
+<p><strong>限流检查</strong></p>
+<ul><li>收集 Key 自身 + 挂载组织 + 全部祖先组织中所有「启用限流」的策略，全部通过才放行；任一策略触发即限流。TPM/RPM 规则的「适用模型」按<strong>转发后的目标模型</strong>匹配（解析链路与模型访问控制一致），而非请求体原始模型名。</li></ul>
+<p><strong>配额扣减</strong></p>
+<ul><li>收集 Key 自身 + 组织链上所有「有限配额」的计划，逐一扣减；任一计划余额不足且未开启「配额不足时放行」→ 拒绝，且已扣减部分原子回滚。</li><li>「配额不足时放行 = 是」时，余额扣到 0 仍放行本次请求。</li></ul>
+<h2 id="87-管理路由规则">8.7 管理路由规则</h2>
+<p>点击操作列的「管理路由规则」按钮，跳转到路由规则页面，自动筛选出属主为该组织的路由规则。详见 <a href="10-route.html">10 章</a>。</p>
+<h2 id="88-注意事项">8.8 注意事项</h2>
+<ul><li>组织名称和类型创建后不可修改。</li><li>父 Entity 的类型级别必须小于当前类型的级别。</li><li>配额与限流可同时配置：配额控制总量成本，限流控制瞬时并发。</li><li>修改组织策略实时生效，影响挂载到该组织及其后代的全部 Key，请在低峰期操作。</li><li>删除组织前需确保不存在子组织和被 API-Key 挂载。</li><li>路由表优先级 API-Key &gt; Entity &gt; Global。</li></ul>
+  </main>
+</div>
+</body>
+</html>

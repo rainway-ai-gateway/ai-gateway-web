@@ -1,10 +1,27 @@
 window.UserUpsert = {
-  roleLabel(isAdmin) {
-    return isAdmin ? '系统管理员' : '用户';
+  roleLabel(role) {
+    if (role === 'system_admin_readonly') return '系统管理员（只读）';
+    if (role === 'system_admin') return '系统管理员';
+    return '用户';
+  },
+
+  roleRadios(selected) {
+    var roles = [
+      { value: 'system_admin', label: '系统管理员' },
+      { value: 'system_admin_readonly', label: '系统管理员（只读）' }
+    ];
+    return roles.map(function (item) {
+      var checked = item.value === selected ? ' checked' : '';
+      return '<label class="proto-radio-item">' +
+        '<input type="radio" name="user-role" value="' + item.value + '"' + checked + ' /> ' +
+        IvuUI.escapeHtml(item.label) +
+        '</label>';
+    }).join('');
   },
 
   scopeLabel(scope) {
     if (scope === 'System') return '系统管理';
+    if (scope === 'SystemReadonly') return '系统管理（只读）';
     if (scope === 'Product') return '租户管理';
     return '内部支持';
   },
@@ -25,15 +42,25 @@ window.UserUpsert = {
       '</div>';
   },
 
-  adminCheckbox() {
-    return '<label class="ivu-checkbox-wrapper ivu-checkbox-wrapper-checked ivu-checkbox-wrapper-disabled">' +
-      '<span class="ivu-checkbox ivu-checkbox-checked ivu-checkbox-disabled"><span class="ivu-checkbox-inner"></span></span>' +
-      '<span>系统管理员</span></label>';
+  roleChangeBody(row) {
+    row = row || {};
+    var isAdminFixed = String(row.user_name || '').toLowerCase() === 'admin';
+    if (isAdminFixed) {
+      return '<form class="ivu-form ivu-form-label-top user-upsert-form">' +
+        IvuUI.formTopItem('用户名', UserUpsert.textField('user-role-name', row.user_name || '', '', true), true) +
+        IvuUI.formTopItem('角色', '<div>系统管理员（内置账号，角色固定不可变更）</div>', true) +
+        '</form>';
+    }
+    return '<form class="ivu-form ivu-form-label-top user-upsert-form">' +
+      IvuUI.formTopItem('用户名', UserUpsert.textField('user-role-name', row.user_name || '', '', true), true) +
+      IvuUI.formTopItem('角色', '<div class="proto-radio-group">' + UserUpsert.roleRadios(row.role || 'system_admin') + '</div>', true) +
+      '</form>';
   },
 
   scopeRadios(selected) {
     var scopes = [
       { value: 'System', label: '系统管理' },
+      { value: 'SystemReadonly', label: '系统管理（只读）' },
       { value: 'Support', label: '内部支持' }
     ];
     return scopes.map(function (item) {
@@ -50,7 +77,7 @@ window.UserUpsert = {
       IvuUI.formTopItem('用户名', UserUpsert.textField('user-create-name', '', '请输入用户名'), true) +
       IvuUI.formTopItem('密码', UserUpsert.passwordField('user-create-password', '请输入密码'), true) +
       IvuUI.formTopItem('确认密码', UserUpsert.passwordField('user-create-confirm', '请再次确认密码'), true) +
-      IvuUI.formTopItem('角色', UserUpsert.adminCheckbox(), false) +
+      IvuUI.formTopItem('角色', '<div class="proto-radio-group">' + UserUpsert.roleRadios('system_admin') + '</div>', true) +
       '</form>';
   },
 
@@ -110,6 +137,10 @@ window.UserUpsert = {
       '<div class="com-btn-box drawer-footer user-drawer-footer proto-hidden" id="user-drawer-footer-password">' +
         IvuUI.btn('提交', 'primary', 'small', '', 'id="btn-user-password-submit"') + ' ' +
         IvuUI.btn('取消', 'default', 'small', '', 'id="btn-user-password-cancel"') +
+      '</div>' +
+      '<div class="com-btn-box drawer-footer user-drawer-footer proto-hidden" id="user-drawer-footer-rolechange">' +
+        IvuUI.btn('提交', 'primary', 'small', '', 'id="btn-user-role-submit"') + ' ' +
+        IvuUI.btn('取消', 'default', 'small', '', 'id="btn-user-role-cancel"') +
       '</div>';
     return IvuUI.drawer('drawer-user', '添加用户', UserUpsert.createUserBody(), footer, '30%');
   },

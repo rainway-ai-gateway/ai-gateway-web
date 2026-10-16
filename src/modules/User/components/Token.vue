@@ -30,7 +30,7 @@
 */
 <template>
     <div>
-        <Button class="add-button" type="primary" size="small" @click="onAdd">{{
+        <Button v-has class="add-button" type="primary" size="small" @click="onAdd">{{
             $t('com.establish')
         }}</Button>
 
@@ -56,7 +56,7 @@
                     <ul class="clearFloat">
                         <li class="title">Scope:</li>
                         <li class="value">
-                            {{ info.scope === 'System' ? $t('user.system') : $t('user.support') }}
+                            {{ scopeLabel(info.scope) }}
                         </li>
                     </ul>
                     <ul class="clearFloat">
@@ -94,20 +94,14 @@ export default {
                     key: 'scope',
                     title: 'scope',
                     render(h, params) {
-                        return (
-                            <p>
-                                {params.row.scope === 'System'
-                                    ? that.$t('user.system')
-                                    : that.$t('user.support')}
-                            </p>
-                        );
+                        return h('p', that.scopeLabel(params.row.scope));
                     }
                 },
                 {
                     key: 'action',
                     title: this.$t('com.operation'),
                     render(h, params) {
-                        return h('div', [
+                        const buttons = [
                             h(
                                 'Button',
                                 {
@@ -125,7 +119,9 @@ export default {
                                     }
                                 },
                                 that.$t('com.detail')
-                            ),
+                            )
+                        ];
+                        buttons.push(
                             h(
                                 'Button',
                                 {
@@ -133,6 +129,7 @@ export default {
                                         type: 'error',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     on: {
                                         click: () => {
                                             that.onDel(params);
@@ -141,7 +138,8 @@ export default {
                                 },
                                 that.$t('com.del')
                             )
-                        ]);
+                        );
+                        return h('div', buttons);
                     }
                 }
             ],
@@ -152,6 +150,15 @@ export default {
         };
     },
     methods: {
+        scopeLabel(scope) {
+            if (scope === 'SystemReadonly') {
+                return this.$t('user.systemReadonly');
+            }
+            if (scope === 'System') {
+                return this.$t('user.system');
+            }
+            return this.$t('user.support');
+        },
         onViewDetails(params) {
             this.$request({
                 url: this.$urlFormat('auth/tokens/{token_name}', {

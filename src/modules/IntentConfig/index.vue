@@ -19,7 +19,7 @@
       <div class="ic-desc">
         {{ $t('intentConfig.pageDesc') }}
       </div>
-      <div class="ic-actions">
+      <div v-has class="ic-actions">
         <template v-if="mode === 'view'">
           <Button size="small" type="primary" @click="enterEditMode">
             {{ $t('route.enterEditMode') }}
@@ -71,7 +71,7 @@
       })"
       class="form-card ic-card"
     >
-      <div v-show="mode === 'edit'" class="ic-list-toolbar">
+      <div v-show="mode === 'edit'" v-has class="ic-list-toolbar">
         <Button type="primary" size="small" @click="onAddQuestion">
           {{ $t('intentConfig.addQuestion') }}
         </Button>
@@ -266,6 +266,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small',type: 'success' },
+                  directives: [{ name: 'has' }],
                   style: { marginRight: '8px' },
                   on: { click: () => that.onEditQuestion(row) }
                 },
@@ -275,6 +276,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'error' },
+                  directives: [{ name: 'has' }],
                   on: { click: () => that.onDeleteQuestion(row) }
                 },
                 that.$t('com.del')

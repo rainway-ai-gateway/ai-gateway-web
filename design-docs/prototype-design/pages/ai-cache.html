@@ -29,6 +29,8 @@
         var root = Layout.render({ pageId: 'AICacheRule.list', basePath: '../' });
         root.innerHTML = '<div id="ai-cache-page"></div>';
 
+        var isReadonly = Prototype.isReadonly();
+
         var STRATEGY_LABELS = {
           lastQuestion: '仅最后一个问题（lastQuestion）',
           allQuestions: '全部问题（allQuestions）',
@@ -131,16 +133,18 @@
         function renderHeader(tab) {
           var editing = state.mode === 'edit';
           var prefix = tab === 'rules' ? 'rules' : 'semantic';
-          var addHtml = editing && tab === 'rules'
+          var addHtml = !isReadonly && editing && tab === 'rules'
             ? IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-cache-' + prefix + '-add"')
             : '';
           var editingLabels = tab === 'rules'
             ? { enter: '进入编辑模式', exit: '退出编辑模式', submit: '提交并生效' }
             : { enter: '编辑', exit: '取消', submit: '保存' };
-          var submitHtml = editing
-            ? IvuUI.btn(editingLabels.exit, 'default', 'small', '', 'id="btn-cache-' + prefix + '-exit"') +
-              IvuUI.btn(editingLabels.submit, 'success', 'small', '', 'id="btn-cache-' + prefix + '-submit"')
-            : IvuUI.btn(editingLabels.enter, 'primary', 'small', '', 'id="btn-cache-' + prefix + '-enter"');
+          var submitHtml = isReadonly
+            ? ''
+            : (editing
+              ? IvuUI.btn(editingLabels.exit, 'default', 'small', '', 'id="btn-cache-' + prefix + '-exit"') +
+                IvuUI.btn(editingLabels.submit, 'success', 'small', '', 'id="btn-cache-' + prefix + '-submit"')
+              : IvuUI.btn(editingLabels.enter, 'primary', 'small', '', 'id="btn-cache-' + prefix + '-enter"'));
           var subtitle = tab === 'rules'
             ? 'AI 缓存规则（集合级，按优先级顺序匹配，首条命中生效）'
             : '语义缓存全局设置（单例，全局生效）';
@@ -215,6 +219,9 @@
                 render: function (row, rowIndex) {
                   var pageStart = (state.currentPage - 1) * state.pageSize;
                   var globalIndex = pageStart + rowIndex;
+                  if (isReadonly) {
+                    return IvuUI.btn('查看', 'primary', 'small', '', 'data-ai-cache-view="' + globalIndex + '"');
+                  }
                   if (state.mode === 'edit') {
                     return IvuUI.btn('编辑', 'primary', 'small', '', 'data-ai-cache-edit="' + globalIndex + '"') + ' ' +
                       IvuUI.btn('删除', 'error', 'small', '', 'data-ai-cache-delete="' + globalIndex + '"');

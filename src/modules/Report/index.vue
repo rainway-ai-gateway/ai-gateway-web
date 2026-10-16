@@ -117,40 +117,17 @@
             />
           </div>
           <div class="report-filter-item">
-            <label class="filter-item-label">{{ $t('report.cacheStatus') }}</label>
+            <label class="filter-item-label">{{ $t('report.tsSplitDim') }}</label>
             <Select
-              v-model="filters.cache_status"
-              :placeholder="$t('report.allOption')"
-              style="width:100px"
-              clearable
+              v-model="tsSplit"
+              size="small"
+              style="width:130px"
+              :placeholder="$t('report.tsSplitNone')"
             >
-              <Option value="hit">{{ $t('report.cacheStatusHit') }}</Option>
-              <Option value="miss">{{ $t('report.cacheStatusMiss') }}</Option>
-              <Option value="skip">{{ $t('report.cacheStatusSkip') }}</Option>
-            </Select>
-          </div>
-          <div class="report-filter-item">
-            <label class="filter-item-label">{{ $t('report.mirrorHit') }}</label>
-            <Select
-              v-model="filters.mirror_hit"
-              :placeholder="$t('report.allOption')"
-              style="width:100px"
-              clearable
-            >
-              <Option value="1">{{ $t('report.mirrorHitYes') }}</Option>
-              <Option value="0">{{ $t('report.mirrorHitNo') }}</Option>
-            </Select>
-          </div>
-          <div class="report-filter-item">
-            <label class="filter-item-label">{{ $t('report.intentAnswer') }}</label>
-            <Select
-              v-model="filters.intent_answer"
-              filterable
-              :placeholder="$t('report.allOption')"
-              style="min-width:140px"
-              clearable
-            >
-              <Option v-for="a in intentAnswerOptions" :key="a" :value="a">{{ a }}</Option>
+              <Option value="">{{ $t('report.tsSplitNone') }}</Option>
+              <Option value="ai_cache_status">{{ $t('report.cacheStatus') }}</Option>
+              <Option value="mirror_hit">{{ $t('report.mirrorHit') }}</Option>
+              <Option value="ai_intent_answer">{{ $t('report.intentAnswer') }}</Option>
             </Select>
           </div>
           <Button type="primary" @click="applyFilters">{{ $t('report.query') }}</Button>
@@ -207,15 +184,13 @@ export default {
         hosts: [],
         stream: '',
         status_codes: '',
-        cache_status: '',
-        mirror_hit: '',
-        intent_answer: '',
       },
+      // 拆分维度：作用于总览 QPS/Token/延迟三张时序图（非接口过滤参数，切换即生效）
+      tsSplit: '',
       modelOptions: [],
       apikeyOptions: [],
       providerOptions: [],
       hostOptions: [],
-      intentAnswerOptions: [],
       filterOptionsRange: null,
     };
   },
@@ -331,8 +306,8 @@ export default {
 
     // ==================== Filters ====================
     buildFilterParams() {
-      // 缓存状态 / 镜像命中 / 意图答案 3 个新维度是排行/分布维度，
-      // 后端未将其定义为 overview/timeseries/logs 的通用过滤参数，故不并入通用查询参数，
+      // 通用过滤参数仅 start/end/models/apikey_ids/providers/hosts/stream/status_codes（见 report.md §1.1）；
+      // 缓存状态 / 镜像命中 / 意图答案不是通用过滤参数，而是 logs 明细过滤参数与图表下钻维度，
       // 明细侧的同名过滤项由 Logs 工具栏独立提供，避免参数重复
       const params = {
         start: this.toUnixTimestamp(this.startTime),
@@ -384,7 +359,7 @@ export default {
       const params = this.buildFilterParams();
       this.loadFilterOptions();
       if (this.activeTab === 'overview') {
-        this.$refs.overview && this.$refs.overview.load(params);
+        this.$refs.overview && this.$refs.overview.load(params, this.tsSplit);
       } else {
         this.$refs.logs && this.$refs.logs.load(params);
       }
@@ -400,10 +375,8 @@ export default {
         hosts: [],
         stream: '',
         status_codes: '',
-        cache_status: '',
-        mirror_hit: '',
-        intent_answer: '',
       };
+      this.tsSplit = '';
       this.applyFilters();
     },
 
@@ -415,7 +388,7 @@ export default {
     onTabChange(name) {
       const params = this.buildFilterParams();
       if (name === 'overview') {
-        this.$refs.overview && this.$refs.overview.load(params);
+        this.$refs.overview && this.$refs.overview.load(params, this.tsSplit);
       } else if (name === 'logs') {
         this.$refs.logs && this.$refs.logs.load(params);
       }
@@ -435,7 +408,6 @@ export default {
         { key: 'apikey', field: 'apikeyOptions' },
         { key: 'provider', field: 'providerOptions' },
         { key: 'host', field: 'hostOptions' },
-        { key: 'ai_intent_answer', field: 'intentAnswerOptions' },
       ];
       dimensions.forEach(({ key, field }) => {
         this.$request({ url: 'report/rankings', method: 'get', params: { ...params, dimension: key, limit: 50 }, openapi: true })

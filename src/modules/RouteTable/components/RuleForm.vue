@@ -33,6 +33,7 @@
         <Expression
           :expression="formData.cond"
           :readonly="readonly"
+          :hide-groups="['response']"
           @expressionChanged="onExpressionChanged"
         />
       </FormItem>

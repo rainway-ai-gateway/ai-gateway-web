@@ -143,6 +143,17 @@ export default {
                 data.forEach(item => {
                     const showTitle = item.showTitle ? item.searchMsg : item.title;
                     if (item.searchable) {
+                        // 服务端分页时，列上预置的 searchValue 需同步进 searchMessage：
+                        // 否则用户修改其他筛选条件时会丢掉该默认值（如路由表默认「启用」）
+                        if (
+                            this.serverPagination &&
+                            item.searchValue !== '' &&
+                            item.searchValue !== null &&
+                            item.searchValue !== undefined &&
+                            this.searchMessage[item.key] === undefined
+                        ) {
+                            this.$set(this.searchMessage, item.key, item.searchValue);
+                        }
                         // Support custom search control types
                         if (item.searchType === 'select' && item.searchFilters) {
                             // Dropdown search
@@ -225,6 +236,8 @@ export default {
                 if (this.serverPagination) {
                     this.showTableData = cloneDeep(data);
                     this.cloneShowData = cloneDeep(data);
+                    this.showSrcIndex = data.map((row, index) => index);
+                    this.cloneShowSrcIndex = this.showSrcIndex.slice();
                     this.handlePageData(this.showTableData, this.page);
                     return;
                 }
@@ -238,6 +251,8 @@ export default {
                 this.filterMessage = {};
                 this.showTableData = cloneDeep(data);
                 this.cloneShowData = cloneDeep(data);
+                this.showSrcIndex = data.map((row, index) => index);
+                this.cloneShowSrcIndex = this.showSrcIndex.slice();
                 if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
@@ -282,7 +297,10 @@ export default {
             searchColumns: [],
             showTableData: [],
             cloneShowData: [],
+            showSrcIndex: [],
+            cloneShowSrcIndex: [],
             pageData: [],
+            pageSrcIndex: [],
             needSerarchInput: false,
             showCurrentPage: 0,
             searchMessage: {},
@@ -323,6 +341,8 @@ export default {
             if (isEmpty(this.searchMessage) && isEmpty(this.filterMessage)) {
                 this.showTableData = cloneDeep(this.tableData);
                 this.cloneShowData = cloneDeep(this.showTableData);
+                this.showSrcIndex = this.tableData.map((row, index) => index);
+                this.cloneShowSrcIndex = this.showSrcIndex.slice();
                 if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
@@ -330,6 +350,7 @@ export default {
                 }
             } else {
                 this.showTableData = [];
+                this.showSrcIndex = [];
                 const sourceData = this.tableData || [];
                 for (let i = 0; i < sourceData.length; i++) {
                     let flag = true;
@@ -391,6 +412,7 @@ export default {
 
                     if (flag) {
                         this.showTableData.push(sourceData[i]);
+                        this.showSrcIndex.push(i);
                     }
                 }
                 if (this.page.currentPage !== 1) {
@@ -399,6 +421,7 @@ export default {
                     this.handlePageData(this.showTableData, this.page);
                 }
                 this.cloneShowData = cloneDeep(this.showTableData);
+                this.cloneShowSrcIndex = this.showSrcIndex.slice();
             }
         },
         getRenderSearchText(render, fallbackValue) {
@@ -446,6 +469,7 @@ export default {
         sortChange(data) {
             if (data.order === 'normal') {
                 this.showTableData = cloneDeep(this.cloneShowData);
+                this.showSrcIndex = this.cloneShowSrcIndex.slice();
                 if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
@@ -455,6 +479,9 @@ export default {
             }
             if (data.column.customSort) {
                 this.pageData = [];
+                // customSort 由父组件接管排序，展示顺序与原始下标无法对应，此时清空映射，
+                // 让 onDragDrop 放弃派发而不是移动错行
+                this.showSrcIndex = [];
                 this.$nextTick(() => {
                     this.showTableData = this.$parent.customSort(
                         data,
@@ -462,14 +489,19 @@ export default {
                     );
                 });
             } else {
-                const sortedData = cloneDeep(this.showTableData).sort((a, b) => {
+                const sortedRows = this.showTableData.map((row, index) => ({
+                    row: cloneDeep(row),
+                    srcIndex: this.showSrcIndex[index]
+                }));
+                sortedRows.sort((a, b) => {
                     return this.compareSortValues(
-                        this.getSortValue(a, data.key),
-                        this.getSortValue(b, data.key),
+                        this.getSortValue(a.row, data.key),
+                        this.getSortValue(b.row, data.key),
                         data.order
                     );
                 });
-                this.showTableData = sortedData;
+                this.showTableData = sortedRows.map(item => item.row);
+                this.showSrcIndex = sortedRows.map(item => item.srcIndex);
             }
             if (this.page.currentPage !== 1) {
                 this.page.currentPage = 1;
@@ -550,18 +582,23 @@ export default {
         handlePageData(data, page) {
             if (this.serverPagination) {
                 this.pageData = data;
+                this.pageSrcIndex = this.showSrcIndex.slice();
                 this.showCurrentPage = page.currentPage;
                 return;
             }
             const startIndex = (page.currentPage - 1) * page.pageSize;
             const endIndex = startIndex + page.pageSize;
             this.pageData = data.slice(startIndex, endIndex);
+            this.pageSrcIndex = this.showSrcIndex.slice(startIndex, endIndex);
             this.showCurrentPage = page.currentPage;
         },
         onDragDrop(a, b) {
-            const pageStartIndex = (this.page.currentPage - 1) * this.page.pageSize;
-            const startIndex = pageStartIndex + parseInt(a, 10);
-            const endIndex = pageStartIndex + parseInt(b, 10);
+            const startIndex = this.pageSrcIndex[parseInt(a, 10)];
+            const endIndex = this.pageSrcIndex[parseInt(b, 10)];
+            // 列筛选/列排序会改变展示顺序，按原始数组下标派发，避免移动错行
+            if (startIndex === undefined || endIndex === undefined) {
+                return;
+            }
             this.$emit('dragDrop', startIndex, endIndex);
         },
         handleRowClick(row, index) {

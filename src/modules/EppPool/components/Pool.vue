@@ -35,7 +35,11 @@
     </div>
 
     <!-- 工具栏 -->
-    <div v-if="editing" style="text-align:right;margin-bottom:12px;">
+    <div
+      v-if="editing"
+      v-has
+      style="text-align:right;margin-bottom:12px;"
+    >
       <Button
         type="primary"
         size="small"
@@ -51,7 +55,7 @@
         >{{ $t('eppPool.cancel') }}</Button
       >
     </div>
-    <div v-else style="text-align:right;margin-bottom:12px;">
+    <div v-else v-has style="text-align:right;margin-bottom:12px;">
       <Button
         type="primary"
         size="small"
@@ -75,7 +79,7 @@
       />
     </Form>
 
-    <div v-if="editing" style="margin-top:12px;">
+    <div v-if="editing" v-has style="margin-top:12px;">
       <Button type="primary" size="small" @click="addGroup">{{
         $t('eppPool.addGroup')
       }}</Button>

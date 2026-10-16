@@ -31,6 +31,7 @@
       <FormItem :label="$t('trafficMirror.condLabel')" prop="cond">
         <Expression
           :expression="formData.cond"
+          :hide-groups="['response']"
           @expressionChanged="onExpressionChanged"
         />
       </FormItem>

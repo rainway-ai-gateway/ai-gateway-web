@@ -22,6 +22,7 @@
       <div class="route-header-actions">
         <Button
           v-show="mode === 'edit'"
+          v-has
           size="small"
           type="primary"
           @click="onAddRule"
@@ -29,7 +30,7 @@
           {{ $t('trafficMirror.addRule') }}
         </Button>
       </div>
-      <div class="route-header-submit">
+      <div v-has class="route-header-submit">
         <template v-if="mode === 'view'">
           <Button size="small" type="primary" @click="enterEditMode">
             {{ $t('route.enterEditMode') }}
@@ -43,6 +44,7 @@
             size="small"
             type="success"
             :loading="submitting"
+            :disabled="!isDirty"
             @click="submitRules"
           >
             {{ $t('com.submitAndEffect') }}
@@ -56,7 +58,13 @@
       :columns="ruleColumns"
       :tableData="tableRules"
       :loading="loading"
+      :draggable="mode === 'edit'"
+      @dragDrop="onRuleDragDrop"
     />
+
+    <div v-if="mode === 'edit'" class="drag-tip">
+      {{ $t('trafficMirror.dragToChangeOrder') }}
+    </div>
 
     <Drawer
       v-model="viewVisible"
@@ -148,6 +156,19 @@ export default {
     }
   },
 
+  beforeRouteLeave(to, from, next) {
+    if (this.mode === 'edit' && this.isDirty) {
+      this.$Modal.confirm({
+        title: this.$t('com.informationTips'),
+        content: this.$t('trafficMirror.exitConfirm'),
+        onOk: () => next(),
+        onCancel: () => next(false)
+      });
+      return;
+    }
+    next();
+  },
+
   methods: {
     buildRuleColumns() {
       const that = this;
@@ -236,6 +257,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'primary' },
+                  directives: [{ name: 'has' }],
                   style: { marginRight: '8px' },
                   on: { click: () => that.onEditRule(row) }
                 },
@@ -245,6 +267,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'error' },
+                  directives: [{ name: 'has' }],
                   on: { click: () => that.onDeleteRule(row) }
                 },
                 that.$t('com.del')
@@ -386,6 +409,16 @@ export default {
       });
     },
 
+    onRuleDragDrop(startIndex, endIndex) {
+      if (startIndex === endIndex) {
+        return;
+      }
+      const rules = cloneDeep(this.rules);
+      const [moved] = rules.splice(startIndex, 1);
+      rules.splice(endIndex, 0, moved);
+      this.rules = rules;
+    },
+
     onFormSubmit(data) {
       const excludeIndex = this.formMode === 'edit' ? this.currentRuleIndex : -1;
       const nameDuplicated = this.rules.some((rule, index) => {
@@ -506,6 +539,12 @@ export default {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .drag-tip {
+    margin-top: 8px;
+    color: #808695;
+    font-size: 12px;
   }
 }
 </style>

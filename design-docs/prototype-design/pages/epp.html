@@ -16,6 +16,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var root = Layout.render({ pageId: 'EppPool.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
 
         var activeTab = 'pool';
 
@@ -108,7 +109,9 @@
             '</div>';
 
           var toolbar;
-          if (editingPool) {
+          if (isReadonly) {
+            toolbar = '';
+          } else if (editingPool) {
             toolbar = '<div style="text-align:right;">' +
               IvuUI.btn('保存', 'primary', 'small', '', 'id="btn-save-pool" style="margin-right:8px;"') +
               IvuUI.btn('取消', 'default', 'small', '', 'id="btn-cancel-pool"') +
@@ -257,7 +260,8 @@
         }
 
         function bindPoolViewEvents(container) {
-          document.getElementById('btn-edit-pool').addEventListener('click', function () {
+          var editBtn = document.getElementById('btn-edit-pool');
+          if (editBtn) editBtn.addEventListener('click', function () {
             editingPool = true;
             renderPool();
           });
@@ -469,6 +473,7 @@
               return row.degraded ? IvuUI.tag('降级', 'warning') : IvuUI.tag('正常', 'success');
             }},
             { title: '操作', key: 'action', render: function (row) {
+              if (isReadonly) return '';
               return IvuUI.btn('编辑', 'primary', 'small', '', 'data-action="override" data-cluster="' + IvuUI.escapeHtml(row.cluster) + '"');
             }}
           ];
@@ -582,7 +587,7 @@
 
           var footer =
             IvuUI.btn('取消', 'default', 'small', '', 'id="btn-override-cancel" style="margin-right:8px;"') +
-            IvuUI.btn('确认', 'primary', 'small', '', 'id="btn-override-confirm"');
+            (isReadonly ? '' : IvuUI.btn('确认', 'primary', 'small', '', 'id="btn-override-confirm"'));
 
           var drawerId = 'drawer-epp-override';
           var existing = document.getElementById(drawerId);
@@ -608,7 +613,8 @@
             Prototype.closeDrawer(drawerId);
           });
 
-          document.getElementById('btn-override-confirm').addEventListener('click', function () {
+          var overrideConfirmBtn = document.getElementById('btn-override-confirm');
+          if (overrideConfirmBtn) overrideConfirmBtn.addEventListener('click', function () {
             var groupName = document.getElementById('override-group-select').value;
             var primaryId = document.getElementById('override-primary-select').value;
             cluster.group = groupName;

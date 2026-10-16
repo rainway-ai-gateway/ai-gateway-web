@@ -51,6 +51,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var root = Layout.render({ pageId: 'ReencryptSweep.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
         root.innerHTML = '<div id="security-page"></div>';
 
         var MODE_LABELS = { reencrypt: '重加密', decrypt: '解密' };
@@ -122,7 +123,7 @@
                   '<label class="sec-switch"><input type="checkbox" id="sec-dry-run"' + (state.trigger.dry_run ? ' checked' : '') + ' /><span class="sec-slider"></span></label>' +
                   '<span class="sec-hint" style="margin-top:0;">开启后仅统计"将要重写"的行数，不落库</span>' +
                 '</div>') +
-              '<div>' + IvuUI.btn('触发任务', 'primary', '', '', 'id="btn-sec-trigger"') + '</div>' +
+              '<div>' + (isReadonly ? '' : IvuUI.btn('触发任务', 'primary', '', '', 'id="btn-sec-trigger"')) + '</div>' +
               '<div id="sec-conflict" class="sec-conflict"></div>' +
             '</form></div>');
         }

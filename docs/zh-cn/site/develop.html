@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>本文描述如何快速开发</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a class="active" href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="本文描述如何快速开发">本文描述如何快速开发</h1>
+<h2 id="目录结构说明">目录结构说明</h2>
+<pre><code>.
+├── build.sh                // 打包脚本
+├── configs                 // 开发和编译配置
+│   ├── build.js
+│   ├── config.js           // 本地开发时端口号设置
+│   ├── dev-client.js
+│   ├── devProxy.js         // 本地开发时API Server端口号设置
+├── docs                    // 项目文档
+│   └── zh-cn               // 中文文档
+│       ├── 00-README.md           // 手册首页与阅读指引
+│       ├── 01-login-and-user.md   // 登录与用户管理
+│       ├── 02-overview.md         // 控制台布局与导航
+│       ├── 03-model-provider.md   // 模型服务商
+│       ├── 04-ai-business-cluster.md // AI 业务集群
+│       ├── 05-epp-schedule.md     // EPP 调度
+│       ├── 06-model-prices.md     // 模型定价
+│       ├── 07-entity-type.md      // Entity 类型
+│       ├── 08-entity.md           // Entity 组织
+│       ├── 09-api-key.md          // API Key 管理
+│       ├── 10-route.md            // 路由管理
+│       ├── 11-operation-logs.md   // 操作日志
+│       ├── 12-report.md          // 数据报表
+│       ├── 13-scenarios.md        // 场景实战
+│       ├── 14-appendix.md         // 附录
+│       ├── deploy.md              // 部署说明
+│       ├── develop.md             // 开发说明（本文）
+│       └── images/                // 文档截图
+├── index.html
+└── src
+    ├── main.js
+    ├── router              // 路由设置
+    │   └── router.js
+    ├── modules             // 业务模块
+    │   ├── APIKey          // API Key管理
+    │   // ├── Cert            // 证书管理（暂未提供）
+    │   ├── Clusters        // AI业务集群
+    │   ├── Entity          // Entity管理
+    │   ├── Login           // 登录模块
+    │   ├── ModelPrices     // 模型定价
+    │   ├── RouteTable      // 路由表（Global / Entity / API-Key）
+    │   └── User            // 用户管理
+    ├── layout              // 布局逻辑
+    │   ├── 404.vue
+    │   ├── layout.vue
+    │   └── sidebar
+    ├── assets              // 静态资源
+    │   ├── css
+    │   ├── favicon.ico
+    │   ├── font
+    │   └── img
+    ├── i18n                // 语言包
+    │   ├── en.js
+    │   └── zh.js
+    ├── components          // 通用组件
+    │   ├── CustomModal
+    │   ├── Expression
+    │   └── table
+    └── utils               // 公共工具</code></pre>
+<h2 id="二次开发步骤">二次开发步骤</h2>
+<p>二次开发步骤包括：</p>
+<ul><li>基础开发环境搭建：nodejs 开发环境搭建本文不展开描述</li><li>启动项目：修改 configs配置后执行 <code>npm run start</code> 即可启动项目
+<ul><li>API Server 必须先启动</li><li>API Server 端口号配置在 configs/devProxy.js 的 <code>proxy.option.target</code></li><li>开发端口号配置在 configs/config.js 的 <code>dev.ports</code></li></ul></li></ul>
+  </main>
+</div>
+</body>
+</html>

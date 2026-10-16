@@ -58,7 +58,7 @@ export default async (to) => {
   if (!userData) {
     return loginRoute;
   }
-  if (!userData.is_admin) {
+  if (!(userData.role === 'system_admin' || userData.role === 'system_admin_readonly')) {
     return 'illegalAccess';
   }
 

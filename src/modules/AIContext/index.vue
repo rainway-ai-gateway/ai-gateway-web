@@ -24,6 +24,7 @@
           <div class="route-header-actions">
             <Button
               v-show="rulesMode === 'edit'"
+              v-has
               size="small"
               type="primary"
               @click="onAddRule"
@@ -31,7 +32,7 @@
               {{ $t('aiContext.addRule') }}
             </Button>
           </div>
-          <div class="route-header-submit">
+          <div v-has class="route-header-submit">
             <template v-if="rulesMode === 'view'">
               <Button size="small" type="primary" @click="enterRulesEditMode">
                 {{ $t('route.enterEditMode') }}
@@ -45,6 +46,7 @@
                 size="small"
                 type="success"
                 :loading="submittingRules"
+                :disabled="!isRulesDirty"
                 @click="submitRules"
               >
                 {{ $t('com.submitAndEffect') }}
@@ -58,7 +60,13 @@
           :columns="ruleColumns"
           :tableData="rules"
           :loading="loadingRules"
+          :draggable="rulesMode === 'edit'"
+          @dragDrop="onRuleDragDrop"
         />
+
+        <div v-if="rulesMode === 'edit'" class="drag-tip">
+          {{ $t('aiContext.dragToChangeOrder') }}
+        </div>
       </TabPane>
 
       <TabPane :label="$t('aiContext.tabSettings')" name="settings">
@@ -66,7 +74,7 @@
           <div class="route-owner-label">
             {{ $t('aiContext.settingsSubtitle') }}
           </div>
-          <div class="route-header-submit">
+          <div v-has class="route-header-submit">
             <template v-if="settingsMode === 'view'">
               <Button size="small" type="primary" @click="enterSettingsEditMode">
                 {{ $t('com.edit') }}
@@ -190,6 +198,19 @@ export default {
     }
   },
 
+  beforeRouteLeave(to, from, next) {
+    if (this.rulesMode === 'edit' && this.isRulesDirty) {
+      this.$Modal.confirm({
+        title: this.$t('com.informationTips'),
+        content: this.$t('aiContext.exitConfirm'),
+        onOk: () => next(),
+        onCancel: () => next(false)
+      });
+      return;
+    }
+    next();
+  },
+
   methods: {
     buildRuleColumns() {
       const that = this;
@@ -265,6 +286,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'primary' },
+                  directives: [{ name: 'has' }],
                   style: { marginRight: '8px' },
                   on: { click: () => that.onEditRule(row) }
                 },
@@ -274,6 +296,7 @@ export default {
                 'Button',
                 {
                   props: { size: 'small', type: 'error' },
+                  directives: [{ name: 'has' }],
                   on: { click: () => that.onDeleteRule(row) }
                 },
                 that.$t('com.del')
@@ -435,6 +458,16 @@ export default {
       });
     },
 
+    onRuleDragDrop(startIndex, endIndex) {
+      if (startIndex === endIndex) {
+        return;
+      }
+      const rules = cloneDeep(this.rules);
+      const [moved] = rules.splice(startIndex, 1);
+      rules.splice(endIndex, 0, moved);
+      this.rules = rules;
+    },
+
     onFormSubmit(data) {
       const excludeIndex = this.formMode === 'edit' ? this.currentRuleIndex : -1;
       const duplicated = this.rules.some((rule, index) => {
@@ -582,6 +615,12 @@ export default {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .drag-tip {
+    margin-top: 8px;
+    color: #808695;
+    font-size: 12px;
   }
 }
 </style>

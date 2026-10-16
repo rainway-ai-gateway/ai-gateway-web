@@ -206,6 +206,7 @@ window.EntityUpsert = {
       maxConc === 0 ? 'banned' : maxConc > 0 ? 'limited' : 'unlimited';
     var tpmRules = (policy.rules && policy.rules.tpm) || [];
     var rpmRules = (policy.rules && policy.rules.rpm) || [];
+    var batchLimits = (policy.rules && policy.rules.batch_limits) || null;
     var typeOptions = (MockData.entityTypes || []).map(function (t) {
       return t.type_name;
     });
@@ -448,15 +449,17 @@ window.EntityUpsert = {
             percent +
             '%"></div></div>' +
             '</div>' +
-            '<div style="margin-top:16px;">' +
-            IvuUI.btn(
-              '重置配额',
-              'primary',
-              'small',
-              '',
-              'type="button" id="btn-entity-reset-quota"',
-            ) +
-            '</div>'
+            (Prototype.isReadonly()
+              ? ''
+              : '<div style="margin-top:16px;">' +
+                IvuUI.btn(
+                  '重置配额',
+                  'primary',
+                  'small',
+                  '',
+                  'type="button" id="btn-entity-reset-quota"',
+                ) +
+                '</div>')
           : ''),
     );
 

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>10 路由管理：路由表与路由规则</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2329; background: #f5f6f7; }
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 260px; background: #1d2530; padding: 20px 0; position: fixed; top: 0; bottom: 0; overflow-y: auto; }
+  .sidebar h1 { color: #fff; font-size: 16px; padding: 0 20px 12px; margin: 0; border-bottom: 1px solid #2c3646; }
+  .sidebar .tagline { color: #6b7887; font-size: 11px; padding: 8px 20px 0; }
+  .sidebar a { display: block; color: #b8c2cc; text-decoration: none; padding: 10px 20px; font-size: 13px; line-height: 1.5; }
+  .sidebar a:hover { color: #fff; background: #2c3646; }
+  .sidebar a.active { color: #fff; background: #2d6cf6; }
+  .sidebar .nav-section { color: #6b7887; font-size: 11px; padding: 18px 20px 6px; border-top: 1px solid #2c3646; margin-top: 12px; }
+  .content { margin-left: 260px; flex: 1; padding: 32px 48px; max-width: 1080px; background: #fff; min-height: 100vh; }
+  h1 { font-size: 26px; } h2 { font-size: 20px; margin-top: 36px; border-bottom: 1px solid #e5e6eb; padding-bottom: 8px; } h3 { font-size: 16px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 20px; } h5 { font-size: 14px; } h6 { font-size: 14px; }
+  h1, h2, h3, h4, h5, h6 { scroll-margin-top: 16px; }
+  p { line-height: 1.8; }
+  li { line-height: 1.8; margin: 4px 0; }
+  ul, ol { padding-left: 24px; } ul ul, ul ol, ol ul, ol ol { margin: 4px 0; padding-left: 22px; }
+  li.task-item { list-style: none; margin-left: -20px; }
+  code { background: #f2f3f5; border: 1px solid #e5e6eb; border-radius: 4px; padding: 1px 6px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre { background: #10141a; color: #d5dde5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+  th, td { border: 1px solid #dee0e3; padding: 8px 12px; font-size: 14px; text-align: left; }
+  th { background: #f7f8fa; }
+  blockquote { margin: 12px 0; padding: 10px 16px; background: #f7f8fa; border-left: 4px solid #2d6cf6; color: #4e5969; }
+  blockquote p { margin: 4px 0; }
+  blockquote table { margin: 8px 0; }
+  img { max-width: 100%; border: 1px solid #e5e6eb; border-radius: 6px; margin: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  a { color: #2d6cf6; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <h1>壬远AI网关管理控制台用户手册</h1>
+    <div class="tagline">控制台使用者手册（离线站点）</div>
+    <a href="index.html">手册首页</a><a href="01-login-and-user.html">登录与用户管理</a><a href="02-overview.html">概览：控制台布局与导航</a><a href="03-model-provider.html">资源管理：模型服务商</a><a href="04-ai-business-cluster.html">资源管理：AI 业务集群</a><a href="05-epp-schedule.html">资源管理：EPP 调度</a><a href="06-model-prices.html">模型定价：管理模型价格与计费</a><a href="07-entity-type.html">消费者管理：Entity 类型</a><a href="08-entity.html">消费者管理：Entity 组织</a><a href="09-api-key.html">消费者管理：API Key</a><a class="active" href="10-route.html">路由管理：路由表与路由规则</a><a href="11-operation-logs.html">操作日志</a><a href="12-report.html">数据报表</a><a href="13-scenarios.html">场景实战：从零到第一次调用成功的完整示例</a><a href="14-appendix.html">附录</a><a href="15-ai-cache-rules.html">功能增强：AI缓存规则</a><a href="16-traffic-mirror-rules.html">功能增强：流量镜像规则</a><a href="17-intent-config.html">功能增强：意图配置</a><a href="18-ai-context.html">功能增强：AI上下文压缩</a><a href="19-batch-tasks.html">消费者管理：批量任务</a><a href="20-key-reencrypt.html">系统安全：密钥收敛</a><div class="nav-section">附加文档</div><a href="deploy.html">本文描述如何获取AI Gateway Web产出和部署</a><a href="develop.html">本文描述如何快速开发</a>
+  </nav>
+  <main class="content">
+<h1 id="10-路由管理路由表与路由规则">10 路由管理：路由表与路由规则</h1>
+<p>路由决定「请求按什么规则、以什么比例转发到哪些集群 + 模型」。系统预置三种作用域的路由表：</p>
+<table><thead><tr><th>路由表类型</th><th>作用范围</th></tr></thead><tbody><tr><td>Global</td><td>全局兜底，未命中 API-Key / Entity 路由表时使用</td></tr><tr><td>Entity</td><td>命中指定组织的请求，该组织下所有 Key 共享</td></tr><tr><td>API-Key</td><td>命中指定 API-Key 的请求，专属规则互不干扰</td></tr></tbody></table>
+<p>匹配优先级：<strong>API-Key &gt; Entity &gt; Global</strong>。</p>
+<p>匹配语义：同一路由表内，规则按列表顺序依次匹配表达式，<strong>命中第一条即停止</strong>，请求按该规则的目标权重转发；全部规则未命中时回落下一优先级路由表 / 走系统默认转发。因此更具体的规则应排在前面。</p>
+<h2 id="101-路由表列表">10.1 路由表列表</h2>
+<p>进入 路由管理 → 路由表，展示所有路由表列表。</p>
+<p><img src="images/06-table-list.png" alt="路由表列表" loading="lazy" /></p>
+<p><strong>表格列说明</strong>：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>路由表类型</td><td>Global / Entity / API-Key，支持下拉筛选</td></tr><tr><td>路由表属主</td><td>global 显示 <code>global</code>；entity 显示组织名称；apikey 显示 Key ID</td></tr><tr><td>状态</td><td>启用 / 停用，支持下拉筛选</td></tr><tr><td>操作</td><td>查看、启用 / 停用</td></tr></tbody></table>
+<p><strong>状态切换</strong>：点击「启用」或「停用」按钮可切换路由表状态。路由表停用后该表规则不再生效，流量回落到下一优先级路由表。</p>
+<p><strong>自动创建</strong>：API-Key 创建后会自动生成属主为该 Key 的 apikey 路由表（见 <a href="09-api-key.html">09 章</a>）。</p>
+<h2 id="102-路由规则页面">10.2 路由规则页面</h2>
+<p>点击路由表行「查看」按钮，进入该路由表的路由规则编辑页面。页面顶部显示当前路由表信息：</p>
+<ul><li><strong>当前路由表</strong>：<code>类型 / 属主</code></li><li><strong>路由表已启用</strong>：启用 / 停用 下拉选择</li><li><strong>操作按钮</strong>：返回、进入编辑模式 / 退出编辑模式、提交并生效</li></ul>
+<p><img src="images/06-rules-list.png" alt="规则列表" loading="lazy" /></p>
+<h3 id="编辑模式">编辑模式</h3>
+<p>规则的新增、编辑、删除需在<strong>编辑模式</strong>下进行。注意有两个"保存"步骤，缺一不可：</p>
+<table><thead><tr><th>步骤</th><th>操作</th><th>作用</th><th>是否影响线上</th></tr></thead><tbody><tr><td>1</td><td>点击「进入编辑模式」</td><td>进入可编辑状态</td><td>不影响</td></tr><tr><td>2</td><td>添加/编辑/删除规则</td><td>修改规则内容</td><td>不影响</td></tr><tr><td>3</td><td>点击「本地保存」</td><td>把本条规则暂存到页面列表中</td><td><strong>仍不影响</strong></td></tr><tr><td>4</td><td>点击「提交并生效」</td><td>把所有修改真正下发到网关</td><td><strong>正式生效</strong></td></tr></tbody></table>
+<blockquote>
+<p>⚠️ <strong>关键提醒</strong>：只有第 4 步"提交并生效"才会让规则真正生效！如果只点了"本地保存"就离开，修改不会生效，页面会弹出提示。</p>
+</blockquote>
+<p>编辑态的修改未提交前不影响线上流量。提交并生效后自动退出编辑模式。</p>
+<h3 id="提交并生效">提交并生效</h3>
+<p>所有规则编辑完成后，点击顶部「提交并生效」按钮，系统将校验规则并保存，成功后提示「提交成功!」，页面回到查看模式，列表显示最新规则。</p>
+<blockquote>
+<p>提交并生效后，配置通常在数秒到数十秒内同步到数据面（依赖 conf-agent）。若 curl 立即失败，可等待 10～30 秒后重试。</p>
+</blockquote>
+<h3 id="离开确认">离开确认</h3>
+<p>规则列表发生变更但尚未提交并生效时，点击「返回」、面包屑或切换其他菜单，会弹出信息提示：「当前规则变更尚未提交并生效，离开页面后修改将丢失，是否确认离开？」。点击「确定」放弃修改离开，点击「取消」回到编辑页继续。</p>
+<p><img src="images/06-unsaved-leave-confirm.png" alt="未提交离开提示" loading="lazy" /></p>
+<h2 id="103-规则列表">10.3 规则列表</h2>
+<p>规则列表展示当前路由表下的所有规则，按列表顺序依次匹配。</p>
+<p><strong>表格列说明</strong>：</p>
+<table><thead><tr><th>列名</th><th>说明</th></tr></thead><tbody><tr><td>规则名称</td><td>规则标识，支持搜索</td></tr><tr><td>表达式</td><td>匹配条件表达式，支持搜索</td></tr><tr><td>目标集群和模型</td><td>命中后转发的目标，鼠标悬停可查看完整内容</td></tr><tr><td>操作</td><td>查看（查看模式）或 编辑/删除（编辑模式）</td></tr></tbody></table>
+<h2 id="104-添加--编辑规则">10.4 添加 / 编辑规则</h2>
+<p>编辑模式下点击「添加规则」，或在操作列点击「编辑」，右侧弹出规则抽屉：</p>
+<p><img src="images/06-rule-form.png" alt="添加规则表单" loading="lazy" /></p>
+<p><strong>表单字段</strong>：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>格式要求</th><th>说明</th></tr></thead><tbody><tr><td>规则名称</td><td>是</td><td>空</td><td>1-64 字符；仅允许字母、数字、<code>-</code>、<code>_</code>、<code>.</code>；不能以 <code>-</code>、<code>_</code>、<code>.</code> 开头或结尾</td><td>表内唯一</td></tr><tr><td>表达式</td><td>是</td><td>空</td><td>合法的 BFE 条件表达式</td><td>构造器点选生成或直接编辑，保存时服务端校验</td></tr><tr><td>目标集群和模型</td><td>是</td><td>至少 1 项目标</td><td>见下方目标说明</td><td>多个目标时按权重分配</td></tr><tr><td>备用集群和模型</td><td>否</td><td>空</td><td>见下方备用集群说明</td><td>转发失败时的回落目标；可为空</td></tr></tbody></table>
+<h3 id="表达式构造器">表达式构造器</h3>
+<blockquote>
+<p><strong>表达式是什么？</strong> 你可以理解为"条件判断语句"——当请求满足这个条件时，就按本条规则转发。不用手写代码，点击构造器按钮就能自动生成。</p>
+</blockquote>
+<p>表达式为 BFE 条件表达式，构造器按维度提供按钮点选生成，点击后自动插入到表达式文本中。</p>
+<p><strong>逻辑连接符</strong>：</p>
+<table><thead><tr><th>按钮</th><th>生成符号</th></tr></thead><tbody><tr><td><code>(</code></td><td><code>(</code></td></tr><tr><td><code>)</code></td><td><code>)</code></td></tr><tr><td><code>&amp;&amp;</code></td><td><code>&amp;&amp;</code></td></tr><tr><td><code>||</code></td><td><code>||</code></td></tr><tr><td><code>!</code></td><td><code>!</code></td></tr></tbody></table>
+<p><strong>条件维度与操作符</strong>：</p>
+<table><thead><tr><th>维度</th><th>操作符</th><th>生成表达式示例</th></tr></thead><tbody><tr><td>host</td><td>in</td><td><code>req_host_in("www.a.com|www.b.com")</code></td></tr><tr><td>port</td><td>in</td><td><code>req_port_in("80|8080")</code></td></tr><tr><td>method</td><td>in</td><td><code>req_method_in("GET")</code></td></tr><tr><td>path</td><td>in / prefix_in / suffix_in</td><td><code>req_path_prefix_in("/v1/", false)</code></td></tr><tr><td>query</td><td>exist / key_in / key_prefix_in / value_in / value_prefix_in / value_suffix_in / value_hash_in</td><td><code>req_query_value_in("search", "flower", false)</code></td></tr><tr><td>cookie</td><td>key_in / value_in / value_prefix_in / value_suffix_in / value_hash_in</td><td><code>req_cookie_value_in("ssp-web-version", "v0", true)</code></td></tr><tr><td>header</td><td>key_in / value_in / value_prefix_in / value_suffix_in / value_hash_in</td><td><code>req_header_value_in("api_version", "v1|v2", true)</code></td></tr><tr><td>clientIP</td><td>range / trusted / hash_in</td><td><code>req_cip_range("1.1.1.1", "2.2.2.2")</code></td></tr><tr><td>proto</td><td>secure</td><td><code>req_proto_secure()</code></td></tr><tr><td>system</td><td>bfe_time_range / bfe_cluster_in</td><td><code>bfe_time_range("20190204203000H", "20190204204500H")</code></td></tr><tr><td>body</td><td>req_body_json_in</td><td><code>req_body_json_in("level1.level2.level3", "pat1|pat2", false)</code></td></tr><tr><td>body</td><td>req_body_json_prefix_in</td><td><code>req_body_json_prefix_in("level1.level2", "prefix1|prefix2", false)</code></td></tr></tbody></table>
+<blockquote>
+<p><strong>参数说明</strong>：表达式末尾的 <code>true</code> 或 <code>false</code> 表示"是否忽略大小写"。</p>
+<ul><li><code>true</code> = <strong>忽略大小写</strong>（推荐，更灵活）</li><li><code>false</code> = <strong>区分大小写</strong>（严格匹配）</li></ul>
+<p>记忆技巧：<code>true</code> 就是"是的，我要忽略大小写"。</p>
+</blockquote>
+<h4 id="最简配置兜底规则">最简配置：兜底规则</h4>
+<p>如果你只想让所有请求都走同一个集群，不需要复杂表达式：</p>
+<ol><li>在构造器中点击 <code>path</code> 行的 <code>prefix_in</code></li><li>参数填 <code>/</code></li><li>得到表达式：<code>req_path_prefix_in("/", false)</code></li></ol>
+<p>这表示"匹配所有以 <code>/</code> 开头的请求"，也就是<strong>所有请求</strong>。这是最常见的兜底规则。</p>
+<p>常用场景示例：</p>
+<table><thead><tr><th>场景</th><th>表达式示例</th></tr></thead><tbody><tr><td>兜底匹配所有请求</td><td><code>req_path_prefix_in("/", false)</code>（或 <code>default_t()</code>）</td></tr><tr><td>按路径前缀分流</td><td><code>req_path_prefix_in("/v1/", false)</code></td></tr><tr><td>按 Header + 方法分流</td><td><code>req_header_value_in("api_version", "v1|v2", true) &amp;&amp; req_method_in("POST")</code></td></tr><tr><td>按查询参数灰度</td><td><code>req_query_value_in("gray", "1", false)</code></td></tr></tbody></table>
+<h3 id="目标与权重">目标与权重</h3>
+<p><img src="images/06-rule-targets.png" alt="目标与权重" loading="lazy" /></p>
+<p>每个目标包含以下字段：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>集群</td><td>是</td><td>空</td><td>下拉选择已创建的业务集群</td></tr><tr><td>模型</td><td>否</td><td>空</td><td>下拉选择该集群下的模型；留空表示透传请求中的模型名</td></tr><tr><td>权重</td><td>是</td><td><code>0</code></td><td>0-100 的整数；多目标时流量分配比例，所有目标权重之和必须等于 100</td></tr><tr><td>操作</td><td>—</td><td>—</td><td>删除该目标</td></tr></tbody></table>
+<ul><li><strong>指定模型</strong>：无论 curl 里写什么 model，都转发到该模型（适合统一出口）。指定模型是目标模型解析的第一步（其后依次为集群「裁剪前缀」、「模型重定向」），API-Key 的允许/禁止模型按最终解析出的目标模型判定。</li><li><strong>留空</strong>：使用 curl 请求体中的 model 字段（适合客户端自选模型；需与后端实际模型名一致）。</li></ul>
+<p>点击「+ 添加目标」增加目标行。规则至少需要保留 1 项目标。</p>
+<h3 id="备用集群">备用集群</h3>
+<p>除正常目标外，还可配置 <strong>fallbacks（备用集群）</strong>。当请求按正常目标转发失败时，可回落到备用集群继续尝试。</p>
+<p>备用集群字段与目标集群类似，但<strong>不含权重</strong>：</p>
+<table><thead><tr><th>字段</th><th>必填</th><th>默认值</th><th>说明</th></tr></thead><tbody><tr><td>集群</td><td>是</td><td>空</td><td>下拉选择已创建的业务集群</td></tr><tr><td>模型</td><td>否</td><td>空</td><td>下拉选择该集群下的模型；留空表示透传请求中的模型名</td></tr><tr><td>操作</td><td>—</td><td>—</td><td>删除该备用集群</td></tr></tbody></table>
+<ul><li>点击「+ 添加备用」增加行；备用集群列表可为空。</li><li>同一规则内，备用集群之间、备用集群与目标集群之间的 <strong>「集群 + 模型」组合均不能重复</strong>。</li></ul>
+<h3 id="查看规则">查看规则</h3>
+<p>非编辑模式下点击规则行「查看」按钮，或在操作列点击「查看」，右侧弹出只读抽屉，展示规则名称、表达式、目标集群和模型。</p>
+<h3 id="保存规则">保存规则</h3>
+<p>规则抽屉底部有两个按钮：</p>
+<ul><li><strong>本地保存</strong>：校验规则名称、表达式、目标权重和重复性，校验通过后保存到规则列表</li><li><strong>重置</strong>：清空当前规则内容，恢复到打开抽屉前的状态</li></ul>
+<h2 id="105-校验规则">10.5 校验规则</h2>
+<p>保存和提交时系统会进行以下校验：</p>
+<ul><li>同一规则内<strong>目标权重之和必须等于 100</strong></li><li>同一规则内<strong>目标集群 + 模型</strong>组合不能重复</li><li>同一规则内<strong>备用集群 + 模型</strong>组合不能重复，且<strong>不能与目标集群组合重复</strong></li><li>同一规则表内<strong>规则名称</strong>不能重复</li><li>表达式语法错误会在保存时提示</li><li>规则至少包含 1 项目标</li></ul>
+<h2 id="106-注意事项">10.6 注意事项</h2>
+<ul><li>修改规则后需「提交并生效」才会下发到数据面生效。</li><li>停用路由表前请确认回落路径可用，避免流量中断。</li><li>路由表停用或表达式不匹配时，请求回落下一优先级路由表（API-Key &gt; Entity &gt; Global）。</li><li>同一路由表内规则按列表顺序匹配，命中第一条即停止，更具体的规则应排在前面。</li><li>目标模型留空表示透传请求中的模型名，请求会携带原始模型名称转发到目标集群。</li><li>路由表列表和规则列表均支持搜索和排序。</li></ul>
+  </main>
+</div>
+</body>
+</html>
