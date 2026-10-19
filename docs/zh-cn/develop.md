@@ -11,25 +11,35 @@
 │   ├── dev-client.js
 │   ├── devProxy.js         // 本地开发时API Server端口号设置
 ├── docs                    // 项目文档
-│   └── zh-cn               // 中文文档
-│       ├── 00-README.md           // 手册首页与阅读指引
-│       ├── 01-login-and-user.md   // 登录与用户管理
-│       ├── 02-overview.md         // 控制台布局与导航
-│       ├── 03-model-provider.md   // 模型服务商
-│       ├── 04-ai-business-cluster.md // AI 业务集群
-│       ├── 05-epp-schedule.md     // EPP 调度
-│       ├── 06-model-prices.md     // 模型定价
-│       ├── 07-entity-type.md      // Entity 类型
-│       ├── 08-entity.md           // Entity 组织
-│       ├── 09-api-key.md          // API Key 管理
-│       ├── 10-route.md            // 路由管理
-│       ├── 11-operation-logs.md   // 操作日志
-│       ├── 12-report.md          // 数据报表
-│       ├── 13-scenarios.md        // 场景实战
-│       ├── 14-appendix.md         // 附录
-│       ├── deploy.md              // 部署说明
-│       ├── develop.md             // 开发说明（本文）
-│       └── images/                // 文档截图
+│   ├── scripts             // 手册离线站点脚本（零依赖）
+│   │   ├── build-manual-site.js   // Markdown 章节 -> site/ 离线站点
+│   │   └── verify-manual-site.js  // 站点内部链接 / 锚点 / 图片自检
+│   └── zh-cn               // 中文文档（章节顺序与左侧菜单顺序一致）
+│       ├── 00-README.md             // 手册首页与阅读指引
+│       ├── 01-login-and-user.md     // 登录与用户管理
+│       ├── 02-overview.md           // 控制台布局与导航
+│       ├── 03-ai-business-cluster.md // 资源管理：AI 业务集群
+│       ├── 04-model-prices.md       // 模型定价
+│       ├── 05-model-provider.md     // 资源管理：模型服务商
+│       ├── 06-epp-schedule.md       // 资源管理：EPP 调度
+│       ├── 07-route.md              // 路由管理：路由表与路由规则
+│       ├── 08-ai-cache-rules.md     // 功能增强：AI缓存规则
+│       ├── 09-traffic-mirror-rules.md // 功能增强：流量镜像规则
+│       ├── 10-intent-config.md      // 功能增强：意图配置
+│       ├── 11-ai-context.md         // 功能增强：AI上下文压缩
+│       ├── 12-api-key.md            // 消费者管理：API Key
+│       ├── 13-batch-tasks.md        // 消费者管理：批量任务
+│       ├── 14-entity-type.md        // 消费者管理：Entity 类型
+│       ├── 15-entity.md             // 消费者管理：Entity 组织
+│       ├── 16-key-reencrypt.md      // 系统安全：密钥收敛
+│       ├── 17-report.md             // 数据报表
+│       ├── 18-operation-logs.md     // 操作日志
+│       ├── 19-scenarios.md          // 场景实战
+│       ├── 20-appendix.md           // 附录
+│       ├── deploy.md                // 部署说明
+│       ├── develop.md               // 开发说明（本文）
+│       ├── images/                  // 文档截图
+│       └── site/                    // 离线站点产物（由 scripts 生成，勿手改）
 ├── index.html
 └── src
     ├── main.js

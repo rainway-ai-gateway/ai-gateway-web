@@ -64,12 +64,36 @@
       <div v-if="selectedRow" class="details-panel">
         <dl class="details-grid">
           <div class="detail-item">
+            <dt>{{ $t('report.logId') }}</dt>
+            <dd>{{ selectedRow.logid != null ? selectedRow.logid : '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.logTime') }}</dt>
+            <dd>{{ formatTs(selectedRow.log_time) }}</dd>
+          </div>
+          <div class="detail-item">
             <dt>{{ $t('report.hostid') }}</dt>
             <dd>{{ selectedRow.hostid || '-' }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.product') }}</dt>
             <dd>{{ selectedRow.product || '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.apiKey') }}</dt>
+            <dd>{{ selectedRow.ai_apikey_id || '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.requestedModel') }}</dt>
+            <dd>{{ selectedRow.ai_requested_model || '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.targetModel') }}</dt>
+            <dd>{{ selectedRow.ai_target_model || '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.provider') }}</dt>
+            <dd>{{ selectedRow.ai_provider || '-' }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.protocol') }}</dt>
@@ -81,11 +105,19 @@
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.streamField') }}</dt>
-            <dd>{{ selectedRow.ai_stream === 1 ? $t('report.yes') : $t('report.no') }}</dd>
+            <dd>{{ selectedRow.ai_stream == null ? '-' : (selectedRow.ai_stream === 1 ? $t('report.yes') : $t('report.no')) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.statusCode') }}</dt>
+            <dd>{{ selectedRow.res_status_code != null ? selectedRow.res_status_code : '-' }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.errCode') }}</dt>
             <dd>{{ selectedRow.err_code || '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.error') }}</dt>
+            <dd>{{ selectedRow.err_msg || '-' }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.inputTokens') }}</dt>
@@ -96,12 +128,44 @@
             <dd>{{ fmtNum(selectedRow.ai_output_tokens) }}</dd>
           </div>
           <div class="detail-item">
+            <dt>{{ $t('report.totalTokens') }}</dt>
+            <dd>{{ fmtNum(selectedRow.ai_total_tokens) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.duration') }}</dt>
+            <dd>{{ selectedRow.all_time != null ? selectedRow.all_time + ' ms' : '-' }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.ttft') }}</dt>
+            <dd>{{ fmtUsDetail(selectedRow.ai_ttft_us) }}</dd>
+          </div>
+          <div class="detail-item">
             <dt>{{ $t('report.tpot') }}</dt>
-            <dd>{{ fmtUs(selectedRow.ai_tpot_us) }}</dd>
+            <dd>{{ fmtUsDetail(selectedRow.ai_tpot_us) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.logCost') }}</dt>
+            <dd>{{ fmtCost(selectedRow) }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.level1') }}</dt>
-            <dd>{{ (selectedRow.level1Name || '-') + ' = ' + (selectedRow.level1 || '-') }}</dd>
+            <dd>{{ fmtLevel(selectedRow.level1Name, selectedRow.level1) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.level2') }}</dt>
+            <dd>{{ fmtLevel(selectedRow.level2Name, selectedRow.level2) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.level3') }}</dt>
+            <dd>{{ fmtLevel(selectedRow.level3Name, selectedRow.level3) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.level4') }}</dt>
+            <dd>{{ fmtLevel(selectedRow.level4Name, selectedRow.level4) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.level5') }}</dt>
+            <dd>{{ fmtLevel(selectedRow.level5Name, selectedRow.level5) }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.clientIp') }}</dt>
@@ -117,11 +181,11 @@
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.cacheStatus') }}</dt>
-            <dd>{{ selectedRow.ai_cache_status || '-' }}</dd>
+            <dd>{{ fmtCacheStatus(selectedRow.ai_cache_status) }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.mirrorHit') }}</dt>
-            <dd>{{ selectedRow.mirror_hit ? $t('report.yes') + (selectedRow.mirror_cluster ? '（' + selectedRow.mirror_cluster + '）' : '') : $t('report.no') }}</dd>
+            <dd>{{ selectedRow.mirror_hit == null ? '-' : (selectedRow.mirror_hit ? $t('report.yes') + (selectedRow.mirror_cluster ? '（' + selectedRow.mirror_cluster + '）' : '') : $t('report.no')) }}</dd>
           </div>
           <div class="detail-item">
             <dt>{{ $t('report.intentQuestion') }}</dt>
@@ -453,6 +517,29 @@ export default {
     onViewDetails(row) {
       this.selectedRow = row;
       this.detailsDrawerVisible = true;
+    },
+
+    // 接口以 0 表示「未设置」（非流式请求无 TTFT/TPOT），与 null 统一按无值展示
+    fmtUsDetail(us) {
+      if (us == null || us === 0) return '-';
+      return this.helpers.fmtUs(us);
+    },
+
+    fmtCost(row) {
+      if (row.ai_cost_value == null) return '-';
+      return row.ai_cost_value + ' ' + (row.ai_cost_currency || '');
+    },
+
+    // API Key 标签按层级打平为 name/value 成对字段，五层同级展示
+    fmtLevel(name, value) {
+      if (name == null && value == null) return '-';
+      return (name || '-') + ' = ' + (value || '-');
+    },
+
+    // 空串表示「未启用缓存」，与未记录（null）区分
+    fmtCacheStatus(status) {
+      if (status == null) return '-';
+      return status === '' ? this.$t('report.cacheDisabled') : status;
     },
 
     handlePageChange({ page, pageSize }) {

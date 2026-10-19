@@ -118,7 +118,7 @@
 | `file_id` | string | 文件标识（provider 侧 file id） | 非空；`(file_id, provider)` 唯一定位 |
 | `provider` | string | provider 名称 | 与 `file_id` 联合唯一定位 |
 | `purpose` | string | 文件用途 | `batch_input` / `batch_output` 等 provider 枚举值 |
-| `filename` | string | 文件名 | - |
+| `filename` | string | 文件名 | 一期留空（`batch_files` 元数据不落库文件名，响应中省略），后续接入 |
 | `bytes` | int64 | 文件大小（字节） | ≥0 |
 | `created_at` | string | 创建时间（RFC3339） | 只读 |
 
@@ -425,4 +425,4 @@
 ## 6. 向后兼容
 
 - `/batches`、`/batch-files` 为本期新增端点，无存量接口变更。
-- 批量价格（`mode=batch`）由 [model-prices.md](./model-prices.md) 的 `batch_discount` 系数展开或手工价格行提供；批量限流（`batch_limits`）由 InnerAPI 导出的 `rules.batch` 段提供（见 [InnerAPI rate-limit-policy.md](../InnerAPI接口定义/rate-limit-policy.md)）。
+- 批量价格（`mode=batch`）由 [model-prices.md](./model-prices.md) 的 `batch_discount` 系数展开或手工价格行提供；批量限流（`batch_limits`）由 InnerAPI 导出的 `rules.batch` 段提供（见 [InnerAPI rate-limit-policy.md](../../../../ai-gateway-api/design-docs/api-define/InnerAPI接口定义/rate-limit-policy.md)）。

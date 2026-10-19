@@ -427,17 +427,11 @@ window.MockData = {
     groups: [
       {
         name: 'g1',
-        instances: [
-          { id: 'epp-a', host: '10.0.0.1', port: 9002 },
-          { id: 'epp-b', host: '10.0.0.2', port: 9002 },
-        ],
+        instances: [{ id: 'epp-a', host: '10.0.0.1', port: 9002 }],
       },
       {
         name: 'g2',
-        instances: [
-          { id: 'epp-c', host: '10.0.0.3', port: 9002 },
-          { id: 'epp-d', host: '10.0.0.4', port: 9002 },
-        ],
+        instances: [{ id: 'epp-c', host: '10.0.0.3', port: 9002 }],
       },
       {
         name: 'g3',
@@ -447,20 +441,8 @@ window.MockData = {
   },
   eppAssignments: {
     clusters: [
-      {
-        cluster: 'epp-cluster-a',
-        group: 'g1',
-        primary: { id: 'epp-a', host: '10.0.0.1', port: 9002 },
-        standby: { id: 'epp-b', host: '10.0.0.2', port: 9002 },
-        degraded: false,
-      },
-      {
-        cluster: 'epp-cluster-b',
-        group: 'g2',
-        primary: { id: 'epp-c', host: '10.0.0.3', port: 9002 },
-        standby: { id: 'epp-d', host: '10.0.0.4', port: 9002 },
-        degraded: false,
-      },
+      { cluster: 'epp-cluster-a', group: 'g1' },
+      { cluster: 'epp-cluster-b', group: 'g2' },
     ],
     unassigned_clusters: [],
     idle_groups: ['g3'],

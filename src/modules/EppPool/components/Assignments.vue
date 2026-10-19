@@ -92,34 +92,12 @@
                 $t('eppAssignment.selectGroup')
                 }}</label
               >
-              <Select
-                v-model="overrideGroup"
-                style="width:100%;"
-                @on-change="onGroupChange"
-              >
+              <Select v-model="overrideGroup" style="width:100%;">
                 <Option
                   v-for="g in poolGroups"
                   :key="g.name"
                   :value="g.name"
                   >{{ g.name }}</Option
-                >
-              </Select>
-            </div>
-          </div>
-          <div class="ivu-row" style="margin-bottom:16px;">
-            <div class="ivu-col ivu-col-span-12" style="padding:0 8px;">
-              <label
-                style="display:block;margin-bottom:4px;font-size:12px;color:#808695;"
-                >{{
-                $t('eppAssignment.selectPrimary')
-                }}</label
-              >
-              <Select v-model="overridePrimary" style="width:100%;">
-                <Option
-                  v-for="inst in primaryOptions"
-                  :key="inst.id"
-                  :value="inst.id"
-                  >{{ inst.id }}</Option
                 >
               </Select>
             </div>
@@ -161,7 +139,6 @@ export default {
       overrideSaving: false,
       overrideCluster: '',
       overrideGroup: '',
-      overridePrimary: '',
     };
   },
   computed: {
@@ -176,11 +153,6 @@ export default {
     },
     overrideTitle() {
       return `${this.$t('eppAssignment.override')} - ${this.overrideCluster}`;
-    },
-    primaryOptions() {
-      const group = this.poolGroups.find((g) => g.name === this.overrideGroup);
-      if (!group) return [];
-      return group.instances || [];
     },
     columns() {
       return [
@@ -199,43 +171,6 @@ export default {
           sortable: 'custom',
           render: (h, { row }) => {
             return h('span', row.group || '-');
-          },
-        },
-        {
-          title: this.$t('eppAssignment.primary'),
-          key: 'primary',
-          sortable: 'custom',
-          render: (h, { row }) => {
-            if (row.primary) {
-              return h('span', row.primary.id);
-            }
-            return h('span', '-');
-          },
-        },
-        {
-          title: this.$t('eppAssignment.standby'),
-          key: 'standby',
-          sortable: 'custom',
-          render: (h, { row }) => {
-            if (row.standby) {
-              return h('span', row.standby.id);
-            }
-            return h(
-              'span',
-              { style: 'color:#c5c8ce;' },
-              this.$t('eppAssignment.noStandby'),
-            );
-          },
-        },
-        {
-          title: this.$t('eppAssignment.status'),
-          key: 'degraded',
-          sortable: 'custom',
-          render: (h, { row }) => {
-            if (row.degraded) {
-              return h('Tag', { props: { color: 'warning' } }, this.$t('eppAssignment.degraded'));
-            }
-            return h('Tag', { props: { color: 'success' } }, this.$t('eppAssignment.normal'));
           },
         },
         {
@@ -317,16 +252,7 @@ export default {
         (c) => c.cluster === clusterName,
       );
       this.overrideGroup = cluster ? cluster.group || '' : '';
-      this.overridePrimary = cluster && cluster.primary ? cluster.primary.id : '';
       this.drawerVisible = true;
-    },
-    onGroupChange(groupName) {
-      const group = this.poolGroups.find((g) => g.name === groupName);
-      if (group && group.instances && group.instances.length > 0) {
-        this.overridePrimary = group.instances[0].id;
-      } else {
-        this.overridePrimary = '';
-      }
     },
     confirmOverride() {
       this.overrideSaving = true;
@@ -338,7 +264,6 @@ export default {
         openapi: true,
         data: {
           group_name: this.overrideGroup,
-          primary_instance_id: this.overridePrimary,
         },
       })
         .then((res) => {

@@ -132,7 +132,8 @@ import { cloneDeep } from 'lodash';
 const TYPE_LABELS = {
   global: 'Global',
   entity: 'Entity',
-  apikey: 'API-Key'
+  apikey: 'API-Key',
+  api_key: 'API-Key'
 };
 
 export default {

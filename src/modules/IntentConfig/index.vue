@@ -212,6 +212,19 @@ export default {
     }
   },
 
+  beforeRouteLeave(to, from, next) {
+    if (this.mode === 'edit' && this.isDirty) {
+      this.$Modal.confirm({
+        title: this.$t('com.informationTips'),
+        content: this.$t('intentConfig.exitConfirm'),
+        onOk: () => next(),
+        onCancel: () => next(false)
+      });
+      return;
+    }
+    next();
+  },
+
   methods: {
     buildQuestionColumns() {
       const that = this;

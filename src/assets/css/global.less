@@ -59,8 +59,11 @@ body {
     background-color: #909399;
     border-color: #909399;
 }
-// v-has 指令隐藏标记：!important 用于稳定覆盖 v-show 写入的内联 display
-.v-has-hidden {
+// v-has 指令隐藏标记：!important 用于稳定覆盖 v-show 写入的内联 display。
+// 同时匹配类与属性两种标记：只靠 class 会在「元素自身有响应式 class 且组件重渲染」时丢失
+// （Vue 的 class 模块会整串重写 class 属性，抹掉命令式加上的类），属性标记作为兜底。
+.v-has-hidden,
+[v-has-hidden] {
     display: none !important;
 }
 

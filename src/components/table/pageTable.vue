@@ -136,6 +136,29 @@ export default {
     },
 
     watch: {
+        /**
+         * 退出可拖拽态时清掉行上残留的 draggable 属性。
+         *
+         * 背景：iView `table-tr.vue` 用 `v-if="draggable"` / `v-else` 两个**同标签、无 key**
+         * 的 `<tr>` 分支；切到 `v-else` 时新 vnode 完全不携带 attrs，而 Vue 对**枚举型属性**
+         * 在 `updateAttrs` 里刻意不 removeAttribute（`isEnumeratedAttr` 含 `draggable`：
+         * 枚举属性语义是「缺省 ≠ false」，正确做法是显式写 "false"）。于是属性会停在
+         * `draggable="true"`，表现为「退出编辑模式后行仍可被拖起」（2026-10-17 实测 5s 后仍为 true）。
+         * 属性在视图模式没有响应式属主（v-else 分支根本不含它），因此在此精确清理是安全的。
+         */
+        draggable(isDraggable) {
+            if (isDraggable) {
+                return;
+            }
+            this.$nextTick(() => {
+                const rows = this.$el
+                    ? this.$el.querySelectorAll(
+                          '.show-iView-Table tbody tr[draggable]',
+                      )
+                    : [];
+                rows.forEach(row => row.removeAttribute('draggable'));
+            });
+        },
         columns: {
             handler(data) {
                 const that = this;
@@ -390,10 +413,22 @@ export default {
                                     }
                                 );
                                 const displayText = this.getRenderSearchText(render, itemValue);
+                                // 带 render 的列同时接受两种匹配口径：
+                                // ①「渲染文案」按**子串**匹配 —— 为「展示即搜索」的列（如 API-Key 掩码列
+                                //    按显示文本搜）保留既有行为；
+                                // ②「原始值」按**等值**匹配 —— 筛选值是枚举、渲染文案是中文的列
+                                //    （如用户角色列 system_admin →「系统管理员」）只比渲染文案会恒不命中，
+                                //    故兜一次原始值。**必须等值而非子串**：枚举之间会互为前缀
+                                //    （system_admin 是 system_admin_readonly 的前缀），子串比较会把
+                                //    「系统管理员（只读）」的行也带进「系统管理员」的筛选结果。
+                                const rawText =
+                                    itemValue === null || itemValue === undefined
+                                        ? ''
+                                        : String(itemValue);
+                                const upper = searchValue.toUpperCase();
                                 if (
-                                    displayText
-                                        .toUpperCase()
-                                        .indexOf(searchValue.toUpperCase()) === -1
+                                    displayText.toUpperCase().indexOf(upper) === -1 &&
+                                    rawText.toUpperCase() !== upper
                                 ) {
                                     flag = false;
                                     break l;

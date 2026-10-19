@@ -1,6 +1,6 @@
 # 02 概览：控制台布局与导航
 
-登录成功后进入控制台，整体布局为「左侧导航 + 右侧内容区」。首次使用建议先浏览本章，再跟做 [13 场景实战](13-scenarios.md)。
+登录成功后进入控制台，整体布局为「左侧导航 + 右侧内容区」。首次使用建议先浏览本章，再跟做 [19 场景实战](19-scenarios.md)。
 
 ## 2.1 导航结构
 
@@ -44,10 +44,10 @@ AI 网关
 
 ## 2.3 三级路由优先级
 
-请求进入数据面后按 **API-Key > Entity > Global** 顺序匹配路由表：先查该 Key 的专属表，未命中再查 Key 挂载组织的表，最后回落 Global。详见 [10 章](10-route.md)。
+请求进入数据面后按 **API-Key > Entity > Global** 顺序匹配路由表：先查该 Key 的专属表，未命中再查 Key 挂载组织的表，最后回落 Global。详见 [07 章](07-route.md)。
 
 ## 2.4 下一步
 
-- 首次配置请跟做 [13 场景实战](13-scenarios.md)；
-- 字段级说明见各模块章节：[模型服务商](03-model-provider.md)、[业务集群](04-ai-business-cluster.md)、[EPP 调度](05-epp-schedule.md)、[模型定价](06-model-prices.md)、[Entity 类型](07-entity-type.md)、[Entity 组织](08-entity.md)、[API Key](09-api-key.md)、[路由管理](10-route.md)、[操作日志](11-operation-logs.md)、[数据报表](12-report.md)；
-- 按菜单分组的新增章节：**功能增强** —— [AI缓存规则](15-ai-cache-rules.md)、[流量镜像规则](16-traffic-mirror-rules.md)、[意图配置](17-intent-config.md)、[AI上下文压缩](18-ai-context.md)；**消费者管理** —— [批量任务](19-batch-tasks.md)；**系统安全** —— [密钥收敛](20-key-reencrypt.md)。
+- 首次配置请跟做 [19 场景实战](19-scenarios.md)；
+- 字段级说明见各模块章节（顺序与左侧导航一致）：[AI业务集群](03-ai-business-cluster.md)、[模型定价](04-model-prices.md)、[模型服务商](05-model-provider.md)、[EPP 调度](06-epp-schedule.md)、[路由表](07-route.md)、[AI缓存规则](08-ai-cache-rules.md)、[流量镜像规则](09-traffic-mirror-rules.md)、[意图配置](10-intent-config.md)、[AI上下文压缩](11-ai-context.md)、[API Key](12-api-key.md)、[批量任务](13-batch-tasks.md)、[Entity 类型](14-entity-type.md)、[Entity 组织](15-entity.md)、[密钥收敛](16-key-reencrypt.md)、[数据报表](17-report.md)、[操作日志](18-operation-logs.md)；
+- 术语与常见报错回查 [20 附录](20-appendix.md)。

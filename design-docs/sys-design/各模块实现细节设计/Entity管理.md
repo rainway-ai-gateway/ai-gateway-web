@@ -19,7 +19,8 @@
 
 ### 3.1 组织管理（Entity）
 
-- 使用 `pageTable` 展示 `name`、`type`、`parent_id`（解析为父名）、配额用量、限流状态、操作。
+- 使用 `pageTable` 展示 `name`、`level`（级别，由行的 `type` 反查 `GET /entity-types` 的 `level`；类型不存在时显示 `-`）、`type`、`parent_id`（解析为父名）、配额用量、限流状态、操作。
+- 「级别」列可排序，并在筛选行提供 `1`–`5` 下拉筛选（与类型管理的级别筛选一致）；列表为客户端筛选/排序，`GET /entities` 不带分页参数。
 - 顶部「创建 Entity」按钮打开抽屉。
 - 行点击可进入详情。
 
@@ -78,6 +79,7 @@ Entity/index.vue (Tab 容器)
 | 组件 | 方法 | 相对 URL | 说明 |
 |------|------|----------|------|
 | `EntityList.vue` | `GET` | `entities` | 列表。 |
+| `EntityList.vue` | `GET` | `entity-types` | 级别列数据源：按行的 `type` 反查类型 `level`（与 `GET entities` 并行发出）。 |
 | `EntityList.vue` | `POST` | `entities` | 创建。 |
 | `EntityList.vue` | `PATCH` | `entities/{id}` | 更新。 |
 | `EntityList.vue` | `DELETE` | `entities/{id}` | 删除。 |
@@ -97,3 +99,4 @@ Entity/index.vue (Tab 容器)
 - 父 Entity 解析失败时，展示文案存在 `- 无父级` 拼接问题，可优化为 `parentEntityName || ('- ' + $t('entity.noParent'))`。
 - Entity 删除前应校验是否被 API Key 挂载，但当前由后端返回错误提示，前端只展示。
 - Entity Type 的 `level` 决定可挂载的父级范围，修改类型 `level` 可能影响现有父子关系，后端需保证一致性。
+- 组织列表的「级别」列在 `GET /entity-types` 失败或行的 `type` 不在类型表中时显示 `-`（级别为 `undefined`，排序时排到末尾）。

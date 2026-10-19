@@ -438,7 +438,12 @@ export default {
             if (f.status) params.status = f.status;
             if (f.mode) params.mode = f.mode;
             if (f.scope) params.scope = f.scope;
-            if (f.dry_run !== '') params.dry_run = f.dry_run === 'true';
+            // 只认显式选中的 'true'/'false'：iView Select 清空时 emit 的是 undefined（**不是** ''），
+            // 用 `!== ''` 判断会把「已清空」误算成「预演=否」，从而下发 dry_run=false，
+            // 结果集恒少掉预演样本（实测 25→24）。其余筛选项（status/mode/scope）用真值判断，故不受影响。
+            if (f.dry_run === 'true' || f.dry_run === 'false') {
+                params.dry_run = f.dry_run === 'true';
+            }
             const start = this.toRfc3339(f.start_time);
             if (start) params.start_time = start;
             const end = this.toRfc3339(f.end_time);
