@@ -16,6 +16,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var root = Layout.render({ pageId: 'EppPool.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
 
         var activeTab = 'pool';
 
@@ -108,7 +109,9 @@
             '</div>';
 
           var toolbar;
-          if (editingPool) {
+          if (isReadonly) {
+            toolbar = '';
+          } else if (editingPool) {
             toolbar = '<div style="text-align:right;">' +
               IvuUI.btn('保存', 'primary', 'small', '', 'id="btn-save-pool" style="margin-right:8px;"') +
               IvuUI.btn('取消', 'default', 'small', '', 'id="btn-cancel-pool"') +
@@ -154,7 +157,7 @@
                 tableHtml += '<strong>' + IvuUI.escapeHtml(g.name) + '</strong>';
               }
               tableHtml += '</div></td>' +
-                '<td><div class="ivu-table-cell">' + (g.instances || []).length + ' / 2</div></td>' +
+                '<td><div class="ivu-table-cell">' + (g.instances || []).length + ' / 1</div></td>' +
                 '<td><div class="ivu-table-cell" style="font-size:12px;color:#808695;">' + (instSummary || '-') + '</div></td>';
               if (editingPool) {
                 tableHtml += '<td><div class="ivu-table-cell">' +
@@ -222,9 +225,9 @@
 
                 if (editingPool) {
                   var instCount = (g.instances || []).length;
-                  var addBtnHtml = instCount >= 2
+                  var addBtnHtml = instCount >= 1
                     ? IvuUI.btn('+添加实例', 'default', 'small', 'disabled', 'data-action="add-inst" data-group-index="' + gi + '"') +
-                      '<span style="color:#c5c8ce;font-size:12px;margin-left:8px;">每组最多 2 个（主+备）</span>'
+                      '<span style="color:#c5c8ce;font-size:12px;margin-left:8px;">每组恰好 1 个实例</span>'
                     : IvuUI.btn('+添加实例', 'primary', 'small', '', 'data-action="add-inst" data-group-index="' + gi + '"');
                   tableHtml += '<div style="margin-top:8px;">' + addBtnHtml + '</div>';
                 }
@@ -257,7 +260,8 @@
         }
 
         function bindPoolViewEvents(container) {
-          document.getElementById('btn-edit-pool').addEventListener('click', function () {
+          var editBtn = document.getElementById('btn-edit-pool');
+          if (editBtn) editBtn.addEventListener('click', function () {
             editingPool = true;
             renderPool();
           });
@@ -299,8 +303,8 @@
                 Prototype.toast('实例组 "' + gName + '" 为空，至少需要 1 个实例', 'error');
                 return;
               }
-              if (insts.length > 2) {
-                Prototype.toast('实例组 "' + gName + '" 实例数超过上限（每组仅主+备，最多 2 个）', 'error');
+              if (insts.length > 1) {
+                Prototype.toast('实例组 "' + gName + '" 实例数超过上限（每组恰好 1 个实例）', 'error');
                 return;
               }
               for (var ii = 0; ii < insts.length; ii++) {
@@ -459,16 +463,8 @@
             { title: '实例组', key: 'group', sortable: true, render: function (row) {
               return IvuUI.escapeHtml(row.group || '-');
             }},
-            { title: '主实例', key: 'primary', sortable: true, render: function (row) {
-              return row.primary ? IvuUI.escapeHtml(row.primary.id) : '-';
-            }},
-            { title: '备实例', key: 'standby', sortable: true, render: function (row) {
-              return row.standby ? IvuUI.escapeHtml(row.standby.id) : '<span style="color:#c5c8ce;">无</span>';
-            }},
-            { title: '状态', key: 'degraded', sortable: true, render: function (row) {
-              return row.degraded ? IvuUI.tag('降级', 'warning') : IvuUI.tag('正常', 'success');
-            }},
             { title: '操作', key: 'action', render: function (row) {
+              if (isReadonly) return '';
               return IvuUI.btn('编辑', 'primary', 'small', '', 'data-action="override" data-cluster="' + IvuUI.escapeHtml(row.cluster) + '"');
             }}
           ];
@@ -562,27 +558,16 @@
             return '<option value="' + IvuUI.escapeHtml(g.name) + '"' + (g.name === cluster.group ? ' selected' : '') + '>' + IvuUI.escapeHtml(g.name) + '</option>';
           }).join('');
 
-          var selectedGroup = groups.find(function (g) { return g.name === cluster.group; });
-          var primaryOptions = selectedGroup ? selectedGroup.instances.map(function (inst) {
-            return '<option value="' + IvuUI.escapeHtml(inst.id) + '"' + (inst.id === (cluster.primary && cluster.primary.id) ? ' selected' : '') + '>' + IvuUI.escapeHtml(inst.id) + '</option>';
-          }).join('') : '';
-
           var body =
             '<div class="ivu-row" style="margin-bottom:16px;">' +
             '<div class="ivu-col ivu-col-span-12" style="padding:0 8px;">' +
             '<label style="display:block;margin-bottom:4px;font-size:12px;color:#808695;">实例组</label>' +
             '<select id="override-group-select" class="ivu-input" style="height:32px;">' + groupOptions + '</select></div>' +
-            '</div>' +
-            '<div class="ivu-row" style="margin-bottom:16px;">' +
-            '<div class="ivu-col ivu-col-span-12" style="padding:0 8px;">' +
-            '<label style="display:block;margin-bottom:4px;font-size:12px;color:#808695;">主实例 ID</label>' +
-            '<select id="override-primary-select" class="ivu-input" style="height:32px;">' + primaryOptions + '</select></div>' +
-            '</div>' +
-            '<p style="color:#808695;font-size:12px;margin:0;">留空 = 自动分配 / 跟随组默认主实例</p>';
+            '</div>';
 
           var footer =
             IvuUI.btn('取消', 'default', 'small', '', 'id="btn-override-cancel" style="margin-right:8px;"') +
-            IvuUI.btn('确认', 'primary', 'small', '', 'id="btn-override-confirm"');
+            (isReadonly ? '' : IvuUI.btn('确认', 'primary', 'small', '', 'id="btn-override-confirm"'));
 
           var drawerId = 'drawer-epp-override';
           var existing = document.getElementById(drawerId);
@@ -593,36 +578,14 @@
           temp.innerHTML = drawerHtml;
           document.body.appendChild(temp.firstElementChild);
 
-          document.getElementById('override-group-select').addEventListener('change', function () {
-            var gName = this.value;
-            var g = groups.find(function (gr) { return gr.name === gName; });
-            var ps = document.getElementById('override-primary-select');
-            if (g) {
-              ps.innerHTML = g.instances.map(function (inst) {
-                return '<option value="' + IvuUI.escapeHtml(inst.id) + '">' + IvuUI.escapeHtml(inst.id) + '</option>';
-              }).join('');
-            }
-          });
-
           document.getElementById('btn-override-cancel').addEventListener('click', function () {
             Prototype.closeDrawer(drawerId);
           });
 
-          document.getElementById('btn-override-confirm').addEventListener('click', function () {
+          var overrideConfirmBtn = document.getElementById('btn-override-confirm');
+          if (overrideConfirmBtn) overrideConfirmBtn.addEventListener('click', function () {
             var groupName = document.getElementById('override-group-select').value;
-            var primaryId = document.getElementById('override-primary-select').value;
             cluster.group = groupName;
-            var g = groups.find(function (gr) { return gr.name === groupName; });
-            if (g) {
-              if (primaryId) {
-                var inst = g.instances.find(function (i) { return i.id === primaryId; });
-                if (inst) cluster.primary = { id: inst.id, host: inst.host, port: inst.port };
-              } else {
-                cluster.primary = g.instances.length > 0 ? { id: g.instances[0].id, host: g.instances[0].host, port: g.instances[0].port } : null;
-              }
-              cluster.standby = g.instances.length > 1 ? { id: g.instances[1].id, host: g.instances[1].host, port: g.instances[1].port } : null;
-              cluster.degraded = false;
-            }
             Prototype.toast('分配覆写成功！');
             Prototype.closeDrawer(drawerId);
             renderAssignments();

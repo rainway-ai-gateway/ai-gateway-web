@@ -7,6 +7,11 @@ var NAV_ICONS = {
   'certs.list': 'iconfont icon-cert',
   'Provider.list': 'ivu-icon ivu-icon-ios-cloud',
   'AdvanceRouteRule.list': 'iconfont icon-zhuanfa',
+  'FeatureEnhance.list': 'ivu-icon ivu-icon-ios-color-wand',
+  'AICacheRule.list': 'ivu-icon ivu-icon-ios-flash',
+  'TrafficMirrorRule.list': 'ivu-icon ivu-icon-ios-copy',
+  'IntentConfig.list': 'ivu-icon ivu-icon-ios-chatbubbles',
+  'AIContextRule.list': 'ivu-icon ivu-icon-ios-crop',
   'user.list': 'iconfont icon-user',
   'APIKey.list': 'ivu-icon ivu-icon-ios-key',
   'Entity.list': 'ivu-icon ivu-icon-ios-settings',
@@ -15,6 +20,9 @@ var NAV_ICONS = {
   'resource.admin.list': 'ivu-icon ivu-icon-md-appstore',
   'ModelPrice.list': 'ivu-icon ivu-icon-logo-yen',
   'OperationLog.list': 'ivu-icon ivu-icon-md-list-box',
+  'BatchTask.list': 'ivu-icon ivu-icon-ios-archive',
+  'systemSecurity.admin.list': 'ivu-icon ivu-icon-ios-lock',
+  'ReencryptSweep.list': 'ivu-icon ivu-icon-ios-lock',
   'Report.list': 'ivu-icon ivu-icon-md-analytics',
 };
 
@@ -72,6 +80,42 @@ window.PrototypeNav = [
         text: '路由表',
         icon: navIcon('AdvanceRouteRule.list'),
       },
+      {
+        id: 'FeatureEnhance.list',
+        i18n: 'FeatureEnhanceManage',
+        text: '功能增强',
+        icon: navIcon('FeatureEnhance.list'),
+        children: [
+          {
+            id: 'AICacheRule.list',
+            i18n: 'AICacheRuleManage',
+            page: 'ai-cache.html',
+            text: 'AI缓存规则',
+            icon: navIcon('AICacheRule.list'),
+          },
+          {
+            id: 'TrafficMirrorRule.list',
+            i18n: 'TrafficMirrorRuleManage',
+            page: 'traffic-mirror.html',
+            text: '流量镜像规则',
+            icon: navIcon('TrafficMirrorRule.list'),
+          },
+          {
+            id: 'IntentConfig.list',
+            i18n: 'IntentConfigManage',
+            page: 'intent-config.html',
+            text: '意图配置',
+            icon: navIcon('IntentConfig.list'),
+          },
+          {
+            id: 'AIContextRule.list',
+            i18n: 'AIContextRuleManage',
+            page: 'ai-context.html',
+            text: 'AI上下文压缩',
+            icon: navIcon('AIContextRule.list'),
+          },
+        ],
+      },
     ],
   },
   {
@@ -87,12 +131,35 @@ window.PrototypeNav = [
         text: 'API Key 管理',
         icon: navIcon('APIKey.list'),
       },
+      // 后端 nav_tree.toml 尚无此菜单项，原型中作为占位先行（已确认决策）
+      {
+        id: 'BatchTask.list',
+        i18n: 'BatchTaskManage',
+        page: 'batches.html',
+        text: '批量任务',
+        icon: navIcon('BatchTask.list'),
+      },
       {
         id: 'Entity.list',
         i18n: 'EntityManage',
         page: 'entity.html',
         text: 'Entity 管理',
         icon: navIcon('Entity.list'),
+      },
+    ],
+  },
+  {
+    id: 'systemSecurity.admin.list',
+    i18n: 'SystemSecurityManage',
+    text: '系统安全',
+    icon: navIcon('systemSecurity.admin.list'),
+    children: [
+      {
+        id: 'ReencryptSweep.list',
+        i18n: 'ReencryptSweepManage',
+        page: 'security.html',
+        text: '密钥收敛',
+        icon: navIcon('ReencryptSweep.list'),
       },
     ],
   },
@@ -132,59 +199,47 @@ function findNavLabel(pageId) {
     window.Prototype && typeof Prototype.t === 'function'
       ? Prototype.t('nav.home')
       : '首页';
-  PrototypeNav.forEach(function (group) {
-    if (group.page === pageId) found = navLabel(group);
-    (group.children || []).forEach(function (child) {
-      if (child.id === pageId) found = navLabel(child);
+  function walk(items) {
+    (items || []).forEach(function (item) {
+      if (item.page === pageId || item.id === pageId) found = navLabel(item);
+      if (item.children) walk(item.children);
     });
-  });
+  }
+  walk(PrototypeNav);
   return found;
+}
+
+function renderSubmenu(item, pageId, basePath) {
+  var sub = (item.children || [])
+    .map(function (child) {
+      return renderMenuItem(child, pageId, basePath);
+    })
+    .join('');
+  return (
+    '<li class="ivu-menu-submenu ivu-menu-opened">' +
+    '<div class="ivu-menu-submenu-title">' +
+    '<i class="' +
+    item.icon +
+    '"></i> ' +
+    navLabel(item) +
+    '<i class="ivu-icon ivu-icon-ios-arrow-down ivu-menu-submenu-title-icon"></i></div>' +
+    '<ul class="ivu-menu">' +
+    sub +
+    '</ul></li>'
+  );
 }
 
 function renderMenuItem(item, pageId, basePath) {
   if (item.children) {
-    var sub = item.children
-      .map(function (child) {
-        var active =
-          child.id === pageId
-            ? ' ivu-menu-item-active ivu-menu-item-selected'
-            : '';
-        var href = basePath + 'pages/' + child.page;
-        return (
-          '<li class="ivu-menu-item' +
-          active +
-          '" name="' +
-          child.id +
-          '">' +
-          '<a href="' +
-          href +
-          '" class="menu-link">' +
-          '<i class="' +
-          child.icon +
-          '"></i> ' +
-          navLabel(child) +
-          '</a></li>'
-        );
-      })
-      .join('');
-    return (
-      '<li class="ivu-menu-submenu ivu-menu-opened">' +
-      '<div class="ivu-menu-submenu-title">' +
-      '<i class="' +
-      item.icon +
-      '"></i> ' +
-      navLabel(item) +
-      '<i class="ivu-icon ivu-icon-ios-arrow-down ivu-menu-submenu-title-icon"></i></div>' +
-      '<ul class="ivu-menu">' +
-      sub +
-      '</ul></li>'
-    );
+    return renderSubmenu(item, pageId, basePath);
   }
-  var activeTop =
+  var active =
     item.id === pageId ? ' ivu-menu-item-active ivu-menu-item-selected' : '';
   return (
     '<li class="ivu-menu-item' +
-    activeTop +
+    active +
+    '" name="' +
+    item.id +
     '">' +
     '<a href="' +
     basePath +

@@ -39,13 +39,13 @@
 | `operator_id` | int64 | 操作者在对应表中的主键 ID | - |
 | `operator_name` | string | 操作者名称 | - |
 | `action` | string | 操作动作 | `create` / `update` / `delete` / `reset` / `import` / `bind` / `unbind` |
-| `resource_type` | string | 资源类型 | `entity` / `entity_type` / `api_key` / `provider` / `cluster` / `route` / `certificate` / `quota_plan` / `model_price` / `user` / `token` |
+| `resource_type` | string | 资源类型 | `entity` / `entity_type` / `api_key` / `provider` / `cluster` / `route` / `certificate` / `quota_plan` / `model_price` / `batch` / `batch_file` / `user` / `token` |
 | `resource_id` | string | 被操作资源业务 ID | - |
 | `resource_name` | string | 被操作资源名称 | - |
 | `resource_parent_id` | string | 资源父级业务 ID | 如 entity 层级中的父节点 |
 | `status` | int8 | 操作结果 | `1` success，`2` failed |
 | `error_msg` | string | 失败时的简要错误信息 | 成功时为空 |
-| `change_summary` | object | 变更摘要 | 包含 `before` / `after` / `diff_keys`，敏感字段已脱敏；部分更新省略的字段不出现在 `after` / `diff_keys`（partial updates omit unchanged fields，显式置零如 `enabled=false` 除外） |
+| `change_summary` | object | 变更摘要 | 包含 `before` / `after` / `diff_keys`，敏感字段已脱敏；快照**键名与资源 API 字段名一致**（小写 JSON 词汇），值表示与 API 对齐（如枚举以字符串表示），API 未暴露的内部记账字段不入快照（issue #205）；部分更新省略的字段不出现在 `after` / `diff_keys`（partial updates omit unchanged fields，显式置零如 `enabled=false` 除外） |
 | `request_path` | string | 请求路径 | - |
 | `request_method` | string | 请求方法 | - |
 | `client_ip` | string | 客户端 IP | - |

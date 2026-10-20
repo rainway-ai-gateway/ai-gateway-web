@@ -5,6 +5,10 @@ window.ProviderUpsert = (function () {
   var MODEL_LIST_PLACEHOLDER =
     '点击「获取」拉取上游模型列表，输入模型名回车添加，或使用「批量添加」';
   var BATCH_MODAL_ID = 'modal-provider-batch-models';
+  var INSTANCE_SOURCE_TIP =
+    '实例来源决定后端实例从何而来：人工维护实例池（instance_pool）由本页手工录入 IP/域名；K8s 实例池（k8s_pool）由系统按 K8s 池名称从 /k8s_pools 同步，只读镜像。切换来源仅改变生效分支，另一分支数据休眠保留。';
+  var K8S_POOL_NAME_TIP =
+    'K8s 池名称，1–64 字符，仅允许字母、数字、_、-、.，且不能以 _、-、. 开头或结尾。引用不存在的池等价于零实例，引用该 Provider 的集群将返回 500（BK_NO_BACKEND）。';
 
   function helpIcon(tip) {
     return (
@@ -14,10 +18,19 @@ window.ProviderUpsert = (function () {
     );
   }
 
+  /** 有效池 = instance_source == "k8s_pool" ? k8s_instance_pool : instance_pool */
+  function effectivePool(data) {
+    data = data || {};
+    if (data.instance_source === 'k8s_pool') {
+      return data.k8s_instance_pool || [];
+    }
+    return data.instance_pool || [];
+  }
+
   function canDiscoverModels(data) {
     var protocols = data.model_protocols || [];
     if (!protocols.length) return false;
-    return (data.instance_pool || []).some(function (inst) {
+    return effectivePool(data).some(function (inst) {
       return String(inst.addr || '').trim();
     });
   }
@@ -192,6 +205,10 @@ window.ProviderUpsert = (function () {
         row.instance_pool && row.instance_pool.length
           ? clone(row.instance_pool)
           : [{ name: '', addr: '', weight: 100, port: 443 }],
+      instance_source:
+        row.instance_source === 'k8s_pool' ? 'k8s_pool' : 'instance_pool',
+      k8s_pool_name: row.k8s_pool_name || '',
+      k8s_instance_pool: clone(row.k8s_instance_pool || []),
       model_protocols: (row.model_protocols || ['openai']).slice(),
       protocol_paths: (function () {
         var src = row.protocol_paths || {};
@@ -294,7 +311,7 @@ window.ProviderUpsert = (function () {
     );
   }
 
-  function renderInstancePool(data, isView, instanceMode) {
+  function renderManualPoolBody(data, isView, instanceMode) {
     var disabled = isView ? ' disabled="disabled"' : '';
     var mode = instanceMode === 'domain' ? 'domain' : 'ip';
     var modeSelect =
@@ -379,11 +396,62 @@ window.ProviderUpsert = (function () {
         '</div></div>';
     }
 
+    return IvuUI.formTopItem('实例形态', modeSelect, true) + bodyHtml;
+  }
+
+  function renderK8sPoolBody(data, isView) {
+    var disabled = isView ? ' disabled="disabled"' : '';
+    var poolName = data.k8s_pool_name || '';
+    var datalistOptions = ((window.MockData && MockData.k8sPoolNames) || [])
+      .map(function (name) {
+        return '<option value="' + IvuUI.escapeHtml(name) + '"></option>';
+      })
+      .join('');
+    var nameItem = IvuUI.formTopItem(
+      'K8s 池名称' + helpIcon(K8S_POOL_NAME_TIP),
+      '<input type="text" class="ivu-input proto-k8s-pool-name" list="proto-k8s-pool-names" value="' +
+        IvuUI.escapeHtml(poolName) +
+        '" placeholder="例如 llm-inference-pool"' +
+        disabled +
+        ' />' +
+        '<datalist id="proto-k8s-pool-names">' +
+        datalistOptions +
+        '</datalist>',
+      true,
+    );
+
+    // 实例池镜像仅在详情页展示，新增/编辑不展示（保存后由系统从 /k8s_pools 同步）
+    return nameItem;
+  }
+
+  function renderInstancePool(data, isView, instanceMode) {
+    var disabled = isView ? ' disabled="disabled"' : '';
+    var source = data.instance_source === 'k8s_pool' ? 'k8s_pool' : 'instance_pool';
+    var sourceSelect =
+      '<select id="provider-instance-source" class="ivu-input proto-instance-source" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;"' +
+      disabled +
+      '>' +
+      '<option value="instance_pool"' +
+      (source === 'instance_pool' ? ' selected' : '') +
+      '>人工维护实例池（instance_pool）</option>' +
+      '<option value="k8s_pool"' +
+      (source === 'k8s_pool' ? ' selected' : '') +
+      '>K8s 实例池（k8s_pool）</option>' +
+      '</select>';
+
+    var bodyHtml =
+      IvuUI.formTopItem(
+        '实例来源' + helpIcon(INSTANCE_SOURCE_TIP),
+        sourceSelect,
+        true,
+      ) +
+      (source === 'k8s_pool'
+        ? renderK8sPoolBody(data, isView)
+        : renderManualPoolBody(data, isView, instanceMode));
+
     return (
       '<div class="llm-card"><div class="llm-card-title">实例池</div><div class="llm-card-body">' +
-      IvuUI.formTop(
-        IvuUI.formTopItem('实例形态', modeSelect, true) + bodyHtml,
-      ) +
+      IvuUI.formTop(bodyHtml) +
       '</div></div>'
     );
   }
@@ -590,7 +658,38 @@ window.ProviderUpsert = (function () {
       (endpoint.uri || '');
 
     var instanceBody = '';
-    if (mode === 'domain') {
+    if (data.instance_source === 'k8s_pool') {
+      var mirrorRows = (data.k8s_instance_pool || [])
+        .map(function (item) {
+          return (
+            '<tr><td>' +
+            IvuUI.escapeHtml(item.addr || '-') +
+            '</td><td>' +
+            IvuUI.escapeHtml(item.port != null ? item.port : '-') +
+            '</td><td>' +
+            IvuUI.escapeHtml(item.weight != null ? item.weight : 100) +
+            '</td></tr>'
+          );
+        })
+        .join('');
+      instanceBody =
+        IvuUI.formTop(
+          IvuUI.formTopItem('实例来源', 'K8s 实例池（k8s_pool）') +
+            IvuUI.formTopItem(
+              'K8s 池名称',
+              IvuUI.escapeHtml(data.k8s_pool_name || '-'),
+            ),
+        ) +
+        renderDetailTable(
+          [
+            { title: 'IP地址' },
+            { title: '端口', width: '110px' },
+            { title: '权重', width: '110px' },
+          ],
+          mirrorRows ||
+            '<tr><td colspan="3" style="text-align:center;color:#999;">暂无镜像实例（池不存在 ≡ 零实例）</td></tr>',
+        );
+    } else if (mode === 'domain') {
       var domain = ((data.instance_pool || [])[0] || {}).addr || '';
       instanceBody = IvuUI.formTop(
         IvuUI.formTopItem('实例形态', '服务商域名') +
@@ -856,18 +955,29 @@ window.ProviderUpsert = (function () {
       if (proto && val) data.protocol_paths[proto] = val;
     });
 
-    data.instance_pool = [];
+    var sourceSelect = root.querySelector('#provider-instance-source');
+    if (sourceSelect) {
+      data.instance_source =
+        sourceSelect.value === 'k8s_pool' ? 'k8s_pool' : 'instance_pool';
+    } else if (!data.instance_source) {
+      data.instance_source = 'instance_pool';
+    }
+
+    var k8sNameInput = root.querySelector('.proto-k8s-pool-name');
+    if (k8sNameInput) {
+      data.k8s_pool_name = (k8sNameInput.value || '').trim();
+    }
+
     var domainInput = root.querySelector('.proto-domain-addr');
+    var instanceRows = root.querySelectorAll('[data-instance-index]');
     if (domainInput) {
       var domainAddr = (domainInput.value || '').trim();
-      data.instance_pool.push({
-        name: domainAddr,
-        addr: domainAddr,
-        port: 443,
-        weight: 100,
-      });
-    } else {
-      root.querySelectorAll('[data-instance-index]').forEach(function (row) {
+      data.instance_pool = [
+        { name: domainAddr, addr: domainAddr, port: 443, weight: 100 },
+      ];
+    } else if (instanceRows.length) {
+      data.instance_pool = [];
+      instanceRows.forEach(function (row) {
         var addr =
           (row.querySelector('.proto-instance-addr') || {}).value || '';
         var trimmedAddr = addr.trim();
@@ -883,6 +993,7 @@ window.ProviderUpsert = (function () {
         });
       });
     }
+    // instance_source=k8s_pool 时 instance_pool 休眠保留，不在 DOM 中改写
 
     data.keys = [];
     root.querySelectorAll('[data-key-index]').forEach(function (row) {
@@ -945,34 +1056,47 @@ window.ProviderUpsert = (function () {
       modelSet[models[mi]] = true;
     }
 
-    var instances = data.instance_pool || [];
-    if (!instances.length) return '实例池至少需要 1 个实例';
-    var poolKeySet = {};
-    var hasWeight = false;
-    for (var i = 0; i < instances.length; i++) {
-      var inst = instances[i];
-      var addr = (inst.addr || '').trim();
-      if (!addr) {
-        return instanceMode === 'domain'
-          ? '请填写服务商域名'
-          : '第 ' + (i + 1) + ' 个实例请填写 IP 或域名';
+    var source =
+      data.instance_source === 'k8s_pool' ? 'k8s_pool' : 'instance_pool';
+    if (source === 'k8s_pool') {
+      var poolName = (data.k8s_pool_name || '').trim();
+      if (!poolName) return 'K8s 池名称必填';
+      if (poolName.length < 1 || poolName.length > 64) {
+        return 'K8s 池名称长度须为 1–64 字符';
       }
-      var port = Number(inst.port);
-      if (!Number.isFinite(port) || port < 1 || port > 65535) {
-        return '第 ' + (i + 1) + ' 个实例端口须为 1–65535';
+      if (!/^[A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?$/.test(poolName)) {
+        return 'K8s 池名称仅允许字母、数字、_、-、.，且不能以 _、-、. 开头或结尾';
       }
-      var weight = Number(inst.weight);
-      if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
-        return '第 ' + (i + 1) + ' 个实例权重须为 0–100';
+    } else {
+      var instances = data.instance_pool || [];
+      if (!instances.length) return '实例池至少需要 1 个实例';
+      var poolKeySet = {};
+      var hasWeight = false;
+      for (var i = 0; i < instances.length; i++) {
+        var inst = instances[i];
+        var addr = (inst.addr || '').trim();
+        if (!addr) {
+          return instanceMode === 'domain'
+            ? '请填写服务商域名'
+            : '第 ' + (i + 1) + ' 个实例请填写 IP 或域名';
+        }
+        var port = Number(inst.port);
+        if (!Number.isFinite(port) || port < 1 || port > 65535) {
+          return '第 ' + (i + 1) + ' 个实例端口须为 1–65535';
+        }
+        var weight = Number(inst.weight);
+        if (!Number.isFinite(weight) || weight < 0 || weight > 100) {
+          return '第 ' + (i + 1) + ' 个实例权重须为 0–100';
+        }
+        if (weight > 0) hasWeight = true;
+        var poolKey = instancePoolKey(addr, port);
+        if (poolKeySet[poolKey]) {
+          return '实例 IP 和端口不能重复: "' + addr + ':' + port + '"';
+        }
+        poolKeySet[poolKey] = true;
       }
-      if (weight > 0) hasWeight = true;
-      var poolKey = instancePoolKey(addr, port);
-      if (poolKeySet[poolKey]) {
-        return '实例 IP 和端口不能重复: "' + addr + ':' + port + '"';
-      }
-      poolKeySet[poolKey] = true;
+      if (!hasWeight) return '至少有一个实例权重大于 0';
     }
-    if (!hasWeight) return '至少有一个实例权重大于 0';
 
     var keys = (data.keys || []).filter(function (k) {
       return (k.name && k.name.trim()) || (k.key && k.key.trim());
@@ -1111,6 +1235,15 @@ window.ProviderUpsert = (function () {
       if (state.isView) return;
 
       bindProtocolSelect(false);
+      var sourceSelect = bodyEl.querySelector('#provider-instance-source');
+      if (sourceSelect && !state.isView) {
+        sourceSelect.addEventListener('change', function () {
+          syncFromDom(bodyEl, state.data);
+          state.data.instance_source =
+            sourceSelect.value === 'k8s_pool' ? 'k8s_pool' : 'instance_pool';
+          render();
+        });
+      }
       var modeSelect = bodyEl.querySelector('#provider-instance-mode');
       if (modeSelect && !state.isView) {
         modeSelect.addEventListener('change', function () {
@@ -1201,7 +1334,7 @@ window.ProviderUpsert = (function () {
       }
       bodyEl
         .querySelectorAll(
-          '.proto-instance-addr, .proto-instance-port, .proto-instance-weight, .proto-domain-addr',
+          '.proto-instance-addr, .proto-instance-port, .proto-instance-weight, .proto-domain-addr, .proto-k8s-pool-name',
         )
         .forEach(function (input) {
           input.addEventListener('input', refreshEndpointHost);

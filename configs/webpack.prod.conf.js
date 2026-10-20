@@ -96,7 +96,6 @@ var webpackConfig = merge(baseWebpackConfig, {
       template: 'index.html',
       inject: true,
       hash: true,
-      favicon: 'src/assets/favicon.ico',
     }),
     new webpack.DefinePlugin({
       'process.env': {

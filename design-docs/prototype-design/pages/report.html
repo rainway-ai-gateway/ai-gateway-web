@@ -142,7 +142,7 @@
       /* ===== Metric Cards ===== */
       .metric-cards {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 12px;
         margin-bottom: 16px;
       }
@@ -195,6 +195,34 @@
         font-size: 14px;
         color: #17233d;
         margin: 0 0 8px 0;
+      }
+      .chart-card h4 select.chart-dim {
+        float: right;
+        font-size: 12px;
+        height: 24px;
+        margin-top: -2px;
+        border: 1px solid #dcdee2;
+        border-radius: 4px;
+        padding: 0 4px;
+        background: #fff;
+        color: #515a6e;
+      }
+      .ts-split-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: #808695;
+      }
+      .ts-split-bar select {
+        height: 26px;
+        border: 1px solid #dcdee2;
+        border-radius: 4px;
+        padding: 0 6px;
+        font-size: 12px;
+        background: #fff;
+        color: #515a6e;
       }
       .chart-box {
         width: 100%;
@@ -343,6 +371,7 @@
           stream: '',
           status_codes: ''
         },
+        chartDims: { ranking: 'model', pieProvider: 'provider', pieStatus: 'status', tsSplit: '' },
         overviewData: null,
         timeseriesData: null,
         rankingData: null,
@@ -352,6 +381,11 @@
         logRequestedModels: '',
         logErrOnly: false,
         logKeyword: '',
+        logCacheStatus: '',
+        logMirrorHit: '',
+        logIntentQuestion: '',
+        logIntentAnswer: '',
+        logIntentSource: '',
         logData: null,
         drawerLog: null,
         charts: {}
@@ -455,6 +489,14 @@
           '<div class="report-filter-item"><label>状态码</label>' +
           '<input id="filter-status_codes" value="' + state.filters.status_codes + '" placeholder="逗号分隔" style="min-width:100px">' +
           '</div>' +
+          '<div class="report-filter-item"><label>拆分维度</label>' +
+          '<select id="filter-ts-split" onchange="state.chartDims.tsSplit=this.value">' +
+          '<option value="">不分维度</option>' +
+          '<option value="ai_cache_status"' + (state.chartDims.tsSplit === 'ai_cache_status' ? ' selected' : '') + '>缓存状态</option>' +
+          '<option value="mirror_hit"' + (state.chartDims.tsSplit === 'mirror_hit' ? ' selected' : '') + '>镜像命中</option>' +
+          '<option value="ai_intent_answer"' + (state.chartDims.tsSplit === 'ai_intent_answer' ? ' selected' : '') + '>意图答案</option>' +
+          '</select>' +
+          '</div>' +
           '<div class="report-filter-actions">' +
           '<button class="primary" onclick="applyFilters()">查询</button>' +
           '<button onclick="resetFilters()">重置</button>' +
@@ -501,6 +543,8 @@
         document.getElementById('filter-end').value = fmtDate(state.end);
         document.getElementById('filter-stream').value = '';
         document.getElementById('filter-status_codes').value = '';
+        state.chartDims.tsSplit = '';
+        document.getElementById('filter-ts-split').value = '';
         renderTimeShortcuts();
         loadTabData();
       }
@@ -606,6 +650,88 @@
         };
       }
 
+      // ==================== Chart Dimension Drilldown ====================
+      var DIM_OPTIONS_RANKING = [
+        ['模型', 'model'], ['提供商', 'provider'], ['API Key', 'apikey'], ['主机', 'host'],
+        ['状态码', 'status'], ['协议', 'protocol'], ['模式', 'mode'],
+        ['缓存状态', 'ai_cache_status'], ['镜像命中', 'mirror_hit'], ['意图答案', 'ai_intent_answer']
+      ];
+      var DIM_OPTIONS_PIE = [
+        ['提供商', 'provider'], ['协议', 'protocol'], ['模式', 'mode'], ['状态码', 'status'],
+        ['缓存状态', 'ai_cache_status'], ['镜像命中', 'mirror_hit'], ['意图答案', 'ai_intent_answer']
+      ];
+      var DIM_OPTIONS_PIE_STATUS = [
+        ['状态码', 'status'], ['协议', 'protocol'], ['模式', 'mode'],
+        ['缓存状态', 'ai_cache_status'], ['镜像命中', 'mirror_hit'], ['意图答案', 'ai_intent_answer']
+      ];
+      var DIM_OPTIONS_TS_SPLIT = [
+        ['不分维度', ''], ['缓存状态', 'ai_cache_status'], ['镜像命中', 'mirror_hit'], ['意图答案', 'ai_intent_answer']
+      ];
+
+      function dimSelectHtml(id, options, value) {
+        var html = '<select id="' + id + '" class="chart-dim" onchange="onChartDimChange()">';
+        options.forEach(function (o) {
+          html += '<option value="' + o[1] + '"' + (o[1] === value ? ' selected' : '') + '>' + o[0] + '</option>';
+        });
+        return html + '</select>';
+      }
+
+      function onChartDimChange() {
+        state.chartDims.ranking = document.getElementById('dim-ranking').value;
+        state.chartDims.pieProvider = document.getElementById('dim-pie-provider').value;
+        state.chartDims.pieStatus = document.getElementById('dim-pie-status').value;
+        renderOverviewCharts();
+      }
+
+      function dimItems(dim) {
+        var src = (state.distData && state.distData[dim]) ||
+          MockData.reportDistribution[dim] ||
+          (state.rankingData && state.rankingData[dim]) ||
+          MockData.reportRankings[dim] ||
+          { items: [] };
+        return src.items || [];
+      }
+
+      // 演示比例（mock）：维度桶名 + 占比
+      function dimBuckets(dim) {
+        if (dim === 'ai_cache_status') {
+          return [{ name: 'hit', ratio: 0.72 }, { name: 'miss', ratio: 0.20 }, { name: 'skip', ratio: 0.08 }];
+        }
+        if (dim === 'mirror_hit') {
+          return [{ name: '命中', ratio: 0.15 }, { name: '未命中', ratio: 0.85 }];
+        }
+        if (dim === 'ai_intent_answer') {
+          var items = ((MockData.reportRankings.ai_intent_answer || {}).items || []).slice(0, 3);
+          var ratios = [0.5, 0.3, 0.2];
+          if (items.length < 3) {
+            var avg = items.length ? 1 / items.length : 1;
+            ratios = items.map(function () { return avg; });
+          }
+          return items.map(function (it, i) { return { name: it.name, ratio: ratios[i] }; });
+        }
+        return [];
+      }
+
+      // 把单条时序（points 元素含 value 或 input/output/total/avg/max 等数值字段）
+      // 按维度桶比例拆成 桶数 × 字段数 条序列；fields: [{label, field}]
+      function splitSeriesByDim(points, dim, fields) {
+        var buckets = dimBuckets(dim);
+        if (!buckets.length) return null;
+        var multi = fields.length > 1;
+        var out = [];
+        buckets.forEach(function (b) {
+          fields.forEach(function (fd) {
+            out.push({
+              name: multi ? b.name + ' ' + fd.label : b.name,
+              data: points.map(function (p) {
+                return p[fd.field] != null ? +(p[fd.field] * b.ratio).toFixed(2) : null;
+              })
+            });
+          });
+        });
+        return out;
+      }
+
       // ==================== Overview Tab ====================
       function loadAllOverviewData() {
         state.overviewData = JSON.parse(JSON.stringify(MockData.reportOverview));
@@ -627,6 +753,10 @@
           return '<div class="metric-sub">' + c.currency + ': ' + fmtNum(c.value) + '</div>';
         }).join('');
 
+        var cache = d.cache || {};
+        var mirror = d.mirror || {};
+        var intent = d.intent || {};
+
         return '' +
           '<div class="metric-cards">' +
           '<div class="metric-card"><div class="metric-label">请求总量</div><div class="metric-value">' + fmtNum(d.request_total) + '</div></div>' +
@@ -634,63 +764,68 @@
           '<div class="metric-card"><div class="metric-label">Token 消耗</div><div class="metric-value">' + fmtNum(d.total_tokens) + '</div><div class="metric-sub">入: ' + fmtNum(d.input_tokens) + ' | 出: ' + fmtNum(d.output_tokens) + '</div></div>' +
           '<div class="metric-card"><div class="metric-label">平均延迟</div><div class="metric-value">' + fmtMs(d.latency_avg_ms) + '</div></div>' +
           '<div class="metric-card"><div class="metric-label">成本</div><div class="metric-value">' + costMain + '</div>' + costSub + '</div>' +
+          '<div class="metric-card"><div class="metric-label">缓存命中率</div><div class="metric-value">' + fmtPercent(cache.hit_rate) + '</div><div class="metric-sub">命中: ' + fmtNum(cache.hit_count) + ' | 未命中: ' + fmtNum(cache.miss_count) + ' | 豁免: ' + fmtNum(cache.skip_count) + '</div><div class="metric-sub">读 Token: ' + fmtNum(cache.read_tokens) + ' | 写 Token: ' + fmtNum(cache.write_tokens) + '</div></div>' +
+          '<div class="metric-card"><div class="metric-label">镜像命中</div><div class="metric-value">' + fmtNum(mirror.hit_count) + '</div></div>' +
+          '<div class="metric-card"><div class="metric-label">意图分类</div><div class="metric-value">' + fmtNum(intent.classified_count) + '</div><div class="metric-sub">未知: ' + fmtNum(intent.unknown_count) + '（' + fmtPercent(intent.unknown_rate) + '）</div></div>' +
           '</div>' +
 
           '<div class="chart-grid">' +
           '<div class="chart-card chart-full"><h4>QPS 时序</h4><div class="chart-box tall" id="chart-qps"></div></div>' +
           '<div class="chart-card"><h4>Token 吞吐时序</h4><div class="chart-box" id="chart-tokens"></div></div>' +
           '<div class="chart-card"><h4>延迟时序</h4><div class="chart-box" id="chart-latency"></div></div>' +
-          '<div class="chart-card"><h4>模型 Top10 排行</h4><div class="chart-box tall" id="chart-model-ranking"></div></div>' +
-          '<div class="chart-card"><h4>提供商占比</h4><div class="chart-box" id="chart-provider-pie"></div></div>' +
-          '<div class="chart-card"><h4>状态码分布</h4><div class="chart-box" id="chart-status-pie"></div></div>' +
+          '<div class="chart-card"><h4>排行 ' + dimSelectHtml('dim-ranking', DIM_OPTIONS_RANKING, state.chartDims.ranking) + '</h4><div class="chart-box tall" id="chart-model-ranking"></div></div>' +
+          '<div class="chart-card"><h4>占比 ' + dimSelectHtml('dim-pie-provider', DIM_OPTIONS_PIE, state.chartDims.pieProvider) + '</h4><div class="chart-box" id="chart-provider-pie"></div></div>' +
+          '<div class="chart-card"><h4>分布 ' + dimSelectHtml('dim-pie-status', DIM_OPTIONS_PIE_STATUS, state.chartDims.pieStatus) + '</h4><div class="chart-box" id="chart-status-pie"></div></div>' +
+          '<div class="chart-card"><h4>缓存 Token 时序（cache_read / cache_write）</h4><div class="chart-box" id="chart-cache-tokens"></div></div>' +
           '</div>';
       }
 
       function renderOverviewCharts() {
+        var tsSplit = state.chartDims.tsSplit;
+
         // QPS Line
         var qpsSeries = (state.timeseriesData.qps || {}).series || [];
         var qpsX = qpsSeries.map(function (p) { return fmtTs(p.time); });
-        var qpsData = qpsSeries.map(function (p) { return p.value; });
+        var qpsArr = tsSplit
+          ? splitSeriesByDim(qpsSeries, tsSplit, [{ label: 'QPS', field: 'value' }])
+          : [{ name: 'QPS', data: qpsSeries.map(function (p) { return p.value; }) }];
         var chartQps = initChart('chart-qps');
-        if (chartQps) chartQps.setOption(chartOptionsLine(qpsX, [{ name: 'QPS', data: qpsData }], 'req/s'));
+        if (chartQps) chartQps.setOption(chartOptionsLine(qpsX, qpsArr, 'req/s'));
 
         // Token Line
         var tokenSeries = (state.timeseriesData.tokens || {}).series || [];
         var tokenX = tokenSeries.map(function (p) { return fmtTs(p.time); });
+        var tokenFields = [{ label: '输入', field: 'input' }, { label: '输出', field: 'output' }, { label: '总量', field: 'total' }];
+        var tokenArr = tsSplit
+          ? splitSeriesByDim(tokenSeries, tsSplit, tokenFields)
+          : tokenFields.map(function (fd) { return { name: fd.label, data: tokenSeries.map(function (p) { return p[fd.field]; }) }; });
         var chartTokens = initChart('chart-tokens');
-        if (chartTokens) {
-          chartTokens.setOption(chartOptionsLine(tokenX, [
-            { name: '输入', data: tokenSeries.map(function (p) { return p.input; }) },
-            { name: '输出', data: tokenSeries.map(function (p) { return p.output; }) },
-            { name: '总量', data: tokenSeries.map(function (p) { return p.total; }) }
-          ], 'tokens/s'));
-        }
+        if (chartTokens) chartTokens.setOption(chartOptionsLine(tokenX, tokenArr, 'tokens/s'));
 
         // Latency Line
         var latencySeries = (state.timeseriesData.latency || {}).series || [];
         var latencyX = latencySeries.map(function (p) { return fmtTs(p.time); });
+        var latencyFields = [{ label: '平均', field: 'avg' }, { label: '最大', field: 'max' }];
+        var latencyArr = tsSplit
+          ? splitSeriesByDim(latencySeries, tsSplit, latencyFields)
+          : latencyFields.map(function (fd) { return { name: fd.label, data: latencySeries.map(function (p) { return p[fd.field]; }) }; });
         var chartLatency = initChart('chart-latency');
-        if (chartLatency) {
-          var seriesArr = [
-            { name: '平均', data: latencySeries.map(function (p) { return p.avg; }) },
-            { name: '最大', data: latencySeries.map(function (p) { return p.max; }) }
-          ];
-          chartLatency.setOption(chartOptionsLine(latencyX, seriesArr, 'ms'));
-        }
+        if (chartLatency) chartLatency.setOption(chartOptionsLine(latencyX, latencyArr, 'ms'));
 
-        // Model Top10 Horizontal Bar
-        var modelItems = ((state.rankingData.model || {}).items || []).slice(0, 10);
+        // Top10 Horizontal Bar (dimension: state.chartDims.ranking)
+        var rankDim = state.chartDims.ranking;
+        var rankItems = (((state.rankingData && state.rankingData[rankDim]) || MockData.reportRankings[rankDim] || { items: [] }).items || []).slice(0, 10);
         var chartMRank = initChart('chart-model-ranking');
         if (chartMRank) {
           chartMRank.setOption(chartOptionsBar(
-            modelItems.map(function (i) { return i.name; }),
-            [{ name: '请求数', data: modelItems.map(function (i) { return i.request_count; }) }],
+            rankItems.map(function (i) { return i.name; }),
+            [{ name: '请求数', data: rankItems.map(function (i) { return i.request_count; }) }],
             true
           ));
         }
 
-        // Provider Pie
-        var provItems = ((state.distData.protocol || { items: [] }).items);
+        // Provider Pie (dimension: state.chartDims.pieProvider)
+        var provItems = dimItems(state.chartDims.pieProvider);
         var chartProv = initChart('chart-provider-pie');
         if (chartProv) {
           chartProv.setOption(chartOptionsPie(provItems.map(function (i) {
@@ -698,13 +833,34 @@
           })));
         }
 
-        // Status Pie
-        var statusItems = ((state.distData.status || { items: [] }).items);
+        // Status Pie (dimension: state.chartDims.pieStatus)
+        var statusItems = dimItems(state.chartDims.pieStatus);
         var chartStatus = initChart('chart-status-pie');
         if (chartStatus) {
           chartStatus.setOption(chartOptionsPie(statusItems.map(function (i) {
             return { name: i.name, value: i.request_count };
           })));
+        }
+
+        // Cache Tokens Line (kind: cache_read / cache_write)
+        var cacheSeries = (state.timeseriesData.cache_tokens || {}).series || [];
+        var cacheTimes = [];
+        cacheSeries.forEach(function (p) {
+          if (cacheTimes.indexOf(p.time) === -1) cacheTimes.push(p.time);
+        });
+        cacheTimes.sort(function (a, b) { return a - b; });
+        var cacheReadMap = {};
+        var cacheWriteMap = {};
+        cacheSeries.forEach(function (p) {
+          if (p.kind === 'cache_read') cacheReadMap[p.time] = p.value;
+          if (p.kind === 'cache_write') cacheWriteMap[p.time] = p.value;
+        });
+        var chartCache = initChart('chart-cache-tokens');
+        if (chartCache) {
+          chartCache.setOption(chartOptionsLine(cacheTimes.map(function (t) { return fmtTs(t); }), [
+            { name: 'cache_read', data: cacheTimes.map(function (t) { return cacheReadMap[t] != null ? cacheReadMap[t] : '-'; }) },
+            { name: 'cache_write', data: cacheTimes.map(function (t) { return cacheWriteMap[t] != null ? cacheWriteMap[t] : '-'; }) }
+          ], 'tokens'));
         }
 
         // Resize all
@@ -722,6 +878,11 @@
         document.getElementById('logs-req-models').value = state.logRequestedModels;
         document.getElementById('logs-err-only').value = state.logErrOnly ? '1' : '0';
         document.getElementById('logs-keyword').value = state.logKeyword;
+        document.getElementById('logs-cache-status').value = state.logCacheStatus;
+        document.getElementById('logs-mirror-hit').value = state.logMirrorHit;
+        document.getElementById('logs-intent-question').value = state.logIntentQuestion;
+        document.getElementById('logs-intent-answer').value = state.logIntentAnswer;
+        document.getElementById('logs-intent-source').value = state.logIntentSource;
       }
 
       function changeLogPage(dir) {
@@ -758,6 +919,11 @@
         state.logRequestedModels = document.getElementById('logs-req-models').value;
         state.logErrOnly = document.getElementById('logs-err-only').value === '1';
         state.logKeyword = document.getElementById('logs-keyword').value;
+        state.logCacheStatus = document.getElementById('logs-cache-status').value;
+        state.logMirrorHit = document.getElementById('logs-mirror-hit').value;
+        state.logIntentQuestion = document.getElementById('logs-intent-question').value;
+        state.logIntentAnswer = document.getElementById('logs-intent-answer').value;
+        state.logIntentSource = document.getElementById('logs-intent-source').value;
         state.logPage = 1;
         loadLogs();
       }
@@ -770,6 +936,11 @@
           '<div><label>请求模型</label><br><input id="logs-req-models" placeholder="逗号分隔"></div>' +
           '<div><label>只看错误</label><br><select id="logs-err-only"><option value="0">否</option><option value="1">是</option></select></div>' +
           '<div><label>错误消息关键字</label><br><input id="logs-keyword" placeholder="模糊匹配 err_msg"></div>' +
+          '<div><label>缓存状态</label><br><select id="logs-cache-status"><option value="">全部</option><option value="hit">hit</option><option value="miss">miss</option><option value="skip">skip</option></select></div>' +
+          '<div><label>镜像命中</label><br><select id="logs-mirror-hit"><option value="">全部</option><option value="1">命中</option><option value="0">未命中</option></select></div>' +
+          '<div><label>意图问题</label><br><input id="logs-intent-question" placeholder="模糊匹配 ai_intent_question"></div>' +
+          '<div><label>意图答案</label><br><input id="logs-intent-answer" placeholder="模糊匹配 ai_intent_answer"></div>' +
+          '<div><label>意图来源</label><br><select id="logs-intent-source"><option value="">全部</option><option value="explicit_header">explicit_header</option><option value="classifier">classifier</option><option value="cache">cache</option></select></div>' +
           '<div style="display:flex;align-items:flex-end"><button onclick="refreshLogs()">搜索</button></div>' +
           '</div>' +
 
@@ -777,7 +948,7 @@
 
           '<table class="ivu-table" style="width:100%"><thead><tr>' +
           '<th>Log ID</th><th>时间</th><th>API Key</th><th>请求模型</th><th>目标模型</th><th>提供商</th>' +
-          '<th>状态码</th><th>耗时</th><th>Token</th><th>TTFT</th><th>成本</th><th>错误</th>' +
+          '<th>状态码</th><th>耗时</th><th>Token</th><th>TTFT</th><th>成本</th><th>缓存</th><th>镜像</th><th>意图答案</th><th>错误</th>' +
           '<th style="width:80px">操作</th>' +
           '</tr></thead><tbody>';
 
@@ -795,6 +966,9 @@
             '<td>' + fmtNum(log.ai_total_tokens) + '</td>' +
             '<td>' + fmtUs(log.ai_ttft_us) + '</td>' +
             '<td>' + (log.ai_cost_value != null ? log.ai_cost_value + ' ' + (log.ai_cost_currency || '') : '-') + '</td>' +
+            '<td>' + (log.ai_cache_status || '-') + '</td>' +
+            '<td>' + (log.mirror_hit ? '命中' + (log.mirror_cluster ? '（' + log.mirror_cluster + '）' : '') : '-') + '</td>' +
+            '<td>' + (log.ai_intent_answer || '-') + '</td>' +
             '<td>' + (log.err_msg ? '<span style="color:#ed4014">' + (log.err_msg.length > 20 ? log.err_msg.substring(0, 20) + '…' : log.err_msg) + '</span>' : '-') + '</td>' +
             '<td><span class="log-view-btn" onclick="openLogDrawer(state.logData.items.find(function(i){return i.logid===' + log.logid + '}))">查看</span></td>' +
             '</tr>';
@@ -841,6 +1015,15 @@
           '<dt>client_ip</dt><dd>' + (log.client_ip || '-') + '</dd>' +
           '<dt>header_host</dt><dd>' + (log.header_host || '-') + '</dd>' +
           '<dt>origin_uri</dt><dd>' + (log.origin_uri || '-') + '</dd>' +
+          '<dt>缓存状态</dt><dd>' + (log.ai_cache_status || '-') + '</dd>' +
+          '<dt>镜像命中</dt><dd>' + (log.mirror_hit ? '是' + (log.mirror_cluster ? '（' + log.mirror_cluster + '）' : '') : '否') + '</dd>' +
+          '<dt>意图问题</dt><dd>' + (log.ai_intent_question || '-') + '</dd>' +
+          '<dt>意图答案</dt><dd>' + (log.ai_intent_answer || '-') + '</dd>' +
+          '<dt>意图置信度</dt><dd>' + (log.ai_intent_confidence != null ? log.ai_intent_confidence : '-') + '</dd>' +
+          '<dt>意图来源</dt><dd>' + (log.ai_intent_source || '-') + '</dd>' +
+          '<dt>意图延迟</dt><dd>' + fmtUs(log.ai_intent_latency_us) + '</dd>' +
+          '<dt>意图缓存命中</dt><dd>' + (log.ai_intent_cache_hit == null ? '-' : (log.ai_intent_cache_hit ? '是' : '否')) + '</dd>' +
+          '<dt>意图问题版本</dt><dd>' + (log.ai_intent_questions_version || '-') + '</dd>' +
           jsonHtml +
           '</dl>';
       }

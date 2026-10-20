@@ -65,4 +65,10 @@ webpack(webpackConfig, function (err, stats) {
   if (err || stats.hasErrors()) {
     process.exit(1);
   }
+
+  // 品牌资源以独立目录输出，部署后可直接修改，无需重新构建
+  var brandingPath = path.resolve('branding');
+  if (fs.existsSync(brandingPath)) {
+    fs.copySync(brandingPath, path.resolve(config.build.assetsRoot, 'branding'));
+  }
 });

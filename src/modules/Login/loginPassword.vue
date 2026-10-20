@@ -31,7 +31,7 @@
 <template>
   <div class="bfe-login">
     <div class="bfe-login-hearder">
-      <p class="text">{{ $t('login.gateway') }}</p>
+      <p class="text">{{ brandingTitle }}</p>
     </div>
     <div class="login-wrap">
       <div class="title">{{ $t('login.userLogin') }}</div>
@@ -73,8 +73,14 @@
   </div>
 </template>
 <script>
+import { getBrandingTitle } from '@/utils/branding';
 export default {
     name: 'loginpassword',
+    computed: {
+        brandingTitle() {
+            return getBrandingTitle(this.$i18n.locale);
+        }
+    },
     data() {
         return {
             formData: {

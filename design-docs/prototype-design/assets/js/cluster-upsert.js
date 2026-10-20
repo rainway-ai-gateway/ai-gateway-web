@@ -72,6 +72,15 @@ window.ClusterUpsert = (function () {
         penalty_enable: true,
       };
     }
+    if (!data.llmConfigData.normalize_upstream_error) {
+      data.llmConfigData.normalize_upstream_error = {
+        enabled: false,
+        stream_enabled: false,
+        unrecognized_action: 'passthrough',
+        max_body_bytes: 65536,
+        redact_secrets: true,
+      };
+    }
   }
 
   function createDefaultData(row) {
@@ -82,6 +91,9 @@ window.ClusterUpsert = (function () {
       balance_mode: row.balance_mode || 'WRR',
       epp_config: row.epp_config
         ? JSON.parse(JSON.stringify(row.epp_config))
+        : null,
+      epp_runtime: row.epp_runtime
+        ? JSON.parse(JSON.stringify(row.epp_runtime))
         : null,
       baseConfigData: {
         name: row.name || '',
@@ -139,6 +151,16 @@ window.ClusterUpsert = (function () {
           redis_prefix: 'bfe:ai:key_affinity',
           penalty_enable: true,
         },
+        normalize_upstream_error:
+          row.llm_config && row.llm_config.normalize_upstream_error
+            ? JSON.parse(JSON.stringify(row.llm_config.normalize_upstream_error))
+            : {
+                enabled: false,
+                stream_enabled: false,
+                unrecognized_action: 'passthrough',
+                max_body_bytes: 65536,
+                redact_secrets: true,
+              },
       },
     };
   }
@@ -701,6 +723,87 @@ window.ClusterUpsert = (function () {
           '</div></div>'
         : '');
 
+    var nue = llm.normalize_upstream_error || {};
+    var normalizeErrorHtml =
+      '<div class="llm-card-title">上游错误归一</div>' +
+      '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+      '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+      IvuUI.formTopItem(
+        '是否启用' +
+          helpIcon(
+            '开启后，上游 4xx/5xx 错误重写为统一错误体（OpenAI 兼容），状态码按统一映射表重映射（如上游 401/402/403 → 502 UPSTREAM_AUTH_ERROR）；缺省关闭，上游错误原样透传',
+          ),
+        ivuSelectNative('llm.normalize_upstream_error.enabled', nue.enabled, [
+          { value: 'false', label: '停用' },
+          { value: 'true', label: '启用' },
+        ]),
+      ) +
+      '</div></div>' +
+      '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+      '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+      IvuUI.formTopItem(
+        '流式归一(SSE)' +
+          helpIcon(
+            '独立于非流式归一开关灰度；开启后流内错误事件 data 载荷改写为统一错误 JSON（响应状态保持 200）',
+          ),
+        ivuSelectNative(
+          'llm.normalize_upstream_error.stream_enabled',
+          nue.stream_enabled,
+          [
+            { value: 'false', label: '停用' },
+            { value: 'true', label: '启用' },
+          ],
+        ),
+      ) +
+      '</div>' +
+      '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+      IvuUI.formTopItem(
+        '凭证脱敏' +
+          helpIcon(
+            '外发错误内容中出现的本集群 API-Key 各编码形态（原文/base64/URL 编码/JSON 转义）替换为掩码 ••••••••，关闭后不外发替换',
+          ),
+        ivuSelectNative(
+          'llm.normalize_upstream_error.redact_secrets',
+          nue.redact_secrets,
+          [
+            { value: 'true', label: '开启' },
+            { value: 'false', label: '关闭' },
+          ],
+        ),
+      ) +
+      '</div></div>' +
+      (nue.enabled
+        ? '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+          '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+          IvuUI.formTopItem(
+            '未识别错误体处理' +
+              helpIcon(
+                'passthrough：原样透传（仍做凭证脱敏）；rewrite_generic：重写为 UPSTREAM_UNKNOWN 通用错误；流式未识别事件始终透传',
+              ),
+            ivuSelectNative(
+              'llm.normalize_upstream_error.unrecognized_action',
+              nue.unrecognized_action,
+              [
+                { value: 'passthrough', label: 'passthrough（原样透传）' },
+                { value: 'rewrite_generic', label: 'rewrite_generic（重写为通用错误）' },
+              ],
+            ),
+          ) +
+          '</div>' +
+          '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+          IvuUI.formTopItem(
+            '错误响应体读取上限(字节)' +
+              helpIcon(
+                '错误响应体读取上限，超限按未识别处理；取值范围 0-4194304，0 或缺省用 BFE 默认 65536',
+              ),
+            IvuUI.inputNumber(
+              nue.max_body_bytes != null ? nue.max_body_bytes : 65536,
+              'class="proto-field" data-field="llm.normalize_upstream_error.max_body_bytes" min="0" max="4194304"',
+            ),
+          ) +
+          '</div></div>'
+        : '');
+
     var instanceHint = '';
     // if (provider && provider.instance_pool && provider.instance_pool.length) {
     //   instanceHint =
@@ -755,6 +858,9 @@ window.ClusterUpsert = (function () {
       '<div class="llm-card"><div class="llm-card-body">' +
       keyAffinityHtml +
       '</div></div>' +
+      '<div class="llm-card"><div class="llm-card-body">' +
+      normalizeErrorHtml +
+      '</div></div>' +
       '<div class="llm-card"><div class="llm-card-title">均衡模式配置</div><div class="llm-card-body">' +
       IvuUI.formTop(
         IvuUI.formTopItem(
@@ -793,37 +899,49 @@ window.ClusterUpsert = (function () {
 
     var eppConfigHtml = '';
     if (isEpp) {
-      var schedulingProfileHtml = IvuUI.formTopItem(
-        '调度策略' +
+      var affinityOff = ec.affinity === 'off';
+      var offNote = affinityOff
+        ? '<span style="color:#ff9900;margin-left:6px;font-size:12px;">亲和强度为 off，不生效</span>'
+        : '';
+
+      var loadProfileHtml = IvuUI.formTopItem(
+        '实例负载画像' +
           helpIcon(
-            'latency-first: 延迟优先; balanced: 均衡; throughput-first: 吞吐优先',
+            'queue-first: 偏向排队短; balanced: 均衡(默认); kv-first: 偏向 KV 空闲',
           ),
-        '<select class="proto-field from-item-inp" data-field="epp.epp_config.scheduling_profile" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
-          '<option value="latency-first"' +
-          (ec.scheduling_profile === 'latency-first' ? ' selected' : '') +
-          '>latency-first（延迟优先）</option>' +
+        '<select class="proto-field from-item-inp" data-field="epp.epp_config.load_profile" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
+          '<option value="queue-first"' +
+          (ec.load_profile === 'queue-first' ? ' selected' : '') +
+          '>queue-first（排队优先）</option>' +
           '<option value="balanced"' +
-          (ec.scheduling_profile === 'balanced' ? ' selected' : '') +
-          '>balanced（均衡）</option>' +
-          '<option value="throughput-first"' +
-          (ec.scheduling_profile === 'throughput-first' ? ' selected' : '') +
-          '>throughput-first（吞吐优先）</option>' +
+          (ec.load_profile == null || ec.load_profile === 'balanced'
+            ? ' selected'
+            : '') +
+          '>balanced（均衡，默认）</option>' +
+          '<option value="kv-first"' +
+          (ec.load_profile === 'kv-first' ? ' selected' : '') +
+          '>kv-first（KV 空闲优先）</option>' +
           '</select>',
         true,
       );
 
-      var cacheAffinityHtml = IvuUI.formTopItem(
-        '缓存亲和性' + helpIcon('默认 medium 表示跟随调度策略'),
-        '<select class="proto-field from-item-inp" data-field="epp.epp_config.cache_affinity" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
+      var affinityHtml = IvuUI.formTopItem(
+        '亲和强度' +
+          helpIcon('off: 不注入亲和 scorer; low/medium/high: 权重 0.3/0.6/1.0') +
+          offNote,
+        '<select class="proto-field from-item-inp" data-field="epp.epp_config.affinity" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
+          '<option value="off"' +
+          (ec.affinity === 'off' ? ' selected' : '') +
+          '>off（关闭亲和）</option>' +
           '<option value="low"' +
-          (ec.cache_affinity === 'low' ? ' selected' : '') +
-          '>low</option>' +
+          (ec.affinity === 'low' ? ' selected' : '') +
+          '>low（0.3）</option>' +
           '<option value="medium"' +
-          (ec.cache_affinity === 'medium' ? ' selected' : '') +
-          '>medium（跟随调度策略）</option>' +
+          (ec.affinity == null || ec.affinity === 'medium' ? ' selected' : '') +
+          '>medium（0.6，默认）</option>' +
           '<option value="high"' +
-          (ec.cache_affinity === 'high' ? ' selected' : '') +
-          '>high</option>' +
+          (ec.affinity === 'high' ? ' selected' : '') +
+          '>high（1.0）</option>' +
           '</select>',
         true,
       );
@@ -835,7 +953,9 @@ window.ClusterUpsert = (function () {
         '<span class="ivu-switch-inner"></span></div>';
 
       var prefixCacheHtml = IvuUI.formTopItem(
-        '前缀缓存亲和性' + helpIcon('开启后优先复用已有前缀缓存'),
+        '前缀缓存亲和性' +
+          helpIcon('开启后将相同前缀的请求尽力收敛到同一后端') +
+          (affinityOff ? '（off 时不生效）' : ''),
         prefixCacheSwitchHtml,
       );
 
@@ -846,7 +966,9 @@ window.ClusterUpsert = (function () {
         '<span class="ivu-switch-inner"></span></div>';
 
       var sessionAffinityHtml = IvuUI.formTopItem(
-        '会话亲和性' + helpIcon('开启后同一会话的请求将绑定到同一端点'),
+        '会话亲和性' +
+          helpIcon('开启后将同一会话的请求尽力粘住同一后端') +
+          (affinityOff ? '（off 时不生效）' : ''),
         sessionAffinitySwitchHtml,
         true,
       );
@@ -856,13 +978,14 @@ window.ClusterUpsert = (function () {
             '会话亲和性 Header',
             '<div class="ivu-input-wrapper ivu-input-type-text"><input type="text" class="ivu-input proto-field" data-field="epp.epp_config.session_affinity_header" value="' +
               IvuUI.escapeHtml(ec.session_affinity_header || '') +
-              '" placeholder="会话亲和性启用时必填" /></div>',
+              '" placeholder="会话亲和性启用时必填，如 x-session-id" /></div>',
             true,
           )
         : '';
 
       var kvCacheHtml = IvuUI.formTopItem(
-        'KV 缓存利用率上限' + helpIcon('范围 (0, 1]，步长 0.01'),
+        'KV 缓存利用率上限' +
+          helpIcon('范围 (0, 1]，默认 0.9；超过该值的端点被过滤'),
         IvuUI.inputNumber(
           ec.kv_cache_utilization_max != null
             ? ec.kv_cache_utilization_max
@@ -872,17 +995,61 @@ window.ClusterUpsert = (function () {
         true,
       );
 
-      var enableEvictionSwitchHtml =
+      var waitingQueueHtml = IvuUI.formTopItem(
+        '排队长度过滤阈值' +
+          helpIcon('后端排队长度超过该值的端点被过滤；0 = 不启用该项过滤'),
+        '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_config.waiting_queue_max" value="' +
+          (ec.waiting_queue_max != null && ec.waiting_queue_max !== ''
+            ? ec.waiting_queue_max
+            : 0) +
+          '" min="0" /></div>',
+        true,
+      );
+
+      var runningRequestsHtml = IvuUI.formTopItem(
+        '在飞请求数过滤阈值' +
+          helpIcon('后端运行中请求数超过该值的端点被过滤；0 = 不启用该项过滤'),
+        '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_config.running_requests_max" value="' +
+          (ec.running_requests_max != null && ec.running_requests_max !== ''
+            ? ec.running_requests_max
+            : 0) +
+          '" min="0" /></div>',
+        true,
+      );
+
+      var fallbackSwitchHtml =
         '<div class="ivu-switch' +
-        (fc.enable_eviction ? ' ivu-switch-checked' : '') +
-        '" id="proto-epp-enable-eviction-switch">' +
+        (ec.fallback_on_empty ? ' ivu-switch-checked' : '') +
+        '" id="proto-epp-fallback-switch">' +
         '<span class="ivu-switch-inner"></span></div>';
 
+      var fallbackHtml = IvuUI.formTopItem(
+        '无端点时回退派发' +
+          helpIcon('所有端点被过滤时：关闭=不派发；开启=派发"最不差"的端点'),
+        fallbackSwitchHtml,
+      );
+
+      var metricsStalenessHtml = IvuUI.formTopItem(
+        '指标失效剔除阈值（ms）' +
+          helpIcon('后端指标超过该时长未更新即被剔除；默认 200，建议 100–500'),
+        '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_config.metrics_staleness_threshold_ms" value="' +
+          (ec.metrics_staleness_threshold_ms != null
+            ? ec.metrics_staleness_threshold_ms
+            : 200) +
+          '" min="1" /></div>',
+        true,
+      );
+
+      var enableEvictionHtml =
+        '<div class="ivu-switch ivu-switch-disabled" title="当前 EPP 未接线，保持关闭">' +
+        '<span class="ivu-switch-inner"></span></div>' +
+        '<span style="color:#999;margin-left:8px;font-size:12px;">当前不支持开启，保持关闭</span>';
+
       var flowControlHtml =
-        '<div class="llm-card"><div class="llm-card-title" id="proto-epp-flow-control-toggle" style="cursor:pointer;">流控配置 ▾</div><div class="llm-card-body" id="proto-epp-flow-control-body">' +
+        '<div class="llm-card"><div class="llm-card-title">流控配置</div><div class="llm-card-body" id="proto-epp-flow-control-body">' +
         IvuUI.formTop(
           IvuUI.formTopItem(
-            '最大请求数' + helpIcon('大于 0 的整数或 -1 表示不限制'),
+            '最大请求数' + helpIcon('大于 0 的整数或 -1 表示不限制；缺省表示不限'),
             '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_config.flow_control.max_requests" value="' +
               (fc.max_requests != null && fc.max_requests !== ''
                 ? fc.max_requests
@@ -891,7 +1058,8 @@ window.ClusterUpsert = (function () {
             true,
           ) +
             IvuUI.formTopItem(
-              '队列 TTL（秒）',
+              '队列 TTL（秒）' +
+                helpIcon('有端点时的排队预算；0 = 显式禁用驱逐；缺省由 EPP 决定（默认 60s）'),
               '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_config.flow_control.queue_ttl" value="' +
                 (fc.queue_ttl != null && fc.queue_ttl !== ''
                   ? fc.queue_ttl
@@ -900,7 +1068,8 @@ window.ClusterUpsert = (function () {
               true,
             ) +
             IvuUI.formTopItem(
-              '无端点队列 TTL（秒）',
+              '无端点队列 TTL（秒）' +
+                helpIcon('无端点（冷启动扩容）时的排队预算；缺省跟随队列 TTL'),
               '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_config.flow_control.no_endpoint_queue_ttl" value="' +
                 (fc.no_endpoint_queue_ttl != null &&
                 fc.no_endpoint_queue_ttl !== ''
@@ -909,19 +1078,84 @@ window.ClusterUpsert = (function () {
                 '" min="0" /></div>',
               true,
             ) +
-            IvuUI.formTopItem('启用驱逐', enableEvictionSwitchHtml, true),
+            IvuUI.formTopItem('启用驱逐', enableEvictionHtml, true),
         ) +
         '</div></div>';
 
       eppConfigHtml =
         IvuUI.formTop(
-          schedulingProfileHtml +
-            cacheAffinityHtml +
+          loadProfileHtml +
+            affinityHtml +
             prefixCacheHtml +
             sessionAffinityHtml +
             sessionAffinityHeaderHtml +
-            kvCacheHtml,
+            kvCacheHtml +
+            waitingQueueHtml +
+            runningRequestsHtml +
+            fallbackHtml +
+            metricsStalenessHtml,
         ) + flowControlHtml;
+
+      var rt = epp.epp_runtime || {};
+      var rtCheck = rt.check || {};
+      var rtTimeout = rt.timeout || {};
+
+      var checkDisabledSwitchHtml =
+        '<div class="ivu-switch' +
+        (rtCheck.disabled ? ' ivu-switch-checked' : '') +
+        '" id="proto-epp-check-disabled-switch">' +
+        '<span class="ivu-switch-inner"></span></div>';
+
+      var eppRuntimeHtml =
+        '<div class="llm-card"><div class="llm-card-title">EPP 运行时参数</div><div class="llm-card-body" id="proto-epp-runtime-body">' +
+        IvuUI.formTop(
+          IvuUI.formTopItem(
+            '关闭后台健康检查' +
+              helpIcon('开启后不进行 EPP 后台健康检查（不建议生产关闭），默认关闭'),
+            checkDisabledSwitchHtml,
+          ) +
+            IvuUI.formTopItem(
+              '健康检查间隔',
+              durationFieldHtml('epp.epp_runtime.check.check_interval', rtCheck.check_interval, 's'),
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '失败次数阈值',
+              '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_runtime.check.fail_threshold" value="' +
+                (rtCheck.fail_threshold != null ? rtCheck.fail_threshold : 3) +
+                '" min="1" /></div>',
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '冷却时长' +
+                helpIcon('冷却期内不切回已失败地址，合法 Go duration 且 > 0，默认 45s'),
+              durationFieldHtml('epp.epp_runtime.check.cooldown', rtCheck.cooldown, 's'),
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '成功次数阈值',
+              '<div class="ivu-input-wrapper ivu-input-type-text"><input type="number" class="ivu-input proto-field" data-field="epp.epp_runtime.check.success_threshold" value="' +
+                (rtCheck.success_threshold != null
+                  ? rtCheck.success_threshold
+                  : 2) +
+                '" min="1" /></div>',
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '连接超时',
+              durationFieldHtml('epp.epp_runtime.timeout.connect', rtTimeout.connect, 'ms'),
+              true,
+            ) +
+            IvuUI.formTopItem(
+              '调用超时' +
+                helpIcon('首条消息收发超时，合法 Go duration 且 > 0，默认 3s'),
+              durationFieldHtml('epp.epp_runtime.timeout.call', rtTimeout.call, 's'),
+              true,
+            ),
+        ) +
+        '</div></div>';
+
+      eppConfigHtml = eppConfigHtml + eppRuntimeHtml;
     }
 
     return '<div class="epp-config">' + eppConfigHtml + '</div>';
@@ -956,6 +1190,9 @@ window.ClusterUpsert = (function () {
     var balanceMode = data.balance_mode || 'WRR';
     var ec = data.epp_config || {};
     var fc = ec.flow_control || {};
+    var rt = data.epp_runtime || {};
+    var rtCheck = rt.check || {};
+    var rtTimeout = rt.timeout || {};
     var isEpp = balanceMode === 'EPP';
     var stickyEnabled =
       b.sticky_sessions && b.sticky_sessions.enabled === 'true';
@@ -1070,7 +1307,33 @@ window.ClusterUpsert = (function () {
           (ka.penalty_enable ? '开启' : '关闭') +
           '</div>'
         : '') +
-      '</div></div></div></li></ul>';
+      '</div></div></li></ul>';
+
+    var nue = llm.normalize_upstream_error || {};
+    var normalizeErrorHtml =
+      '<ul class="clearFloat detail-row detail-row-block policy-row"><li class="title">上游错误归一:</li><li class="value">' +
+      '<div class="policy-card" style="border:1px solid #e7e9f0;border-radius:4px;padding:12px;background:#fafafa;">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px 24px;">' +
+      '<div>启用：' +
+      (nue.enabled ? '开启' : '关闭') +
+      '</div>' +
+      '<div>流式归一(SSE)：' +
+      (nue.stream_enabled ? '开启' : '关闭') +
+      '</div>' +
+      '<div>凭证脱敏：' +
+      (nue.redact_secrets == null || nue.redact_secrets ? '开启' : '关闭') +
+      '</div>' +
+      (nue.enabled
+        ? '<div>未识别错误体处理：' +
+          IvuUI.escapeHtml(nue.unrecognized_action || 'passthrough') +
+          '</div>' +
+          '<div>错误响应体读取上限(字节)：' +
+          IvuUI.escapeHtml(
+            nue.max_body_bytes != null ? nue.max_body_bytes : 65536,
+          ) +
+          '</div>'
+        : '') +
+      '</div></div></li></ul>';
 
     var llmRows =
       reviewRow('所属服务商', llm.provider || '-') +
@@ -1100,14 +1363,15 @@ window.ClusterUpsert = (function () {
       keysHtml +
       '</li></ul>' +
       keyPolicyHtml +
-      keyAffinityHtml;
+      keyAffinityHtml +
+      normalizeErrorHtml;
 
     var eppConfigRows = '';
     if (isEpp) {
       eppConfigRows =
         reviewRow('负载均衡模式', balanceMode) +
-        reviewRow('调度策略', ec.scheduling_profile || 'balanced') +
-        reviewRow('缓存亲和性', ec.cache_affinity || 'medium') +
+        reviewRow('实例负载画像', ec.load_profile || 'balanced') +
+        reviewRow('亲和强度', ec.affinity || 'medium') +
         reviewRow(
           '前缀缓存亲和性',
           ec.prefix_cache_affinity ? '开启' : '关闭',
@@ -1122,6 +1386,21 @@ window.ClusterUpsert = (function () {
             ? ec.kv_cache_utilization_max
             : '0.9',
         ) +
+        reviewRow(
+          '排队长度过滤阈值',
+          ec.waiting_queue_max != null ? ec.waiting_queue_max : 0,
+        ) +
+        reviewRow(
+          '在飞请求数过滤阈值',
+          ec.running_requests_max != null ? ec.running_requests_max : 0,
+        ) +
+        reviewRow('无端点时回退派发', ec.fallback_on_empty ? '开启' : '关闭') +
+        reviewRow(
+          '指标失效剔除阈值（ms）',
+          ec.metrics_staleness_threshold_ms != null
+            ? ec.metrics_staleness_threshold_ms
+            : 200,
+        ) +
         (fc.max_requests != null && fc.max_requests !== ''
           ? reviewRow('流控-最大请求数', fc.max_requests)
           : '') +
@@ -1131,7 +1410,39 @@ window.ClusterUpsert = (function () {
         (fc.no_endpoint_queue_ttl != null && fc.no_endpoint_queue_ttl !== ''
           ? reviewRow('流控-无端点队列 TTL（秒）', fc.no_endpoint_queue_ttl)
           : '') +
-        reviewRow('流控-启用驱逐', fc.enable_eviction ? '开启' : '关闭');
+        reviewRow('流控-启用驱逐', '关闭（当前不支持开启）') +
+        (rt.check || rt.timeout
+          ? reviewRow(
+              '关闭后台健康检查',
+              rtCheck.disabled ? '开启' : '关闭',
+            ) +
+            reviewRow(
+              '健康检查间隔',
+              rtCheck.check_interval != null ? rtCheck.check_interval : '2s',
+            ) +
+            reviewRow(
+              '失败次数阈值',
+              rtCheck.fail_threshold != null ? rtCheck.fail_threshold : 3,
+            ) +
+            reviewRow(
+              '冷却时长',
+              rtCheck.cooldown != null ? rtCheck.cooldown : '45s',
+            ) +
+            reviewRow(
+              '成功次数阈值',
+              rtCheck.success_threshold != null
+                ? rtCheck.success_threshold
+                : 2,
+            ) +
+            reviewRow(
+              '连接超时',
+              rtTimeout.connect != null ? rtTimeout.connect : '500ms',
+            ) +
+            reviewRow(
+              '调用超时',
+              rtTimeout.call != null ? rtTimeout.call : '3s',
+            )
+          : reviewRow('EPP 运行时参数', '未配置（BFE 补默认）'));
     } else {
       eppConfigRows = reviewRow('负载均衡模式', balanceMode);
     }
@@ -1179,6 +1490,17 @@ window.ClusterUpsert = (function () {
             ? null
             : Number(field.value)
           : field.value;
+      // duration 复合控件：数字输入 + 单位下拉拼成 duration 字符串（空输入归一为空串）
+      if (field.getAttribute('data-duration') === '1') {
+        var durationUnitEl = field.parentNode.querySelector(
+          '.proto-duration-unit',
+        );
+        value =
+          field.value === ''
+            ? ''
+            : String(field.value) +
+              (durationUnitEl ? durationUnitEl.value : 's');
+      }
       if (path.indexOf('base.') === 0)
         setNestedValue(data.baseConfigData, path.slice(5), value);
       else if (path.indexOf('health.') === 0)
@@ -1187,6 +1509,9 @@ window.ClusterUpsert = (function () {
         var eppKey = path.slice(4);
         if (eppKey === 'balance_mode') {
           data.balance_mode = value;
+        } else if (eppKey.indexOf('epp_runtime.') === 0) {
+          if (!data.epp_runtime) data.epp_runtime = {};
+          setNestedValue(data.epp_runtime, eppKey.slice(12), value);
         } else if (eppKey.indexOf('epp_config.') === 0) {
           if (!data.epp_config) data.epp_config = {};
           setNestedValue(data.epp_config, eppKey.slice(11), value);
@@ -1210,6 +1535,23 @@ window.ClusterUpsert = (function () {
               value === 'true' || value === true;
           } else {
             data.llmConfigData.key_affinity[kaKey] = value;
+          }
+        } else if (key.indexOf('normalize_upstream_error.') === 0) {
+          if (!data.llmConfigData.normalize_upstream_error)
+            data.llmConfigData.normalize_upstream_error = {};
+          var nueKey = key.slice(25);
+          if (
+            nueKey === 'enabled' ||
+            nueKey === 'stream_enabled' ||
+            nueKey === 'redact_secrets'
+          ) {
+            data.llmConfigData.normalize_upstream_error[nueKey] =
+              value === 'true' || value === true;
+          } else if (nueKey === 'max_body_bytes') {
+            data.llmConfigData.normalize_upstream_error[nueKey] =
+              value === null || value === '' ? null : Number(value);
+          } else {
+            data.llmConfigData.normalize_upstream_error[nueKey] = value;
           }
         } else {
           data.llmConfigData[key] = value;
@@ -1378,12 +1720,169 @@ window.ClusterUpsert = (function () {
     if (Number(kp.retry_backoff_max) < Number(kp.retry_backoff_initial)) {
       return '最大退避时间必须大于或等于初始退避时间';
     }
+
+    var nue = llm.normalize_upstream_error || {};
+    if (
+      nue.unrecognized_action != null &&
+      ['passthrough', 'rewrite_generic'].indexOf(nue.unrecognized_action) === -1
+    ) {
+      return '未识别错误体处理仅支持 passthrough / rewrite_generic';
+    }
+    var maxBodyBytes = Number(nue.max_body_bytes);
+    if (
+      nue.max_body_bytes != null &&
+      (!Number.isFinite(maxBodyBytes) ||
+        maxBodyBytes < 0 ||
+        maxBodyBytes > 4194304)
+    ) {
+      return '错误响应体读取上限须为 0-4194304 的整数';
+    }
+    return null;
+  }
+
+  // ---- duration 复合控件（与 UI 代码一致：数字输入 + 单位下拉 ms/s/m，单位区主色蓝底）----
+  var DURATION_UI_UNITS = ['ms', 's', 'm'];
+  var DURATION_UNIT_MS = {
+    ns: 1e-6,
+    us: 1e-3,
+    'µs': 1e-3,
+    ms: 1,
+    s: 1000,
+    m: 60000,
+    h: 3600000,
+  };
+  var DURATION_SIMPLE_RE = /^\+?(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)$/;
+
+  function formatDurationNum(num) {
+    return String(Number(num.toFixed(6)));
+  }
+
+  // duration 字符串拆成 数字 + 单位（ms/s/m）；组合写法（如 1m30s）标记为 raw 走纯文本输入
+  function durationParts(value, defaultUnit) {
+    var str = value == null ? '' : String(value);
+    if (str === '') return { raw: false, num: '', unit: defaultUnit };
+    var m = DURATION_SIMPLE_RE.exec(str);
+    if (!m) return { raw: true, text: str };
+    var num = parseFloat(m[1]);
+    var unit = m[2];
+    if (DURATION_UI_UNITS.indexOf(unit) === -1) {
+      var totalMs = num * DURATION_UNIT_MS[unit];
+      unit = totalMs < 1000 ? 'ms' : totalMs < 60000 ? 's' : 'm';
+      num = (num * DURATION_UNIT_MS[m[2]]) / DURATION_UNIT_MS[unit];
+    }
+    return { raw: false, num: formatDurationNum(num), unit: unit };
+  }
+
+  function durationFieldHtml(path, value, defaultUnit) {
+    var parts = durationParts(value, defaultUnit);
+    if (parts.raw) {
+      return (
+        '<div class="ivu-input-wrapper ivu-input-type-text"><input type="text" class="ivu-input proto-field" data-field="' +
+        path +
+        '" value="' +
+        IvuUI.escapeHtml(parts.text) +
+        '" /></div>'
+      );
+    }
+    return (
+      '<div class="ivu-input-wrapper ivu-input-group ivu-input-group-with-append">' +
+      '<input type="text" class="ivu-input proto-field" data-field="' +
+      path +
+      '" data-duration="1" value="' +
+      IvuUI.escapeHtml(parts.num) +
+      '" />' +
+      '<div class="ivu-input-group-append" style="background:#2d8cf0;border-color:#2d8cf0;padding:0;width:64px;">' +
+      '<select class="proto-duration-unit" data-prev-unit="' +
+      parts.unit +
+      '" style="width:100%;height:100%;border:none;background:transparent;color:#fff;">' +
+      DURATION_UI_UNITS.map(function (u) {
+        return (
+          '<option value="' +
+          u +
+          '"' +
+          (u === parts.unit ? ' selected' : '') +
+          '>' +
+          u +
+          '</option>'
+        );
+      }).join('') +
+      '</select></div></div>'
+    );
+  }
+
+  // 解析 Go duration 字符串：合法且 > 0 时返回毫秒数，否则返回 NaN
+  // 语法与 time.ParseDuration 对齐：允许前导 '+' 与 "1." / ".5" 形式的小数
+  function parseDurationMs(str) {
+    if (typeof str !== 'string') return NaN;
+    var source = str.charAt(0) === '+' ? str.slice(1) : str;
+    var re = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)/g;
+    var total = 0;
+    var matched = false;
+    var lastIndex = 0;
+    var m;
+    while ((m = re.exec(source)) !== null) {
+      if (m.index !== lastIndex) return NaN;
+      lastIndex = m.index + m[0].length;
+      total += parseFloat(m[1]) * DURATION_UNIT_MS[m[2]];
+      matched = true;
+    }
+    if (!matched || lastIndex !== source.length) return NaN;
+    return total;
+  }
+
+  function validateEppRuntime(rt) {
+    if (!rt) return null;
+    var check = rt.check || {};
+    var timeout = rt.timeout || {};
+    function badDuration(v) {
+      return v != null && v !== '' && !(parseDurationMs(v) > 0);
+    }
+    function badThreshold(v) {
+      return (
+        v != null &&
+        v !== '' &&
+        (!Number.isInteger(Number(v)) || Number(v) < 1)
+      );
+    }
+    if (badDuration(check.check_interval)) {
+      return '健康检查间隔须为合法的 Go duration 且 > 0（如 2s）';
+    }
+    if (badDuration(check.cooldown)) {
+      return '冷却时长须为合法的 Go duration 且 > 0（如 45s）';
+    }
+    if (badThreshold(check.fail_threshold)) {
+      return '失败次数阈值须为 >= 1 的整数';
+    }
+    if (badThreshold(check.success_threshold)) {
+      return '成功次数阈值须为 >= 1 的整数';
+    }
+    if (badDuration(timeout.connect)) {
+      return '连接超时须为合法的 Go duration 且 > 0（如 500ms）';
+    }
+    if (badDuration(timeout.call)) {
+      return '调用超时须为合法的 Go duration 且 > 0（如 3s）';
+    }
     return null;
   }
 
   function validateEpp(data) {
-    if (data.balance_mode !== 'EPP') return null;
-    var ec = data.epp_config || {};
+    var ec = data.epp_config;
+    var rtErr = validateEppRuntime(data.epp_runtime);
+    if (rtErr) return rtErr;
+    // epp_config 非空即须通过字段校验（含 WRR 时休眠保留的配置）
+    if (!ec) return null;
+    if (
+      ec.load_profile != null &&
+      ['queue-first', 'balanced', 'kv-first'].indexOf(ec.load_profile) === -1
+    ) {
+      return '实例负载画像取值范围不合法';
+    }
+    if (
+      ec.affinity != null &&
+      ['off', 'low', 'medium', 'high'].indexOf(ec.affinity) === -1
+    ) {
+      return '亲和强度取值范围不合法';
+    }
     if (
       ec.session_affinity_enabled &&
       !(ec.session_affinity_header || '').trim()
@@ -1396,6 +1895,53 @@ window.ClusterUpsert = (function () {
       (!Number.isFinite(kvCache) || kvCache <= 0 || kvCache > 1)
     ) {
       return 'KV 缓存利用率上限须在 (0, 1] 范围内';
+    }
+    if (
+      ec.waiting_queue_max != null &&
+      (!Number.isFinite(Number(ec.waiting_queue_max)) ||
+        Number(ec.waiting_queue_max) < 0)
+    ) {
+      return '排队长度过滤阈值须为 >= 0 的数';
+    }
+    if (
+      ec.running_requests_max != null &&
+      (!Number.isFinite(Number(ec.running_requests_max)) ||
+        Number(ec.running_requests_max) < 0)
+    ) {
+      return '在飞请求数过滤阈值须为 >= 0 的数';
+    }
+    if (
+      ec.metrics_staleness_threshold_ms != null &&
+      (!Number.isInteger(Number(ec.metrics_staleness_threshold_ms)) ||
+        Number(ec.metrics_staleness_threshold_ms) <= 0)
+    ) {
+      return '指标失效剔除阈值须为 > 0 的整数（ms）';
+    }
+    var fc = ec.flow_control || {};
+    if (
+      fc.max_requests != null &&
+      fc.max_requests !== '' &&
+      !(Number(fc.max_requests) === -1 || Number(fc.max_requests) > 0)
+    ) {
+      return '流控-最大请求数须为 > 0 的整数或 -1';
+    }
+    if (
+      fc.queue_ttl != null &&
+      fc.queue_ttl !== '' &&
+      (!Number.isInteger(Number(fc.queue_ttl)) || Number(fc.queue_ttl) < 0)
+    ) {
+      return '流控-队列 TTL 须为 >= 0 的整数（秒）';
+    }
+    if (
+      fc.no_endpoint_queue_ttl != null &&
+      fc.no_endpoint_queue_ttl !== '' &&
+      (!Number.isInteger(Number(fc.no_endpoint_queue_ttl)) ||
+        Number(fc.no_endpoint_queue_ttl) < 0)
+    ) {
+      return '流控-无端点队列 TTL 须为 >= 0 的整数（秒）';
+    }
+    if (fc.enable_eviction) {
+      return '启用驱逐当前不支持开启，请保持关闭';
     }
     return null;
   }
@@ -1519,6 +2065,11 @@ window.ClusterUpsert = (function () {
       if (submitBtn)
         submitBtn.addEventListener('click', function () {
           syncFromDom(bodyEl, state.data);
+          var err = validateEpp(state.data);
+          if (err) {
+            Prototype.toast(err, 'error');
+            return;
+          }
           if (typeof options.onSubmit === 'function')
             options.onSubmit(state.data);
         });
@@ -1550,18 +2101,35 @@ window.ClusterUpsert = (function () {
           // 切换 WRR/EPP 时，若为 EPP 模式但无 epp_config 则初始化默认值
           if (state.data.balance_mode === 'EPP' && !state.data.epp_config) {
             state.data.epp_config = {
-              scheduling_profile: 'balanced',
-              cache_affinity: 'medium',
+              load_profile: 'balanced',
+              affinity: 'medium',
               prefix_cache_affinity: true,
               session_affinity_enabled: false,
               session_affinity_header: '',
               kv_cache_utilization_max: 0.9,
+              waiting_queue_max: 0,
+              running_requests_max: 0,
+              fallback_on_empty: false,
+              metrics_staleness_threshold_ms: 200,
               flow_control: {
                 max_requests: null,
                 queue_ttl: null,
                 no_endpoint_queue_ttl: null,
                 enable_eviction: false,
               },
+            };
+          }
+          // 切换 WRR/EPP 时，若为 EPP 模式但无 epp_runtime 则初始化默认值
+          if (state.data.balance_mode === 'EPP' && !state.data.epp_runtime) {
+            state.data.epp_runtime = {
+              check: {
+                disabled: false,
+                check_interval: '2s',
+                fail_threshold: 3,
+                cooldown: '45s',
+                success_threshold: 2,
+              },
+              timeout: { connect: '500ms', call: '3s' },
             };
           }
           render();
@@ -1746,18 +2314,65 @@ window.ClusterUpsert = (function () {
           render();
         });
 
-      var eppEnableEvictionSwitch = bodyEl.querySelector(
-        '#proto-epp-enable-eviction-switch',
+      var eppAffinitySelect = bodyEl.querySelector(
+        '[data-field="epp.epp_config.affinity"]',
       );
-      if (eppEnableEvictionSwitch)
-        eppEnableEvictionSwitch.addEventListener('click', function () {
+      if (eppAffinitySelect)
+        eppAffinitySelect.addEventListener('change', function () {
+          syncFromDom(bodyEl, state.data);
+          render();
+        });
+
+      var eppFallbackSwitch = bodyEl.querySelector(
+        '#proto-epp-fallback-switch',
+      );
+      if (eppFallbackSwitch)
+        eppFallbackSwitch.addEventListener('click', function () {
           syncFromDom(bodyEl, state.data);
           if (!state.data.epp_config) state.data.epp_config = {};
-          if (!state.data.epp_config.flow_control)
-            state.data.epp_config.flow_control = {};
-          state.data.epp_config.flow_control.enable_eviction =
-            !state.data.epp_config.flow_control.enable_eviction;
+          state.data.epp_config.fallback_on_empty =
+            !state.data.epp_config.fallback_on_empty;
           render();
+        });
+
+      var eppCheckDisabledSwitch = bodyEl.querySelector(
+        '#proto-epp-check-disabled-switch',
+      );
+      if (eppCheckDisabledSwitch)
+        eppCheckDisabledSwitch.addEventListener('click', function () {
+          syncFromDom(bodyEl, state.data);
+          if (!state.data.epp_runtime) state.data.epp_runtime = {};
+          if (!state.data.epp_runtime.check)
+            state.data.epp_runtime.check = {};
+          state.data.epp_runtime.check.disabled =
+            !state.data.epp_runtime.check.disabled;
+          render();
+        });
+
+      // duration 复合控件切单位：换算数值保持物理时长不变（500ms → s = 0.5s）
+      bodyEl
+        .querySelectorAll('.proto-duration-unit')
+        .forEach(function (unitSelect) {
+          unitSelect.addEventListener('change', function () {
+            var wrapper = unitSelect.parentNode.parentNode;
+            var numInput = wrapper.querySelector('[data-duration="1"]');
+            var prevUnit = unitSelect.getAttribute('data-prev-unit');
+            var num = parseFloat(numInput ? numInput.value : '');
+            if (
+              numInput &&
+              isFinite(num) &&
+              DURATION_UNIT_MS[prevUnit] &&
+              DURATION_UNIT_MS[unitSelect.value]
+            ) {
+              numInput.value = formatDurationNum(
+                (num * DURATION_UNIT_MS[prevUnit]) /
+                  DURATION_UNIT_MS[unitSelect.value],
+              );
+            }
+            unitSelect.setAttribute('data-prev-unit', unitSelect.value);
+            syncFromDom(bodyEl, state.data);
+            render();
+          });
         });
 
       var keyAffinitySelect = bodyEl.querySelector(
@@ -1774,6 +2389,15 @@ window.ClusterUpsert = (function () {
       );
       if (keyPenaltySelect)
         keyPenaltySelect.addEventListener('change', function () {
+          syncFromDom(bodyEl, state.data);
+          render();
+        });
+
+      var normalizeErrorSelect = bodyEl.querySelector(
+        '[data-field="llm.normalize_upstream_error.enabled"]',
+      );
+      if (normalizeErrorSelect)
+        normalizeErrorSelect.addEventListener('change', function () {
           syncFromDom(bodyEl, state.data);
           render();
         });

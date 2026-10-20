@@ -293,9 +293,35 @@ window.IvuUI = {
     }).join('');
 
     var totalPages = Math.max(1, Math.ceil(total / pageSize));
-    var pagerItems = '';
-    for (var p = 1; p <= totalPages; p++) {
-      pagerItems += '<li class="number' + (p === currentPage ? ' active' : '') + '" data-page="' + p + '">' + p + '</li>';
+    var paginationHtml = '';
+    if (options.cursorPaging) {
+      // 主键游标分页：仅「上一页 / 下一页」，无页码与每页条数选择器（对齐真实 UI）
+      var prevDisabled = options.prevDisabled != null ? options.prevDisabled : false;
+      var nextDisabled = options.nextDisabled != null ? options.nextDisabled : false;
+      paginationHtml =
+        '<div class="el-pagination is-background page">' +
+          '<button type="button" class="btn-prev proto-page-prev"' + (prevDisabled ? ' disabled' : '') + '>上一页</button>' +
+          '<button type="button" class="btn-next proto-page-next"' + (nextDisabled ? ' disabled' : '') + '>下一页</button>' +
+        '</div>';
+    } else {
+      var pagerItems = '';
+      for (var p = 1; p <= totalPages; p++) {
+        pagerItems += '<li class="number' + (p === currentPage ? ' active' : '') + '" data-page="' + p + '">' + p + '</li>';
+      }
+      paginationHtml = '<div class="el-pagination is-background page">' +
+        '<span class="el-pagination__sizes">' +
+          '<div class="el-select el-select--mini">' +
+            '<select class="proto-page-size" style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 8px;">' +
+              sizeOptions +
+            '</select>' +
+          '</div>' +
+        '</span>' +
+        '<button type="button" class="btn-prev proto-page-prev"' + (currentPage <= 1 ? ' disabled' : '') + '>' +
+          '<i class="el-icon el-icon-arrow-left"></i></button>' +
+        '<ul class="el-pager">' + pagerItems + '</ul>' +
+        '<button type="button" class="btn-next proto-page-next"' + (currentPage >= totalPages ? ' disabled' : '') + '>' +
+          '<i class="el-icon el-icon-arrow-right"></i></button>' +
+      '</div>';
     }
 
     return '<div class="page-table" id="' + tableId + '">' +
@@ -313,20 +339,7 @@ window.IvuUI = {
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="el-pagination is-background page">' +
-        '<span class="el-pagination__sizes">' +
-          '<div class="el-select el-select--mini">' +
-            '<select class="proto-page-size" style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 8px;">' +
-              sizeOptions +
-            '</select>' +
-          '</div>' +
-        '</span>' +
-        '<button type="button" class="btn-prev proto-page-prev"' + (currentPage <= 1 ? ' disabled' : '') + '>' +
-          '<i class="el-icon el-icon-arrow-left"></i></button>' +
-        '<ul class="el-pager">' + pagerItems + '</ul>' +
-        '<button type="button" class="btn-next proto-page-next"' + (currentPage >= totalPages ? ' disabled' : '') + '>' +
-          '<i class="el-icon el-icon-arrow-right"></i></button>' +
-      '</div>' +
+      paginationHtml +
     '</div>';
   },
 

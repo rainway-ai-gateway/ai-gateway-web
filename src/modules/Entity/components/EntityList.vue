@@ -17,6 +17,7 @@
   <div>
     <div class="title">
       <Button
+        v-has
         size="small"
         type="primary"
         @click="onAdd"
@@ -101,6 +102,25 @@ export default {
                     searchable: true
                 },
                 {
+                    title: that.$t('entity.level'),
+                    key: 'level',
+                    minWidth: 100,
+                    sortable: 'custom',
+                    searchable: true,
+                    searchType: 'select',
+                    searchFilters: [
+                        { label: '1', value: '1' },
+                        { label: '2', value: '2' },
+                        { label: '3', value: '3' },
+                        { label: '4', value: '4' },
+                        { label: '5', value: '5' }
+                    ],
+                    render(h, params) {
+                        const level = params.row.level;
+                        return h('span', level === undefined || level === null ? '-' : String(level));
+                    }
+                },
+                {
                     title: that.$t('entity.description'),
                     key: 'description',
                     minWidth: 180,
@@ -174,7 +194,7 @@ export default {
                     title: that.$t('com.operation'),
                     width: 300,
                     render(h, params) {
-                        return h('div', [
+                        const buttons = [
                             h(
                                 'Button',
                                 {
@@ -193,7 +213,9 @@ export default {
                                     }
                                 },
                                 that.$t('route.manageRouteRules')
-                            ),
+                            )
+                        ];
+                        buttons.push(
                             h(
                                 'Button',
                                 {
@@ -201,6 +223,7 @@ export default {
                                         type: 'primary',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     style: {
                                         marginRight: '5px'
                                     },
@@ -212,7 +235,9 @@ export default {
                                     }
                                 },
                                 that.$t('com.edit')
-                            ),
+                            )
+                        );
+                        buttons.push(
                             h(
                                 'Button',
                                 {
@@ -220,6 +245,7 @@ export default {
                                         type: 'error',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     on: {
                                         click: (e) => {
                                             e.stopPropagation();
@@ -229,13 +255,15 @@ export default {
                                 },
                                 that.$t('com.del')
                             )
-                        ]);
+                        );
+                        return h('div', buttons);
                     }
                 }
             ],
             tableLoading: false,
             isHiden: false,
             currentData: {},
+            entityTypeList: [],
             loading: false,
             modal: false,
             currentId: '',
@@ -380,13 +408,16 @@ export default {
         },
         fetchData() {
             this.tableLoading = true;
-            this.$request({
-                url: 'entities',
-                method: 'get',
-                openapi: true
-            })
-                .then(res => {
-                    if (res.status === 200) {
+            Promise.all([
+                this.fetchEntityTypeList(),
+                this.$request({
+                    url: 'entities',
+                    method: 'get',
+                    openapi: true
+                })
+            ])
+                .then(([, res]) => {
+                    if (res && res.status === 200) {
                         const data = res.data.Data || {};
                         const list = Array.isArray(data.list) ? data.list : [];
                         this.tableData = list.map(item => {
@@ -394,6 +425,7 @@ export default {
                             const isUnlimited = quotaPlan.unlimited === true || quotaPlan.unlimited === 'true';
                             return {
                                 ...item,
+                                level: this.getEntityLevel(item.type),
                                 rate_limit_policy_enabled: !!(item.rate_limit_policy && item.rate_limit_policy.enabled),
                                 quota_plan_used: isUnlimited
                                     ? -1
@@ -405,6 +437,28 @@ export default {
                 .finally(() => {
                     this.tableLoading = false;
                 });
+        },
+        fetchEntityTypeList() {
+            return this.$request({
+                url: 'entity-types',
+                method: 'get',
+                openapi: true
+            })
+                .then(res => {
+                    if (res && res.status === 200) {
+                        const data = res.data.Data || {};
+                        const list = Array.isArray(data.list) ? data.list : [];
+                        this.entityTypeList = list.filter(item => item && item.type_name);
+                    }
+                })
+                .catch(() => {
+                    this.entityTypeList = [];
+                });
+        },
+        getEntityLevel(typeName) {
+            if (!typeName) return undefined;
+            const entityType = this.entityTypeList.find(item => item && item.type_name === typeName);
+            return entityType ? entityType.level : undefined;
         }
     }
 };

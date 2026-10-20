@@ -35,7 +35,11 @@
     </div>
 
     <!-- 工具栏 -->
-    <div v-if="editing" style="text-align:right;margin-bottom:12px;">
+    <div
+      v-if="editing"
+      v-has
+      style="text-align:right;margin-bottom:12px;"
+    >
       <Button
         type="primary"
         size="small"
@@ -51,7 +55,7 @@
         >{{ $t('eppPool.cancel') }}</Button
       >
     </div>
-    <div v-else style="text-align:right;margin-bottom:12px;">
+    <div v-else v-has style="text-align:right;margin-bottom:12px;">
       <Button
         type="primary"
         size="small"
@@ -75,7 +79,7 @@
       />
     </Form>
 
-    <div v-if="editing" style="margin-top:12px;">
+    <div v-if="editing" v-has style="margin-top:12px;">
       <Button type="primary" size="small" @click="addGroup">{{
         $t('eppPool.addGroup')
       }}</Button>
@@ -159,10 +163,8 @@ export default {
           key: 'instanceCount',
           width: 100,
           render: (h, params) => {
-            return h(
-              'span',
-              (this.getGroup(params.index).instances || []).length,
-            );
+            const count = (this.getGroup(params.index).instances || []).length;
+            return h('span', `${count} / 1`);
           },
         },
         {
@@ -284,6 +286,9 @@ export default {
         const insts = groups[i].instances || [];
         if (!insts.length) {
           return this.$t('eppPool.groupNeedInstance', { index: i + 1 });
+        }
+        if (insts.length > 1) {
+          return this.$t('eppPool.groupInstanceExactlyOne', { index: i + 1 });
         }
         for (let j = 0; j < insts.length; j++) {
           const inst = insts[j];
@@ -590,7 +595,7 @@ export default {
     addInstance(groupIndex) {
       const group = this.getGroup(groupIndex);
       const insts = group.instances || [];
-      if (insts.length >= 2) {
+      if (insts.length >= 1) {
         this.$Message.warning(this.$t('eppPool.instanceCountMax'));
         return;
       }
@@ -770,20 +775,33 @@ export default {
       }
 
       if (this.editing) {
-        children.push(
-          h('div', { style: 'margin-top:8px;' }, [
-            h(
-              'Button',
-              {
-                props: { type: 'primary', size: 'small' },
-                on: {
-                  click: () => this.addInstance(groupIndex),
-                },
+        const addDisabled = insts.length >= 1;
+        const addNodes = [
+          h(
+            'Button',
+            {
+              props: {
+                type: addDisabled ? 'default' : 'primary',
+                size: 'small',
+                disabled: addDisabled,
               },
-              this.$t('eppPool.addInstance'),
+              on: {
+                click: () => this.addInstance(groupIndex),
+              },
+            },
+            this.$t('eppPool.addInstance'),
+          ),
+        ];
+        if (addDisabled) {
+          addNodes.push(
+            h(
+              'span',
+              { style: 'color:#c5c8ce;font-size:12px;margin-left:8px;' },
+              this.$t('eppPool.instanceCountMax'),
             ),
-          ]),
-        );
+          );
+        }
+        children.push(h('div', { style: 'margin-top:8px;' }, addNodes));
       }
 
       return h(

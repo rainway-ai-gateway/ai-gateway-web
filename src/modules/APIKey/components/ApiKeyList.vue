@@ -17,6 +17,7 @@
   <div>
     <div class="title">
       <Button
+        v-has
         size="small"
         type="primary"
         @click="onAdd"
@@ -302,7 +303,7 @@ export default {
                     title: that.$t('com.operation'),
                     width: 300,
                     render(h, params) {
-                        return h('div', [
+                        const buttons = [
                             h(
                                 'Button',
                                 {
@@ -321,7 +322,9 @@ export default {
                                     }
                                 },
                                 that.$t('route.manageRouteRules')
-                            ),
+                            )
+                        ];
+                        buttons.push(
                             h(
                                 'Button',
                                 {
@@ -329,6 +332,7 @@ export default {
                                         type: 'primary',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     style: {
                                         marginRight: '5px'
                                     },
@@ -340,7 +344,9 @@ export default {
                                     }
                                 },
                                 that.$t('com.edit')
-                            ),
+                            )
+                        );
+                        buttons.push(
                             h(
                                 'Button',
                                 {
@@ -348,6 +354,7 @@ export default {
                                         type: 'error',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     on: {
                                         click: (e) => {
                                             e.stopPropagation();
@@ -357,7 +364,8 @@ export default {
                                 },
                                 that.$t('com.del')
                             )
-                        ]);
+                        );
+                        return h('div', buttons);
                     }
                 }
             ],

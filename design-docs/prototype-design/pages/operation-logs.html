@@ -74,6 +74,26 @@
         return type === 0 ? '用户' : 'Token';
       }
 
+      var RESOURCE_TYPE_LABELS = {
+        entity: 'Entity',
+        entity_type: 'Entity 类型',
+        api_key: 'API Key',
+        provider: '服务商',
+        cluster: '集群',
+        route: '路由',
+        certificate: '证书',
+        quota_plan: '配额计划',
+        model_price: '模型定价',
+        batch: '批量任务',
+        batch_file: '批量文件',
+        user: '用户',
+        token: 'Token'
+      };
+
+      function resourceTypeLabel(type) {
+        return RESOURCE_TYPE_LABELS[type] || type || '-';
+      }
+
       function applyFilter() {
         var sp = state.searchParams;
         var allLogs = (MockData.operationLogs || []).concat(MockData.operationLogExtraData || []);
@@ -100,7 +120,7 @@
         var data = getPageData();
 
         var actionOptions = MockData.operationLogActions.map(function (a) { return { value: a, label: a }; });
-        var resourceTypeOptions = MockData.operationLogResourceTypes.map(function (r) { return { value: r, label: r }; });
+        var resourceTypeOptions = MockData.operationLogResourceTypes.map(function (r) { return { value: r, label: resourceTypeLabel(r) }; });
         var statusOptions = MockData.operationLogStatusOptions.map(function (s) { return { value: s.value, label: s.label }; });
 
         var columns = [
@@ -115,7 +135,8 @@
           },
           {
             key: 'resource_type', title: '资源类型', sortable: true, searchable: true, searchType: 'select',
-            searchFilters: resourceTypeOptions, width: 140
+            searchFilters: resourceTypeOptions, width: 140,
+            render: function (row) { return IvuUI.escapeHtml(resourceTypeLabel(row.resource_type)); }
           },
           { key: 'resource_name', title: '资源名称', sortable: true, searchable: true, searchPlaceholder: '输入资源名称查询' },
           {
@@ -237,7 +258,7 @@
             ) +
             fieldRow(
               { label: '操作动作', value: actionTag(row.action) },
-              { label: '资源类型', value: row.resource_type || '-' }
+              { label: '资源类型', value: resourceTypeLabel(row.resource_type) }
             ) +
             fieldRow(
               { label: '资源ID', value: row.resource_id || '-' },

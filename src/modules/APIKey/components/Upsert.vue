@@ -516,6 +516,36 @@
               </FormItem>
             </Col>
           </Row>
+
+          <!-- 批量限流 -->
+          <div class="rules-section">
+            <h4 class="rules-title">{{ $t("apiKey.batchLimits") }}</h4>
+            <Row :gutter="16">
+              <Col
+                v-for="field in batchLimitFields"
+                :key="field.key"
+                span="12"
+              >
+                <FormItem
+                  :label="$t(field.labelKey)"
+                  :prop="'rate_limit_policy.rules.batch_limits.' + field.key"
+                  :rules="[{ validator: validateBatchLimit }]"
+                >
+                  <InputNumber
+                    v-model="
+                      formData.rate_limit_policy.rules.batch_limits[field.key]
+                    "
+                    :max="INT64_MAX"
+                    :precision="0"
+                    :formatter="formatNumberInput"
+                    :parser="parseNumberInput"
+                    style="width: 100%"
+                  ></InputNumber>
+                </FormItem>
+              </Col>
+            </Row>
+            <p class="form-tip">{{ $t("apiKey.batchLimitsTip") }}</p>
+          </div>
         </div>
       </Card>
 
@@ -540,6 +570,13 @@ import { getModelGroupsFromServices } from "@/utils/model";
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
 const DESCRIPTION_MAX_LENGTH = 512;
+// 批量限流（batch_limits）维度：回显、校验、提交组装共用
+const BATCH_LIMIT_FIELDS = [
+  { key: "max_create_rpm", labelKey: "apiKey.batchMaxCreateRpm" },
+  { key: "max_active_batches", labelKey: "apiKey.batchMaxActiveBatches" },
+  { key: "max_file_bytes", labelKey: "apiKey.batchMaxFileBytes" },
+  { key: "max_file_lines", labelKey: "apiKey.batchMaxFileLines" },
+];
 
 export default {
   props: {
@@ -682,6 +719,8 @@ export default {
         const rpm = that.formData.rate_limit_policy.rules.rpm || [];
         const maxConcurrency =
           that.formData.rate_limit_policy.rules.max_concurrency;
+        const batchLimits =
+          that.formData.rate_limit_policy.rules.batch_limits || {};
         const hasTpmRules = tpm.length > 0;
         const hasRpmRules = rpm.length > 0;
         const hasEffectiveMaxConcurrency =
@@ -689,7 +728,15 @@ export default {
           (that.maxConcurrencyMode === "limited" &&
             Number.isInteger(maxConcurrency) &&
             maxConcurrency > 0);
-        if (!hasTpmRules && !hasRpmRules && !hasEffectiveMaxConcurrency) {
+        const hasBatchLimits = BATCH_LIMIT_FIELDS.some(
+          (f) => Number(batchLimits[f.key]) > 0
+        );
+        if (
+          !hasTpmRules &&
+          !hasRpmRules &&
+          !hasEffectiveMaxConcurrency &&
+          !hasBatchLimits
+        ) {
           callback(new Error(this.$t("apiKey.rateLimitRuleRequired")));
           return;
         }
@@ -725,6 +772,7 @@ export default {
       RMB_QUOTA_MAX,
       INT_MAX,
       DESCRIPTION_MAX_LENGTH,
+      batchLimitFields: BATCH_LIMIT_FIELDS,
       neverExpire: true,
       subnetInput: "*",
       formRenderKey: 0,
@@ -751,6 +799,12 @@ export default {
             tpm: [],
             rpm: [],
             max_concurrency: 1,
+            batch_limits: {
+              max_create_rpm: null,
+              max_active_batches: null,
+              max_file_bytes: null,
+              max_file_lines: null,
+            },
           },
         },
       },
@@ -972,6 +1026,10 @@ export default {
         this.formData.rate_limit_policy.rules.rpm,
         "rpm"
       );
+      this.formData.rate_limit_policy.rules.batch_limits =
+        this.normalizeBatchLimits(
+          this.formData.rate_limit_policy.rules.batch_limits
+        );
 
       this.syncMaxConcurrencyMode();
 
@@ -1369,6 +1427,59 @@ export default {
         return next;
       });
     },
+    // 批量限流：缺失/为空/非正数一律回显为空
+    normalizeBatchLimits(batchLimits) {
+      const src = batchLimits || {};
+      const result = {};
+      BATCH_LIMIT_FIELDS.forEach((f) => {
+        const value = src[f.key];
+        result[f.key] =
+          value !== undefined &&
+          value !== null &&
+          value !== "" &&
+          Number(value) > 0
+            ? Number(value)
+            : null;
+      });
+      return result;
+    },
+    // 批量限流校验：负数报「X不能为负数」；留空或 0 视为不配此维度，放行
+    validateBatchLimit(rule, value, callback) {
+      if (value === "" || value === null || value === undefined) {
+        callback();
+        return;
+      }
+      const num = Number(value);
+      if (!Number.isFinite(num) || num < 0) {
+        const fieldKey = String((rule && rule.field) || "").split(".").pop();
+        const meta = BATCH_LIMIT_FIELDS.find((f) => f.key === fieldKey);
+        callback(
+          new Error(
+            this.$t("apiKey.batchLimitNegativeError", {
+              label: meta ? this.$t(meta.labelKey) : fieldKey,
+            })
+          )
+        );
+        return;
+      }
+      callback();
+    },
+    // 批量限流提交组装：留空或 ≤0 的维度不提交；全部未配置时返回 null（省略整个 batch_limits）
+    collectBatchLimits(batchLimits) {
+      const result = {};
+      BATCH_LIMIT_FIELDS.forEach((f) => {
+        const raw = batchLimits ? batchLimits[f.key] : null;
+        if (raw === "" || raw === null || raw === undefined) {
+          return;
+        }
+        const num = Number(raw);
+        if (!Number.isFinite(num) || num <= 0) {
+          return;
+        }
+        result[f.key] = num;
+      });
+      return Object.keys(result).length > 0 ? result : null;
+    },
     validateTpmRuleName(rule, value, callback) {
       if (this.formData.rate_limit_policy.enabled === "false") {
         callback();
@@ -1526,6 +1637,15 @@ export default {
               submitData.rate_limit_policy.rules.rpm = this.stripRateLimitRuleMeta(
                 submitData.rate_limit_policy.rules.rpm
               );
+              // 批量限流：留空或 ≤0 不提交，全部未配置时省略 batch_limits
+              const batchLimits = this.collectBatchLimits(
+                submitData.rate_limit_policy.rules.batch_limits
+              );
+              if (batchLimits) {
+                submitData.rate_limit_policy.rules.batch_limits = batchLimits;
+              } else {
+                delete submitData.rate_limit_policy.rules.batch_limits;
+              }
             }
 
             this.$emit("submit", submitData);

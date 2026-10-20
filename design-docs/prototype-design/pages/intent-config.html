@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../assets/static/css/app.css" />
+    <link rel="stylesheet" href="../assets/static/css/ai-rule.css" />
+    <link rel="stylesheet" href="../assets/font/iconfont.css" />
+    <link rel="stylesheet" href="../assets/css/prototype-overrides.css" />
+    <style>
+      .ic-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+      .ic-desc { color:#515a6e; font-size:14px; }
+      .ic-actions { display:flex; align-items:center; gap:8px; }
+      .ic-item-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+      .ic-item-row input { height:32px; border:1px solid #dcdee2; border-radius:4px; padding:0 8px; flex:1; }
+      .ic-list-empty { color:#808695; font-size:12px; padding:8px 0; }
+      .ic-unpublished-tip { background:#f0f6ff; border:1px solid #c8ddff; border-radius:4px; color:#2d8cf0; font-size:12px; line-height:1.6; padding:8px 12px; margin-bottom:16px; }
+      .ic-global-value { color:#17233d; line-height:32px; }
+      .ic-hint { color:#808695; font-size:12px; line-height:1.6; margin-top:4px; }
+      .ic-list-toolbar { display:flex; align-items:center; justify-content:flex-start; margin-bottom:12px; }
+      #ic-question-table .el-pagination { display:none; }
+      .question-view .info-row { display:flex; padding:8px 0; line-height:24px; }
+      .question-view .info-label { width:120px; flex-shrink:0; color:#808695; }
+      .question-view .info-value { flex:1; color:#17233d; word-break:break-all; }
+      .question-view .list-line { line-height:24px; }
+      .question-view .empty-text { color:#999; }
+    </style>
+    <script src="../assets/js/mock-data.js"></script>
+    <script src="../assets/js/ivu-ui.js"></script>
+    <script src="../assets/js/layout.js"></script>
+    <script src="../assets/js/prototype.js"></script>
+  </head>
+  <body>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var root = Layout.render({ pageId: 'IntentConfig.list', basePath: '../' });
+        root.innerHTML = '<div id="intent-config-page"></div>';
+
+        var isReadonly = Prototype.isReadonly();
+
+        var TYPE_LABELS = { choice: '枚举（choice）', score: '评分（score）' };
+        var MAX_QUESTIONS = 10;
+        var MAX_OPTIONS = 10;
+
+        var state = {
+          published: !!(MockData.intentConfig && MockData.intentConfig.questions),
+          mode: 'view',
+          minConfidence: 0.6,
+          originalMinConfidence: 0.6,
+          questions: [],
+          originalQuestions: [],
+          drawerMode: 'add',
+          editingIndex: -1,
+          draft: null
+        };
+
+        function clone(value) {
+          return value == null ? value : JSON.parse(JSON.stringify(value));
+        }
+
+        function normalizeOptions(raw) {
+          if (!raw) return [];
+          if (Array.isArray(raw)) {
+            return raw.map(function (item) {
+              if (item && typeof item === 'object') {
+                return { name: item.name || '', description: item.description || '' };
+              }
+              return { name: item == null ? '' : String(item), description: '' };
+            });
+          }
+          if (typeof raw === 'object') {
+            return Object.keys(raw).map(function (key) {
+              return { name: key, description: raw[key] == null ? '' : String(raw[key]) };
+            });
+          }
+          return [];
+        }
+
+        function normalizeQuestion(raw) {
+          var type = raw && raw.type === 'score' ? 'score' : 'choice';
+          return {
+            name: (raw && raw.name) || '',
+            type: type,
+            instructions: (raw && raw.instructions) || '',
+            criteria: type === 'choice' ? normalizeOptions(raw && raw.criteria) : [],
+            levels: type === 'score' ? normalizeOptions(raw && raw.levels) : [],
+            min_confidence:
+              raw && raw.min_confidence != null ? Number(raw.min_confidence) : null
+          };
+        }
+
+        function optionKey(q) { return q && q.type === 'choice' ? 'criteria' : 'levels'; }
+        function optionNoun(q) { return q && q.type === 'choice' ? '选项' : '档位'; }
+        function optionList(q) { return q ? (q[optionKey(q)] || []) : []; }
+        function optionLabelText(q) {
+          return q && q.type === 'choice'
+            ? '选项（criteria，1-10 项，选项名不含 |）'
+            : '档位（levels，1-10 档，低→高）';
+        }
+
+        function newQuestion() {
+          return { name: '', type: 'choice', instructions: '', criteria: [], levels: [], min_confidence: null };
+        }
+
+        function loadConfig() {
+          var cfg = MockData.intentConfig;
+          state.published = !!(cfg && cfg.questions);
+          state.minConfidence = cfg && cfg.min_confidence != null ? cfg.min_confidence : 0.6;
+          state.originalMinConfidence = state.minConfidence;
+          state.questions = ((cfg && cfg.questions) || []).map(normalizeQuestion);
+          state.originalQuestions = clone(state.questions);
+        }
+
+        // ======= Render =======
+        function renderPage() {
+          document.getElementById('intent-config-page').innerHTML =
+            '<div class="ic-header">' +
+              '<div class="ic-desc">意图配置（单例，全量覆盖式写入，无历史版本；问题数量 0-10，为空数组表示停用意图分类）</div>' +
+              '<div class="ic-actions">' +
+                (isReadonly ? '' :
+                  state.mode === 'view'
+                    ? IvuUI.btn('进入编辑模式', 'primary', 'small', '', 'id="btn-ic-enter-edit"')
+                    : IvuUI.btn('退出编辑模式', 'default', 'small', '', 'id="btn-ic-exit-edit"') + ' ' +
+                      IvuUI.btn('保存并发布', 'success', 'small', '', 'id="btn-ic-save"')) +
+              '</div>' +
+            '</div>' +
+            (state.published ? '' :
+              '<div class="ic-unpublished-tip">意图配置尚未发布，当前展示的是默认配置，点击右上角「保存并发布」后生效。</div>') +
+            '<div class="ivu-card ivu-card-bordered form-card" style="margin-bottom:16px;">' +
+              '<div class="ivu-card-head"><p>全局配置</p></div>' +
+              '<div class="ivu-card-body">' +
+                IvuUI.formTopItem('最小置信度（0-1，默认 0.6，全局门限，可被单问题覆盖）',
+                  state.mode === 'view'
+                    ? '<span class="ic-global-value">' + state.minConfidence + '</span>'
+                    : IvuUI.inputNumber('', 'id="ic-min-confidence" min="0" max="1" step="0.01" placeholder="0.6"')) +
+              '</div>' +
+            '</div>' +
+            '<div class="ivu-card ivu-card-bordered form-card">' +
+              '<div class="ivu-card-head"><p>问题列表（当前 ' + state.questions.length + ' / ' + MAX_QUESTIONS + '）</p></div>' +
+              '<div class="ivu-card-body">' +
+                '<div class="ic-list-toolbar"' + (state.mode === 'view' ? ' style="display:none;"' : '') + '>' +
+                  (isReadonly ? '' : IvuUI.btn('添加问题', 'primary', 'small', '', 'id="btn-ic-add"')) +
+                '</div>' +
+                '<div id="ic-question-table"></div>' +
+              '</div>' +
+            '</div>' +
+            drawerQuestion();
+
+          var minEl = document.getElementById('ic-min-confidence');
+          if (minEl) minEl.value = state.minConfidence;
+          bindHeaderButtons();
+          renderQuestionTable();
+        }
+
+        function renderQuestionTable() {
+          var container = document.getElementById('ic-question-table');
+          if (!container) return;
+          container.innerHTML = IvuUI.pageTable({
+            tableId: 'ic-question-page-table',
+            columns: [
+              { title: '问题名称', key: 'name', minWidth: 180, render: function (row) { return IvuUI.escapeHtml(row.name || '-'); } },
+              {
+                title: '类型', key: 'type', width: 160,
+                render: function (row) {
+                  return IvuUI.tag(TYPE_LABELS[row.type] || row.type || '-', row.type === 'score' ? 'success' : 'primary');
+                }
+              },
+              {
+                title: '判定说明', key: 'instructions', minWidth: 320,
+                render: function (row) { return IvuUI.escapeHtml(row.instructions || '-'); }
+              },
+              {
+                title: '操作', key: 'action', width: 220,
+                render: function (row, rowIndex) {
+                  if (isReadonly || state.mode === 'view') {
+                    return IvuUI.btn('查看', 'primary', 'small', '', 'data-ic-view="' + rowIndex + '"');
+                  }
+                  return IvuUI.btn('编辑', 'success', 'small', '', 'data-ic-edit="' + rowIndex + '"') + ' ' +
+                    IvuUI.btn('删除', 'error', 'small', '', 'data-ic-del="' + rowIndex + '"');
+                }
+              }
+            ],
+            rows: state.questions,
+            total: state.questions.length,
+            pageSize: 20,
+            currentPage: 1
+          });
+          bindQuestionTableEvents();
+        }
+
+        // ======= Drawer =======
+        function drawerQuestion() {
+          var footer =
+            '<div class="com-btn-box drawer-footer route-drawer-footer">' +
+              IvuUI.btn('保存', 'primary', 'small', '', 'id="btn-ic-q-save"') + ' ' +
+              IvuUI.btn('取消', 'default', 'small', 'reset-btn', 'id="btn-ic-q-cancel"') +
+            '</div>';
+          return IvuUI.drawer('drawer-intent-question', '添加问题', '<div class="ivu-drawer-body-placeholder"></div>', footer, '60%');
+        }
+
+        function viewInfoRow(label, valueHtml) {
+          return '<div class="info-row"><span class="info-label">' + label +
+            '</span><span class="info-value">' + valueHtml + '</span></div>';
+        }
+
+        function viewQuestionBody(q) {
+          var isChoice = q.type === 'choice';
+          var list = optionList(q);
+          var optionsHtml = list.length
+            ? list.map(function (item) {
+              return '<div class="list-line">' + IvuUI.escapeHtml(item.name) +
+                (item.description ? '：' + IvuUI.escapeHtml(item.description) : '') + '</div>';
+            }).join('')
+            : '<span class="empty-text">' + (isChoice ? '暂无选项' : '暂无档位') + '</span>';
+          return '<div class="question-view">' +
+            viewInfoRow('问题名称', IvuUI.escapeHtml(q.name || '-')) +
+            viewInfoRow('类型', TYPE_LABELS[q.type] || IvuUI.escapeHtml(q.type || '-')) +
+            viewInfoRow('判定说明', IvuUI.escapeHtml(q.instructions || '-')) +
+            viewInfoRow(isChoice ? '选项' : '档位', optionsHtml) +
+            viewInfoRow('最小置信度覆盖',
+              q.min_confidence != null ? String(q.min_confidence) : '使用全局门限（' + state.minConfidence + '）') +
+            '</div>';
+        }
+
+        function editQuestionBody(q) {
+          var typeOptions = Object.keys(TYPE_LABELS).map(function (key) {
+            return '<option value="' + key + '"' + (q.type === key ? ' selected' : '') + '>' + TYPE_LABELS[key] + '</option>';
+          }).join('');
+          return '<form class="ivu-form ivu-form-label-top">' +
+            IvuUI.formTopItem('问题名称（全局唯一）',
+              '<div class="ivu-input-wrapper ivu-input-type-text">' +
+                '<input type="text" id="ic-q-name" class="ivu-input" value="' +
+                IvuUI.escapeHtml(q.name || '') + '" placeholder="如 task_type" maxlength="64" />' +
+              '</div>', true) +
+            IvuUI.formTopItem('类型',
+              '<div class="ivu-select ivu-select-single" style="width:220px;">' +
+                '<div class="ivu-select-selection">' +
+                  '<select id="ic-q-type" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    typeOptions +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div>' +
+              '</div>', true) +
+            IvuUI.formTopItem('判定说明（instructions）',
+              '<div class="ivu-input-wrapper ivu-input-type-textarea">' +
+                '<textarea id="ic-q-instructions" class="ivu-input" rows="3" placeholder="供分类模型参考的自然语言说明">' +
+                IvuUI.escapeHtml(q.instructions || '') + '</textarea>' +
+              '</div>') +
+            IvuUI.formTopItem('<span id="ic-q-option-label">' + optionLabelText(q) + '</span>',
+              '<div id="ic-q-options"></div>' +
+              '<div style="margin-top:8px;">' +
+                IvuUI.btn('添加' + optionNoun(q), 'default', 'small', '', 'id="btn-ic-q-option-add"') +
+              '</div>') +
+            IvuUI.formTopItem('最小置信度覆盖（可选，留空则使用全局门限）',
+              IvuUI.inputNumber(q.min_confidence != null ? q.min_confidence : '', 'id="ic-q-min-confidence" min="0" max="1" step="0.01" placeholder="留空使用全局门限"')) +
+            '</form>';
+        }
+
+        function setQuestionDrawerTitle(mode) {
+          var titleEl = document.querySelector('#drawer-intent-question .ivu-drawer-header-inner');
+          if (!titleEl) return;
+          titleEl.textContent = mode === 'view' ? '查看问题' : (mode === 'add' ? '添加问题' : '编辑问题');
+        }
+
+        function openQuestionDrawer(mode, index) {
+          state.drawerMode = mode;
+          if (mode === 'add') {
+            state.editingIndex = -1;
+            state.draft = newQuestion();
+          } else {
+            state.editingIndex = index;
+            state.draft = clone(state.questions[index]);
+          }
+
+          var drawerContent = document.querySelector('#drawer-intent-question .ivu-drawer-content');
+          var bodyEl = drawerContent.querySelector('.ivu-drawer-body');
+          var footerEl = drawerContent.querySelector('.ivu-drawer-footer');
+
+          if (mode === 'view') {
+            bodyEl.innerHTML = viewQuestionBody(state.draft);
+            if (footerEl) footerEl.style.display = 'none';
+          } else {
+            bodyEl.innerHTML = editQuestionBody(state.draft);
+            if (footerEl) footerEl.style.display = '';
+            bindQuestionDrawerEvents();
+          }
+
+          setQuestionDrawerTitle(mode);
+          Prototype.openDrawer('drawer-intent-question');
+        }
+
+        function renderOptions() {
+          var container = document.getElementById('ic-q-options');
+          if (!container) return;
+          var q = state.draft;
+          var list = optionList(q);
+          if (!list.length) {
+            container.innerHTML = '<div class="ic-list-empty">暂无' + optionNoun(q) + '</div>';
+            bindOptionEvents();
+            return;
+          }
+          container.innerHTML = list.map(function (item, oi) {
+            return '<div class="ic-item-row">' +
+              '<input type="text" data-ic-opt-name="' + oi + '" value="' + IvuUI.escapeHtml(item.name == null ? '' : item.name) +
+              '" placeholder="' + (q.type === 'choice' ? '选项名' : '档位名') + '" style="flex:1;" />' +
+              '<input type="text" data-ic-opt-desc="' + oi + '" value="' + IvuUI.escapeHtml(item.description == null ? '' : item.description) +
+              '" placeholder="' + (q.type === 'choice' ? '选项描述' : '档位描述') + '" style="flex:2;" />' +
+              IvuUI.btn('删除', 'error', 'small', '', 'data-ic-opt-del="' + oi + '"') +
+              '</div>';
+          }).join('');
+          bindOptionEvents();
+        }
+
+        function bindOptionEvents() {
+          var container = document.getElementById('ic-q-options');
+          if (!container) return;
+          container.querySelectorAll('[data-ic-opt-name]').forEach(function (input) {
+            input.oninput = function () {
+              optionList(state.draft)[parseInt(input.getAttribute('data-ic-opt-name'), 10)].name = input.value;
+            };
+          });
+          container.querySelectorAll('[data-ic-opt-desc]').forEach(function (input) {
+            input.oninput = function () {
+              optionList(state.draft)[parseInt(input.getAttribute('data-ic-opt-desc'), 10)].description = input.value;
+            };
+          });
+          container.querySelectorAll('[data-ic-opt-del]').forEach(function (btn) {
+            btn.onclick = function () {
+              optionList(state.draft).splice(parseInt(btn.getAttribute('data-ic-opt-del'), 10), 1);
+              renderOptions();
+            };
+          });
+        }
+
+        function bindQuestionDrawerEvents() {
+          var nameEl = document.getElementById('ic-q-name');
+          var typeEl = document.getElementById('ic-q-type');
+          var instructionsEl = document.getElementById('ic-q-instructions');
+          var minEl = document.getElementById('ic-q-min-confidence');
+
+          nameEl.oninput = function () { state.draft.name = nameEl.value; };
+          instructionsEl.oninput = function () { state.draft.instructions = instructionsEl.value; };
+          minEl.oninput = function () {
+            state.draft.min_confidence = minEl.value === '' ? null : parseFloat(minEl.value);
+          };
+
+          typeEl.onchange = function () {
+            var nextType = typeEl.value;
+            if (state.draft.type === nextType) return;
+            state.draft.type = nextType;
+            if (nextType === 'choice') {
+              state.draft.levels = [];
+              if (!state.draft.criteria) state.draft.criteria = [];
+            } else {
+              state.draft.criteria = [];
+              if (!state.draft.levels) state.draft.levels = [];
+            }
+            var labelEl = document.getElementById('ic-q-option-label');
+            if (labelEl) labelEl.textContent = optionLabelText(state.draft);
+            var addBtn = document.getElementById('btn-ic-q-option-add');
+            if (addBtn) addBtn.querySelector('span').textContent = '添加' + optionNoun(state.draft);
+            renderOptions();
+          };
+
+          var addOptBtn = document.getElementById('btn-ic-q-option-add');
+          if (addOptBtn) addOptBtn.onclick = function () {
+            var key = optionKey(state.draft);
+            if (!state.draft[key]) state.draft[key] = [];
+            var list = state.draft[key];
+            if (list.length >= MAX_OPTIONS) { Prototype.toast('最多 ' + MAX_OPTIONS + ' 项', 'error'); return; }
+            list.push({ name: '', description: '' });
+            renderOptions();
+          };
+
+          var saveBtn = document.getElementById('btn-ic-q-save');
+          if (saveBtn) saveBtn.onclick = saveQuestion;
+
+          var cancelBtn = document.getElementById('btn-ic-q-cancel');
+          if (cancelBtn) cancelBtn.onclick = function () { Prototype.closeDrawer('drawer-intent-question'); };
+
+          renderOptions();
+        }
+
+        function saveQuestion() {
+          var q = state.draft;
+          var name = (q.name || '').trim();
+          if (!name) { Prototype.toast('请输入问题名称', 'error'); return; }
+          if (name.length > 64) { Prototype.toast('问题名称不能超过 64 字符', 'error'); return; }
+
+          var duplicated = state.questions.some(function (item, idx) {
+            if (state.drawerMode === 'edit' && idx === state.editingIndex) return false;
+            return (item.name || '').trim() === name;
+          });
+          if (duplicated) { Prototype.toast('问题名称已存在：' + name, 'error'); return; }
+
+          if (q.type !== 'choice' && q.type !== 'score') { Prototype.toast('类型非法', 'error'); return; }
+
+          var list = optionList(q);
+          if (!list.length || list.length > MAX_OPTIONS) {
+            Prototype.toast(optionNoun(q) + '数量必须为 1-' + MAX_OPTIONS, 'error'); return;
+          }
+          var names = [];
+          for (var i = 0; i < list.length; i++) {
+            var val = String(list[i].name == null ? '' : list[i].name).trim();
+            if (!val) { Prototype.toast(optionNoun(q) + '名不能为空', 'error'); return; }
+            if (q.type === 'choice' && val.indexOf('|') !== -1) { Prototype.toast('选项名不能包含 |', 'error'); return; }
+            names.push(val);
+          }
+          var hasDuplicate = names.some(function (v, idx) { return names.indexOf(v) !== idx; });
+          if (hasDuplicate) { Prototype.toast(q.type === 'choice' ? '选项名不能重复' : '档位名不能重复', 'error'); return; }
+          if (q.min_confidence != null && (isNaN(q.min_confidence) || q.min_confidence < 0 || q.min_confidence > 1)) {
+            Prototype.toast('最小置信度覆盖必须为 0-1', 'error'); return;
+          }
+
+          var options = list.map(function (item) {
+            return {
+              name: String(item.name == null ? '' : item.name).trim(),
+              description: String(item.description == null ? '' : item.description).trim()
+            };
+          });
+          var data = {
+            name: name,
+            type: q.type,
+            instructions: (q.instructions || '').trim(),
+            criteria: q.type === 'choice' ? options : [],
+            levels: q.type === 'score' ? options : [],
+            min_confidence: q.min_confidence != null ? Number(q.min_confidence) : null
+          };
+
+          if (state.drawerMode === 'add') {
+            if (state.questions.length >= MAX_QUESTIONS) { Prototype.toast('最多配置 ' + MAX_QUESTIONS + ' 个问题', 'error'); return; }
+            state.questions.push(data);
+          } else if (state.editingIndex >= 0) {
+            state.questions[state.editingIndex] = data;
+          }
+
+          Prototype.closeDrawer('drawer-intent-question');
+          renderPage();
+          Prototype.toast(state.drawerMode === 'add' ? '已添加问题' : '已保存问题');
+        }
+
+        // ======= Table events =======
+        function bindQuestionTableEvents() {
+          var container = document.getElementById('ic-question-table');
+          if (!container) return;
+          container.querySelectorAll('[data-ic-view]').forEach(function (btn) {
+            btn.onclick = function () { openQuestionDrawer('view', parseInt(btn.getAttribute('data-ic-view'), 10)); };
+          });
+          container.querySelectorAll('[data-ic-edit]').forEach(function (btn) {
+            btn.onclick = function () { openQuestionDrawer('edit', parseInt(btn.getAttribute('data-ic-edit'), 10)); };
+          });
+          container.querySelectorAll('[data-ic-del]').forEach(function (btn) {
+            btn.onclick = function () { deleteQuestion(parseInt(btn.getAttribute('data-ic-del'), 10)); };
+          });
+        }
+
+        function bindHeaderButtons() {
+          var addBtn = document.getElementById('btn-ic-add');
+          if (addBtn) addBtn.onclick = addQuestion;
+          var enterBtn = document.getElementById('btn-ic-enter-edit');
+          if (enterBtn) enterBtn.onclick = enterEditMode;
+          var exitBtn = document.getElementById('btn-ic-exit-edit');
+          if (exitBtn) exitBtn.onclick = exitEditMode;
+          var saveBtn = document.getElementById('btn-ic-save');
+          if (saveBtn) saveBtn.onclick = saveConfig;
+        }
+
+        function addQuestion() {
+          if (state.questions.length >= MAX_QUESTIONS) {
+            Prototype.toast('最多配置 ' + MAX_QUESTIONS + ' 个问题', 'error');
+            return;
+          }
+          openQuestionDrawer('add');
+        }
+
+        function deleteQuestion(index) {
+          var q = state.questions[index];
+          if (!q) return;
+          Prototype.confirm({
+            title: '提示',
+            content: '确认删除该问题？保存并发布后将同步移除。',
+            onOk: function () {
+              state.questions.splice(index, 1);
+              renderPage();
+              Prototype.toast('已删除问题');
+            },
+            onCancel: function () { Prototype.toast('取消删除', 'info'); }
+          });
+        }
+
+        function enterEditMode() {
+          state.mode = 'edit';
+          state.originalMinConfidence = state.minConfidence;
+          state.originalQuestions = clone(state.questions);
+          renderPage();
+        }
+
+        function isDirty() {
+          return JSON.stringify({ min: state.minConfidence, questions: state.questions }) !==
+            JSON.stringify({ min: state.originalMinConfidence, questions: state.originalQuestions });
+        }
+
+        function exitEditMode() {
+          if (isDirty()) {
+            Prototype.confirm({
+              title: '提示',
+              content: '当前有未提交的改动，退出编辑模式将丢弃这些改动，确认退出？',
+              onOk: function () {
+                performExitEditMode();
+                Prototype.toast('已退出编辑模式', 'info');
+              },
+              onCancel: function () { Prototype.toast('已取消退出', 'info'); }
+            });
+            return;
+          }
+          performExitEditMode();
+        }
+
+        function performExitEditMode() {
+          state.mode = 'view';
+          loadConfig();
+          renderPage();
+        }
+
+        // ======= Validation & Save =======
+        function validate() {
+          var minConfidence = parseFloat(document.getElementById('ic-min-confidence').value);
+          if (isNaN(minConfidence) || minConfidence < 0 || minConfidence > 1) return '最小置信度必须为 0-1';
+          if (state.questions.length > MAX_QUESTIONS) return '问题数量不能超过 ' + MAX_QUESTIONS;
+
+          var names = {};
+          for (var i = 0; i < state.questions.length; i++) {
+            var q = state.questions[i];
+            var name = (q.name || '').trim();
+            if (!name) return '问题 ' + (i + 1) + '：请输入问题名称';
+            if (names[name]) return '问题名称重复：' + name;
+            names[name] = true;
+            if (q.type !== 'choice' && q.type !== 'score') return '问题 ' + (i + 1) + '：类型非法';
+            if (q.type === 'choice') {
+              var criteria = q.criteria || [];
+              if (!criteria.length || criteria.length > MAX_OPTIONS) return '问题 ' + name + '：枚举选项数量必须为 1-' + MAX_OPTIONS;
+              var criteriaNames = [];
+              for (var c = 0; c < criteria.length; c++) {
+                var cName = String(criteria[c].name || '').trim();
+                if (!cName) return '问题 ' + name + '：选项名不能为空';
+                if (cName.indexOf('|') !== -1) return '问题 ' + name + '：选项名不能包含 |';
+                if (criteriaNames.indexOf(cName) !== -1) return '问题 ' + name + '：选项名不能重复';
+                criteriaNames.push(cName);
+              }
+            } else {
+              var levels = q.levels || [];
+              if (!levels.length || levels.length > MAX_OPTIONS) return '问题 ' + name + '：评分档位数量必须为 1-' + MAX_OPTIONS;
+              var levelNames = [];
+              for (var l = 0; l < levels.length; l++) {
+                var lName = String(levels[l].name || '').trim();
+                if (!lName) return '问题 ' + name + '：档位名不能为空';
+                if (levelNames.indexOf(lName) !== -1) return '问题 ' + name + '：档位名不能重复';
+                levelNames.push(lName);
+              }
+            }
+            if (q.min_confidence != null) {
+              if (isNaN(q.min_confidence) || q.min_confidence < 0 || q.min_confidence > 1) return '问题 ' + name + '：最小置信度覆盖必须为 0-1';
+            }
+          }
+          return '';
+        }
+
+        function saveConfig() {
+          var err = validate();
+          if (err) { Prototype.toast(err, 'error'); return; }
+
+          var questions = state.questions.map(function (q) {
+            var item = {
+              name: (q.name || '').trim(),
+              type: q.type,
+              instructions: (q.instructions || '').trim()
+            };
+            if (q.type === 'choice') {
+              var criteria = {};
+              (q.criteria || []).forEach(function (o) {
+                criteria[String(o.name || '').trim()] = String(o.description || '').trim();
+              });
+              item.criteria = criteria;
+            } else {
+              item.levels = (q.levels || []).map(function (o) {
+                return {
+                  name: String(o.name || '').trim(),
+                  description: String(o.description || '').trim()
+                };
+              });
+            }
+            if (q.min_confidence != null) item.min_confidence = Number(q.min_confidence);
+            return item;
+          });
+
+          MockData.intentConfig = {
+            min_confidence: parseFloat(document.getElementById('ic-min-confidence').value),
+            questions: questions
+          };
+          state.mode = 'view';
+          loadConfig();
+          renderPage();
+          Prototype.toast('保存并发布成功！');
+        }
+
+        Prototype.bindDrawerClose();
+        loadConfig();
+        if (!state.published && !isReadonly) {
+          state.mode = 'edit';
+          state.originalMinConfidence = state.minConfidence;
+          state.originalQuestions = clone(state.questions);
+        }
+        renderPage();
+      });
+    </script>
+  </body>
+</html>

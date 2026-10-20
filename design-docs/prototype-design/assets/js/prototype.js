@@ -21,6 +21,11 @@ window.Prototype = {
       'nav.AIClusterManage': 'AI业务集群',
       'nav.RouteManage': '路由管理',
       'nav.RouteTableManage': '路由表',
+      'nav.FeatureEnhanceManage': '功能增强',
+      'nav.AICacheRuleManage': 'AI缓存规则',
+      'nav.TrafficMirrorRuleManage': '流量镜像规则',
+      'nav.IntentConfigManage': '意图配置',
+      'nav.AIContextRuleManage': 'AI上下文压缩',
       'nav.DefaultRouteRuleManage': '默认转发规则',
       'nav.AdvanceRouteRuleManage': '路由规则',
       'nav.ConsumerManage': '消费者管理',
@@ -33,6 +38,14 @@ window.Prototype = {
       'nav.EppPoolManage': 'EPP调度',
       'nav.CertsManage': '证书管理',
       'nav.ReportManage': '数据报表',
+      'nav.BatchTaskManage': '批量任务',
+      'nav.SystemSecurityManage': '系统安全',
+      'nav.ReencryptSweepManage': '密钥收敛',
+      'user.passwordPlaceholder': '长度 8-72 字节（bcrypt 上限），不含空白字符，不能等于用户名或其逆序',
+      'user.tipReservedUserName': '「admin」「root」「system」为保留用户名，创建用户时不可使用',
+      'user.tipPasswordLength': '密码长度须为 8-72 字节（bcrypt 上限，按 UTF-8 字节计）',
+      'user.tipPasswordWhitespace': '密码不能包含空白字符',
+      'user.tipPasswordUserName': '密码不能等于用户名或其逆序',
     },
     en: {
       'login.gateway': 'Rainway AI Gateway',
@@ -51,17 +64,30 @@ window.Prototype = {
       'nav.AIClusterManage': 'AI Cluster Manage',
       'nav.RouteManage': 'Route Manage',
       'nav.RouteTableManage': 'Route Tables',
+      'nav.FeatureEnhanceManage': 'Feature Enhance',
+      'nav.AICacheRuleManage': 'AI Cache Rules',
+      'nav.TrafficMirrorRuleManage': 'Traffic Mirror Rules',
+      'nav.IntentConfigManage': 'Intent Config',
+      'nav.AIContextRuleManage': 'AI Context Compress',
       'nav.DefaultRouteRuleManage': 'Default Route Rule Manage',
       'nav.AdvanceRouteRuleManage': 'Advance Route Rule Manage',
       'nav.ConsumerManage': 'Consumer Manage',
       'nav.EntityManage': 'Entity Manage',
       'nav.APIKeyManage': 'API Key Manage',
+      'nav.BatchTaskManage': 'Batch Tasks',
+      'nav.SystemSecurityManage': 'System Security',
+      'nav.ReencryptSweepManage': 'Key Re-encryption',
       'nav.ModelManage': 'Model Manage',
       'nav.ModelPriceManage': 'Model Pricing',
       'nav.UserManage': 'User Manage',
       'nav.OperationLogManage': 'Operation Logs',
       'nav.EppPoolManage': 'EPP Scheduling',
       'nav.ReportManage': 'Data Report',
+      'user.passwordPlaceholder': '8-72 bytes (bcrypt limit), no whitespace, must not equal the user name or its reverse',
+      'user.tipReservedUserName': '"admin", "root" and "system" are reserved user names and cannot be used when creating a user',
+      'user.tipPasswordLength': 'Password must be 8-72 bytes (bcrypt limit, counted as UTF-8 bytes)',
+      'user.tipPasswordWhitespace': 'Password must not contain whitespace',
+      'user.tipPasswordUserName': 'Password must not equal the user name or its reverse',
     },
   },
 
@@ -95,6 +121,13 @@ window.Prototype = {
       this.USER_KEY,
       JSON.stringify(user || { name: 'admin' }),
     );
+  },
+
+  // 只读管理员判定：登录态带 role，system_admin_readonly 为只读视角。
+  // 与 src/store.js 的 isReadonly() 语义一致（不做 is_admin 回退）。
+  isReadonly() {
+    var user = this.getUser();
+    return !!(user && user.role === 'system_admin_readonly');
   },
 
   removeUser() {
@@ -310,14 +343,13 @@ window.Prototype = {
       tab.addEventListener('click', function () {
         var name = tab.getAttribute('data-tab');
         container.querySelectorAll('.ivu-tabs-tab').forEach(function (t) {
-          t.classList.remove('ivu-tabs-tab-active');
+          t.classList.toggle('ivu-tabs-tab-active', t === tab);
         });
         container.querySelectorAll('[data-tab-pane]').forEach(function (p) {
-          p.classList.remove('ivu-tabs-tabpane-active');
+          var isTarget = p.getAttribute('data-tab-pane') === name;
+          p.classList.toggle('ivu-tabs-tabpane-active', isTarget);
+          p.classList.toggle('ivu-tabs-tabpane-inactive', !isTarget);
         });
-        tab.classList.add('ivu-tabs-tab-active');
-        var pane = container.querySelector('[data-tab-pane="' + name + '"]');
-        if (pane) pane.classList.add('ivu-tabs-tabpane-active');
       });
     });
   },

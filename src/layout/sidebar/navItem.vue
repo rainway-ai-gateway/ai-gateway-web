@@ -70,6 +70,9 @@ export default {
                 'APIKey.list': 'ivu-icon-ios-key',
                 'APIKeyManage': 'ivu-icon-ios-key',
 
+                'BatchTask.list': 'ivu-icon-ios-archive',
+                'BatchTaskManage': 'ivu-icon-ios-archive',
+
                 'QuotaControl.list': 'ivu-icon-md-apps',
 
                 'ai_route.list.admin': 'iconfont icon-zhuanfa',
@@ -94,12 +97,28 @@ export default {
                 'AdvanceRouteRuleManage': 'iconfont icon-zhuanfa',
                 'RouteTableManage': 'iconfont icon-zhuanfa',
 
+                'FeatureEnhance.list': 'ivu-icon-ios-color-wand',
+                'FeatureEnhanceManage': 'ivu-icon-ios-color-wand',
+                'AICacheRule.list': 'ivu-icon-ios-flash',
+                'AICacheRuleManage': 'ivu-icon-ios-flash',
+                'TrafficMirrorRule.list': 'ivu-icon-ios-copy',
+                'TrafficMirrorRuleManage': 'ivu-icon-ios-copy',
+                'IntentConfig.list': 'ivu-icon-ios-chatbubbles',
+                'IntentConfigManage': 'ivu-icon-ios-chatbubbles',
+                'AIContextRule.list': 'ivu-icon-ios-crop',
+                'AIContextRuleManage': 'ivu-icon-ios-crop',
+
                 'EppPool.list': 'iconfont icon-jiqun',
                 'ModelPrice.list': 'ivu-icon-logo-yen',
 
                 'report.list': 'ivu-icon-ios-stats',
 
                 'OperationLog.list': 'ivu-icon-md-list-box',
+
+                'systemSecurity.admin.list': 'ivu-icon-ios-lock',
+                'SystemSecurityManage': 'ivu-icon-ios-lock',
+                'ReencryptSweep.list': 'ivu-icon-ios-lock',
+                'ReencryptSweepManage': 'ivu-icon-ios-lock',
             }
         };
     },

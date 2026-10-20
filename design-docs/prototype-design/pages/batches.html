@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../assets/static/css/app.css" />
+    <link rel="stylesheet" href="../assets/static/css/ai-rule.css" />
+    <link rel="stylesheet" href="../assets/font/iconfont.css" />
+    <link rel="stylesheet" href="../assets/css/prototype-overrides.css" />
+    <style>
+      .batch-filter-bar { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+      .batch-filter-item { display:flex; flex-direction:column; gap:4px; }
+      .batch-filter-item label { color:#515a6e; font-size:12px; }
+      .batch-filter-item input, .batch-filter-item select { height:32px; border:1px solid #dcdee2; border-radius:4px; padding:0 8px; background:#fff; }
+      .batch-filter-item input[type="date"] { width:150px; }
+      /* 列表表头帮助 icon（hover 展示提示，对应 iView Tooltip） */
+      .batch-help-icon { position:relative; margin-left:4px; font-size:14px; color:#2d8cf0; cursor:help; vertical-align:middle; }
+      .batch-help-icon:hover::after { content:attr(data-tip); position:absolute; left:50%; bottom:100%; transform:translateX(-50%); margin-bottom:6px; padding:6px 10px; background:#515a6e; color:#fff; font-size:12px; line-height:1.4; border-radius:4px; white-space:nowrap; z-index:2000; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+      .batch-table th { white-space:nowrap; }
+    </style>
+    <script src="../assets/js/mock-data.js"></script>
+    <script src="../assets/js/ivu-ui.js"></script>
+    <script src="../assets/js/layout.js"></script>
+    <script src="../assets/js/prototype.js"></script>
+  </head>
+  <body>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var root = Layout.render({ pageId: 'BatchTask.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
+        root.innerHTML = '<div id="batch-page"></div>';
+
+        var PAGE_LIMIT = 5;
+        var TERMINAL_STATUSES = ['completed', 'expired', 'failed', 'cancelled'];
+
+        var STATUS_LABELS = {
+          validating: '校验中（validating）',
+          queued: '排队中（queued）',
+          in_progress: '进行中（in_progress）',
+          finalizing: '收尾中（finalizing）',
+          completed: '已完成（completed）',
+          expired: '已过期（expired）',
+          failed: '已失败（failed）',
+          cancelled: '已取消（cancelled）',
+          cancelling: '取消中（cancelling）'
+        };
+
+        var STATUS_TAG_TYPES = {
+          validating: 'default',
+          queued: 'primary',
+          in_progress: 'primary',
+          finalizing: 'warning',
+          completed: 'success',
+          expired: 'default',
+          failed: 'error',
+          cancelled: 'default',
+          cancelling: 'warning'
+        };
+
+        var SETTLE_LABELS = {
+          reserved: '已预留（reserved）',
+          settled: '已结算（settled）',
+          released: '已释放（released）'
+        };
+
+        var SETTLE_TAG_TYPES = { reserved: 'warning', settled: 'success', released: 'default' };
+
+        var state = {
+          rows: cloneRows((MockData.batchTasks && MockData.batchTasks.list) || []),
+          filter: { status: '', provider: '', api_key_id: '', start_time: '', end_time: '' },
+          // 主键游标分页：cursorStack 保存已访问游标，首页游标为空串
+          cursorStack: [''],
+          nextCursor: '',
+          detailIndex: -1
+        };
+
+        function cloneRows(list) {
+          return JSON.parse(JSON.stringify(list || []));
+        }
+
+        function helpIcon(tip) {
+          return '<i class="ivu-icon ivu-icon-ios-help-circle-outline batch-help-icon" data-tip="' + IvuUI.escapeHtml(tip || '') + '"></i>';
+        }
+
+        function isTerminal(status) {
+          return TERMINAL_STATUSES.indexOf(status) !== -1;
+        }
+
+        function formatBytes(bytes) {
+          if (bytes == null || bytes === 0) return '0 B';
+          var units = ['B', 'KB', 'MB', 'GB'];
+          var idx = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+          var value = bytes / Math.pow(1024, idx);
+          return (idx === 0 ? value : value.toFixed(2)) + ' ' + units[idx];
+        }
+
+        // ======= 筛选（对应 GET /open-api/v1/batches Query 参数） =======
+        function filteredRows() {
+          return state.rows.filter(function (row) {
+            var f = state.filter;
+            if (f.status && row.status !== f.status) return false;
+            if (f.provider && row.provider !== f.provider) return false;
+            if (f.api_key_id && String(row.api_key_id || '').toUpperCase().indexOf(f.api_key_id.toUpperCase()) === -1) return false;
+            if (f.start_time) {
+              var startTs = new Date(f.start_time + 'T00:00:00').getTime();
+              if (new Date(row.created_at).getTime() < startTs) return false;
+            }
+            if (f.end_time) {
+              var endTs = new Date(f.end_time + 'T23:59:59').getTime();
+              if (new Date(row.created_at).getTime() > endTs) return false;
+            }
+            return true;
+          });
+        }
+
+        // ======= 游标分页（cursor/limit/next_cursor） =======
+        function currentCursorRows() {
+          var all = filteredRows();
+          var cursor = state.cursorStack[state.cursorStack.length - 1];
+          var start = 0;
+          if (cursor) {
+            start = all.findIndex(function (row) { return row.batch_id === cursor; });
+            if (start === -1) start = 0;
+          }
+          var pageRows = all.slice(start, start + PAGE_LIMIT);
+          var nextIndex = start + PAGE_LIMIT;
+          state.nextCursor = nextIndex < all.length ? all[nextIndex].batch_id : '';
+          return pageRows;
+        }
+
+        // ======= 筛选栏 =======
+        function renderFilterBar() {
+          var statusOpts = '<option value="">全部状态</option>' + Object.keys(STATUS_LABELS).map(function (key) {
+            return '<option value="' + key + '"' + (state.filter.status === key ? ' selected' : '') + '>' + STATUS_LABELS[key] + '</option>';
+          }).join('');
+          var providers = {};
+          state.rows.forEach(function (row) { if (row.provider) providers[row.provider] = true; });
+          var providerOpts = '<option value="">全部服务商</option>' + Object.keys(providers).map(function (name) {
+            return '<option value="' + IvuUI.escapeHtml(name) + '"' + (state.filter.provider === name ? ' selected' : '') + '>' + IvuUI.escapeHtml(name) + '</option>';
+          }).join('');
+
+          return '<div class="batch-filter-bar">' +
+            '<div class="batch-filter-item"><label>任务状态</label>' +
+              '<select id="batch-filter-status">' + statusOpts + '</select></div>' +
+            '<div class="batch-filter-item"><label>服务商</label>' +
+              '<select id="batch-filter-provider">' + providerOpts + '</select></div>' +
+            '<div class="batch-filter-item"><label>API Key ID</label>' +
+              '<input type="text" id="batch-filter-apikey" placeholder="按 API Key 过滤" value="' + IvuUI.escapeHtml(state.filter.api_key_id) + '" /></div>' +
+            '<div class="batch-filter-item"><label>创建时间起</label>' +
+              '<input type="date" id="batch-filter-start" value="' + IvuUI.escapeHtml(state.filter.start_time) + '" /></div>' +
+            '<div class="batch-filter-item"><label>创建时间止</label>' +
+              '<input type="date" id="batch-filter-end" value="' + IvuUI.escapeHtml(state.filter.end_time) + '" /></div>' +
+            '<div class="batch-filter-item">' + IvuUI.btn('查询', 'primary', 'small', '', 'id="btn-batch-search"') + '</div>' +
+            '<div class="batch-filter-item">' + IvuUI.btn('重置', 'default', 'small', '', 'id="btn-batch-reset"') + '</div>' +
+          '</div>';
+        }
+
+        // ======= 表格（GET /open-api/v1/batches 返回 list） =======
+        function renderTable() {
+          var pageRows = currentCursorRows();
+          var hasPrev = state.cursorStack.length > 1;
+          var hasNext = !!state.nextCursor;
+
+          document.getElementById('batch-page').innerHTML =
+            '<div class="route-editor-header">' +
+            '</div>' +
+            renderFilterBar() +
+            '<div id="batch-table"></div>' +
+            drawerBatch();
+
+          document.getElementById('batch-table').innerHTML = IvuUI.pageTable({
+            tableId: 'batch-page-table',
+            columns: [
+              { title: '批量任务ID', key: 'batch_id', minWidth: 170 },
+              { title: '状态', key: 'status', minWidth: 150, render: function (row) {
+                  return IvuUI.tag(STATUS_LABELS[row.status] || row.status, STATUS_TAG_TYPES[row.status] || 'default');
+                } },
+              { title: '请求计数' + helpIcon('总数 / 完成 / 失败'), key: 'request_counts', minWidth: 150, render: function (row) {
+                  var rc = row.request_counts || {};
+                  return (rc.total || 0) + ' / ' + (rc.completed || 0) + ' / ' + (rc.failed || 0);
+                } },
+              { title: '结算状态', key: 'settle_status', minWidth: 130, render: function (row) {
+                  return IvuUI.tag(SETTLE_LABELS[row.settle_status] || row.settle_status || '-', SETTLE_TAG_TYPES[row.settle_status] || 'default');
+                } },
+              { title: '创建时间', key: 'created_at', minWidth: 165 },
+              { title: '操作', key: 'action', width: 150, render: function (row, rowIndex) {
+                  if (isReadonly) return IvuUI.btn('详情', 'primary', 'small', '', 'data-batch-detail="' + rowIndex + '"');
+                  var btns = IvuUI.btn('详情', 'primary', 'small', '', 'data-batch-detail="' + rowIndex + '"');
+                  if (isTerminal(row.status)) {
+                    btns += ' ' + IvuUI.btn('取消', 'default', 'small', '', 'disabled title="终态任务不可取消"');
+                  } else {
+                    btns += ' ' + IvuUI.btn('取消', 'error', 'small', '', 'data-batch-cancel="' + rowIndex + '"');
+                  }
+                  return btns;
+                } }
+            ],
+            rows: pageRows,
+            cursorPaging: true,
+            prevDisabled: !hasPrev,
+            nextDisabled: !hasNext
+          });
+
+          bindTableEvents(pageRows);
+        }
+
+        function bindTableEvents(pageRows) {
+          var searchBtn = document.getElementById('btn-batch-search');
+          if (searchBtn) searchBtn.onclick = function () {
+            state.filter.status = document.getElementById('batch-filter-status').value;
+            state.filter.provider = document.getElementById('batch-filter-provider').value;
+            state.filter.api_key_id = document.getElementById('batch-filter-apikey').value.trim();
+            state.filter.start_time = document.getElementById('batch-filter-start').value;
+            state.filter.end_time = document.getElementById('batch-filter-end').value;
+            state.cursorStack = [''];
+            renderTable();
+          };
+
+          ['status', 'provider', 'start', 'end'].forEach(function (name) {
+            var el = document.getElementById('batch-filter-' + name);
+            if (el) el.onchange = function () { searchBtn.onclick(); };
+          });
+          var apiKeyInput = document.getElementById('batch-filter-apikey');
+          if (apiKeyInput) apiKeyInput.onkeydown = function (e) {
+            if (e.key === 'Enter') searchBtn.onclick();
+          };
+
+          var resetBtn = document.getElementById('btn-batch-reset');
+          if (resetBtn) resetBtn.onclick = function () {
+            state.filter = { status: '', provider: '', api_key_id: '', start_time: '', end_time: '' };
+            state.cursorStack = [''];
+            renderTable();
+          };
+
+          var tableRoot = document.getElementById('batch-page-table');
+          var prevBtn = tableRoot ? tableRoot.querySelector('.proto-page-prev') : null;
+          if (prevBtn) prevBtn.onclick = function () {
+            if (state.cursorStack.length > 1) {
+              state.cursorStack.pop();
+              renderTable();
+            }
+          };
+
+          var nextBtn = tableRoot ? tableRoot.querySelector('.proto-page-next') : null;
+          if (nextBtn) nextBtn.onclick = function () {
+            if (state.nextCursor) {
+              state.cursorStack.push(state.nextCursor);
+              renderTable();
+            }
+          };
+
+          var sizeSelect = tableRoot ? tableRoot.querySelector('.proto-page-size') : null;
+          if (sizeSelect) sizeSelect.onchange = function () { renderTable(); };
+
+          document.querySelectorAll('[data-batch-detail]').forEach(function (btn) {
+            btn.onclick = function () {
+              openDetail(pageRows[parseInt(btn.getAttribute('data-batch-detail'), 10)]);
+            };
+          });
+
+          document.querySelectorAll('[data-batch-cancel]').forEach(function (btn) {
+            btn.onclick = function () {
+              var row = pageRows[parseInt(btn.getAttribute('data-batch-cancel'), 10)];
+              if (!row || isTerminal(row.status)) return;
+              Prototype.confirm({
+                title: '提示',
+                content: '确认取消批量任务 ' + row.batch_id + '？取消将调用 provider cancel 端点并释放金额预留。',
+                onOk: function () {
+                  // POST /open-api/v1/batches/{batch_id}/cancel：DB 条件更新抢占置 cancelling，预留幂等释放
+                  row.status = 'cancelling';
+                  row.settle_status = 'released';
+                  row.updated_at = new Date().toISOString();
+                  renderTable();
+                  Prototype.toast('取消请求已受理，任务进入 cancelling 状态');
+                },
+                onCancel: function () { Prototype.toast('已取消操作', 'info'); }
+              });
+            };
+          });
+        }
+
+        // ======= 详情抽屉（GET /open-api/v1/batches/{batch_id}） =======
+        // 参照 cluster / providers 详情，采用 Review panel 卡片式布局
+        function drawerBatch() {
+          return IvuUI.drawer('drawer-batch', '批量任务详情', '<div class="ivu-drawer-body-placeholder"></div>', '', '70%');
+        }
+
+        function reviewPanel(title, rowsHtml) {
+          return '<div class="panel"><div class="panel-header">' + title +
+            '</div><div class="panel-body">' + rowsHtml + '</div></div>';
+        }
+
+        function reviewRow(label, value) {
+          return '<ul class="clearFloat"><li class="title">' + IvuUI.escapeHtml(label) + ':</li><li class="value">' +
+            (value != null && value !== '' ? IvuUI.escapeHtml(value) : '-') + '</li></ul>';
+        }
+
+        function reviewRowHtml(label, htmlValue) {
+          return '<ul class="clearFloat"><li class="title">' + IvuUI.escapeHtml(label) + ':</li><li class="value">' + (htmlValue || '-') + '</li></ul>';
+        }
+
+        function openDetail(row) {
+          if (!row) return;
+          state.detailIndex = state.rows.findIndex(function (item) { return item.batch_id === row.batch_id; });
+          var rc = row.request_counts || {};
+
+          var basicRows =
+            reviewRow('批量任务ID', row.batch_id) +
+            reviewRow('服务商', row.provider) +
+            reviewRow('API Key ID', row.api_key_id) +
+            reviewRow('产品名称', row.product_name) +
+            reviewRow('Entity ID', row.entity_id) +
+            reviewRow('透传端点', row.endpoint);
+
+          var statusRows =
+            reviewRowHtml('状态', IvuUI.tag(STATUS_LABELS[row.status] || row.status, STATUS_TAG_TYPES[row.status] || 'default')) +
+            reviewRow('请求总数', rc.total) +
+            reviewRow('已完成请求数', rc.completed) +
+            reviewRow('失败请求数', rc.failed) +
+            reviewRow('估算行数', row.est_lines);
+
+          var usageRows =
+            reviewRow('输入 token 数', row.usage_input_tokens) +
+            reviewRow('输出 token 数', row.usage_output_tokens) +
+            reviewRow('用量来源', row.usage_source) +
+            reviewRow('预留金额', row.reserve_units) +
+            reviewRow('结算金额', row.settle_units) +
+            reviewRowHtml('结算状态', IvuUI.tag(SETTLE_LABELS[row.settle_status] || row.settle_status || '-', SETTLE_TAG_TYPES[row.settle_status] || 'default')) +
+            reviewRow('预留结余', row.over_reserved == null ? '' : String(row.over_reserved)) +
+            reviewRow('同步来源', row.sync_source);
+
+          var timeRows =
+            reviewRow('输入文件ID', row.input_file_id) +
+            reviewRow('输出文件ID', row.output_file_id) +
+            reviewRow('创建时间', row.created_at) +
+            reviewRow('更新时间', row.updated_at) +
+            reviewRow('终结时间', row.terminal_at);
+
+          var files = row.batch_files || [];
+          var filesTable = files.length
+            ? '<table class="mapping-table"><thead><tr>' +
+                '<th>文件ID</th>' +
+                '<th>服务商</th>' +
+                '<th>用途</th>' +
+                '<th>文件名</th>' +
+                '<th>大小</th>' +
+                '<th>创建时间</th>' +
+              '</tr></thead><tbody>' +
+              files.map(function (f) {
+                return '<tr>' +
+                  '<td>' + IvuUI.escapeHtml(f.file_id) + '</td>' +
+                  '<td>' + IvuUI.escapeHtml(f.provider) + '</td>' +
+                  '<td>' + IvuUI.escapeHtml(f.purpose) + '</td>' +
+                  '<td>' + IvuUI.escapeHtml(f.filename) + '</td>' +
+                  '<td>' + (f.bytes || 0) + '（' + formatBytes(f.bytes) + '）</td>' +
+                  '<td>' + IvuUI.escapeHtml(f.created_at) + '</td>' +
+                '</tr>';
+              }).join('') +
+              '</tbody></table>'
+            : '<span class="empty-text">-</span>';
+          var filesRows = '<ul class="clearFloat detail-row detail-row-block"><li class="title">批量文件:</li><li class="value">' + filesTable + '</li></ul>';
+
+          var body =
+            '<div class="Review">' +
+              reviewPanel('基本信息', basicRows) +
+              reviewPanel('状态与计数', statusRows) +
+              reviewPanel('用量与记账', usageRows) +
+              reviewPanel('文件与时间', timeRows) +
+              reviewPanel('批量文件', filesRows) +
+            '</div>';
+
+          var drawerContent = document.querySelector('#drawer-batch .ivu-drawer-content');
+          drawerContent.querySelector('.ivu-drawer-body').innerHTML = body;
+          Prototype.openDrawer('drawer-batch');
+        }
+
+        Prototype.bindDrawerClose();
+        renderTable();
+      });
+    </script>
+  </body>
+</html>

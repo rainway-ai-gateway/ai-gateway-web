@@ -20,6 +20,7 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var root = Layout.render({ pageId: 'RouteTable.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
         root.innerHTML = '<div id="route-table-list"></div>';
 
         var TYPE_LABELS = { global: 'Global', entity: 'Entity', api_key: 'API-Key' };
@@ -153,6 +154,7 @@
                 width: 260,
                 render: function (row) {
                   var editHref = 'route.html?type=' + encodeURIComponent(row.type) + '&owner=' + encodeURIComponent(row.owner);
+                  if (isReadonly) return IvuUI.btn('查看', 'primary', 'small', '', 'onclick="window.location.href=\'' + editHref + '\'"');
                   return IvuUI.btn('查看', 'primary', 'small', '', 'onclick="window.location.href=\'' + editHref + '\'"') + ' ' +
                     IvuUI.btn('启用', 'success', 'small', '', 'data-route-enable="' + row.type + ':' + row.owner + '"' + (row.enabled ? ' disabled' : '')) + ' ' +
                     IvuUI.btn('停用', 'warning', 'small', '', 'data-route-disable="' + row.type + ':' + row.owner + '"' + (row.enabled ? '' : ' disabled'));

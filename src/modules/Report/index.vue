@@ -40,6 +40,7 @@
               @on-ok="applyFilters"
             />
           </div>
+          <Button icon="md-refresh" @click="refreshLatest">{{ $t('report.refreshLatest') }}</Button>
         </div>
       </div>
 
@@ -109,11 +110,25 @@
           </div>
           <div class="report-filter-item">
             <label class="filter-item-label">{{ $t('report.statusCodes') }}</label>
-            <i-Input
+            <Input
               v-model="filters.status_codes"
               :placeholder="$t('report.statusCodesPlaceholder')"
               style="width:120px"
             />
+          </div>
+          <div class="report-filter-item">
+            <label class="filter-item-label">{{ $t('report.tsSplitDim') }}</label>
+            <Select
+              v-model="tsSplit"
+              size="small"
+              style="width:130px"
+              :placeholder="$t('report.tsSplitNone')"
+            >
+              <Option value="">{{ $t('report.tsSplitNone') }}</Option>
+              <Option value="ai_cache_status">{{ $t('report.cacheStatus') }}</Option>
+              <Option value="mirror_hit">{{ $t('report.mirrorHit') }}</Option>
+              <Option value="ai_intent_answer">{{ $t('report.intentAnswer') }}</Option>
+            </Select>
           </div>
           <Button type="primary" @click="applyFilters">{{ $t('report.query') }}</Button>
           <Button @click="resetFilters">{{ $t('com.reset') }}</Button>
@@ -170,6 +185,8 @@ export default {
         stream: '',
         status_codes: '',
       },
+      // 拆分维度：作用于总览 QPS/Token/延迟三张时序图（非接口过滤参数，切换即生效）
+      tsSplit: '',
       modelOptions: [],
       apikeyOptions: [],
       providerOptions: [],
@@ -289,6 +306,9 @@ export default {
 
     // ==================== Filters ====================
     buildFilterParams() {
+      // 通用过滤参数仅 start/end/models/apikey_ids/providers/hosts/stream/status_codes（见 report.md §1.1）；
+      // 缓存状态 / 镜像命中 / 意图答案不是通用过滤参数，而是 logs 明细过滤参数与图表下钻维度，
+      // 明细侧的同名过滤项由 Logs 工具栏独立提供，避免参数重复
       const params = {
         start: this.toUnixTimestamp(this.startTime),
         end: this.toUnixTimestamp(this.endTime),
@@ -319,23 +339,35 @@ export default {
       this.shortcut = '';
     },
 
+    // 保持当前时间跨度不变，将窗口平移到最新时刻后重新查询
+    refreshLatest() {
+      const start = this.validDate(this.startTime);
+      const end = this.validDate(this.endTime);
+      if (!start || !end || end.getTime() <= start.getTime()) {
+        this.applyFilters();
+        return;
+      }
+      const span = end.getTime() - start.getTime();
+      const newEnd = Date.now();
+      this.endTime = new Date(newEnd);
+      this.startTime = new Date(newEnd - span);
+      this.applyFilters();
+    },
+
     applyFilters() {
       if (!this.validateTimeRange()) return;
       const params = this.buildFilterParams();
       this.loadFilterOptions();
       if (this.activeTab === 'overview') {
-        this.$refs.overview && this.$refs.overview.load(params);
+        this.$refs.overview && this.$refs.overview.load(params, this.tsSplit);
       } else {
         this.$refs.logs && this.$refs.logs.load(params);
       }
     },
 
+    // 重置只清空筛选条件，不动时间范围：默认时间基于"当前时刻"计算，
+    // 若重置时重算时间会静默改变查询窗口，用户会误以为查询结果不一致
     resetFilters() {
-      const end = this.now();
-      const start = end - 3600;
-      this.shortcut = '1h';
-      this.startTime = new Date(start * 1000);
-      this.endTime = new Date(end * 1000);
       this.filters = {
         models: [],
         apikey_ids: [],
@@ -344,6 +376,7 @@ export default {
         stream: '',
         status_codes: '',
       };
+      this.tsSplit = '';
       this.applyFilters();
     },
 
@@ -355,7 +388,7 @@ export default {
     onTabChange(name) {
       const params = this.buildFilterParams();
       if (name === 'overview') {
-        this.$refs.overview && this.$refs.overview.load(params);
+        this.$refs.overview && this.$refs.overview.load(params, this.tsSplit);
       } else if (name === 'logs') {
         this.$refs.logs && this.$refs.logs.load(params);
       }
