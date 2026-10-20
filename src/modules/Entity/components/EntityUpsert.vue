@@ -518,7 +518,6 @@
               </FormItem>
             </Col>
           </Row>
-          <p class="form-tip">{{ $t('entity.batchLimitsTip') }}</p>
         </div>
       </div>
     </Card>
@@ -668,6 +667,7 @@ export default {
                 const tpm = that.formData.rate_limit_policy.rules.tpm || [];
                 const rpm = that.formData.rate_limit_policy.rules.rpm || [];
                 const maxConcurrency = that.formData.rate_limit_policy.rules.max_concurrency;
+                const batchLimits = that.formData.rate_limit_policy.rules.batch_limits || {};
                 const hasTpmRules = tpm.length > 0;
                 const hasRpmRules = rpm.length > 0;
                 const hasEffectiveMaxConcurrency =
@@ -677,7 +677,10 @@ export default {
                         && Number.isInteger(maxConcurrency)
                         && maxConcurrency > 0
                     );
-                if (!hasTpmRules && !hasRpmRules && !hasEffectiveMaxConcurrency) {
+                const hasBatchLimits = BATCH_LIMIT_FIELDS.some(
+                    f => Number(batchLimits[f.key]) > 0
+                );
+                if (!hasTpmRules && !hasRpmRules && !hasEffectiveMaxConcurrency && !hasBatchLimits) {
                     callback(new Error(this.$t('entity.rateLimitRuleRequired')));
                     return;
                 }

@@ -182,7 +182,7 @@ classDiagram
 - **Entity模型访问控制**：`allow_models`和`block_models`共同决定该Entity及其挂载的API-Key可访问的模型范围。`block_models`优先级高于`allow_models`。
 - **QuotaPlan → QuotaBalance**：一个QuotaPlan对应唯一的QuotaBalance（一一对应）。QuotaPlan为静态配置（unlimited、quota、unit、reset_period等），QuotaBalance为动态运行态（used、remaining）。运行时网关扣减操作直接作用于QuotaBalance的remaining。
 - **QuotaPlan的balance字段**：为只读字段，反映对应QuotaBalance的used和remaining。`GET /api-keys` 和 `GET /api-keys/{id}` 的返回中 `quota_plan` 已包含 `balance`；独立查询接口（`/api-keys/{id}/quota-plan`、`/entities/{id}/quota-plan`）也返回完整balance。
-- **RateLimitPolicy → Rules**：一个RateLimitPolicy包含一组Rules，Rules中可配置tpm（最多3个）、rpm（最多3个）和max_concurrency（默认-1，表示不限制）。
+- **RateLimitPolicy → Rules**：一个RateLimitPolicy包含一组Rules，Rules中可配置tpm（最多3个）、rpm（最多3个）、max_concurrency（默认-1，表示不限制）和batch_limits（批量限流，四维度均按API-Key计、与模型无关）。
 - **运行时层级生效逻辑**：API-Key挂载到Entity后，运行时生效的QuotaPlan和RateLimitPolicy为该API-Key自身直接拥有的 + 该Entity直接拥有的 + 该Entity所有祖先Entity直接拥有的（去重）。
 - **GlobalRouteTable → RouteRules → AiRouteRule → AiRouteTarget/AiRouteFallback**：Global路由表通过嵌套的 RouteRules 管理规则，每条规则包含转发目标（targets）和降级目标（fallbacks）。
 - **Provider → Cluster**：一个 Provider 可被多个 Cluster 引用；Cluster 通过 `llm_config.provider` 关联 Provider，并只保留“转发策略”。

@@ -13,8 +13,9 @@
       .batch-filter-item label { color:#515a6e; font-size:12px; }
       .batch-filter-item input, .batch-filter-item select { height:32px; border:1px solid #dcdee2; border-radius:4px; padding:0 8px; background:#fff; }
       .batch-filter-item input[type="date"] { width:150px; }
-      /* 列表表头 + 详情字段的帮助 icon（hover 展示提示） */
-      .batch-help-icon { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border:1px solid #2d8cf0; border-radius:50%; color:#2d8cf0; font-size:11px; font-style:normal; line-height:1; margin-left:4px; cursor:help; vertical-align:middle; }
+      /* 列表表头帮助 icon（hover 展示提示，对应 iView Tooltip） */
+      .batch-help-icon { position:relative; margin-left:4px; font-size:14px; color:#2d8cf0; cursor:help; vertical-align:middle; }
+      .batch-help-icon:hover::after { content:attr(data-tip); position:absolute; left:50%; bottom:100%; transform:translateX(-50%); margin-bottom:6px; padding:6px 10px; background:#515a6e; color:#fff; font-size:12px; line-height:1.4; border-radius:4px; white-space:nowrap; z-index:2000; box-shadow:0 2px 8px rgba(0,0,0,.15); }
       .batch-table th { white-space:nowrap; }
     </style>
     <script src="../assets/js/mock-data.js"></script>
@@ -78,7 +79,7 @@
         }
 
         function helpIcon(tip) {
-          return '<span class="batch-help-icon" title="' + IvuUI.escapeHtml(tip || '') + '">?</span>';
+          return '<i class="ivu-icon ivu-icon-ios-help-circle-outline batch-help-icon" data-tip="' + IvuUI.escapeHtml(tip || '') + '"></i>';
         }
 
         function isTerminal(status) {
@@ -171,9 +172,6 @@
             tableId: 'batch-page-table',
             columns: [
               { title: '批量任务ID', key: 'batch_id', minWidth: 170 },
-              { title: '服务商', key: 'provider', minWidth: 100 },
-              { title: 'API Key ID', key: 'api_key_id', minWidth: 140 },
-              { title: 'Entity ID', key: 'entity_id', minWidth: 100 },
               { title: '状态', key: 'status', minWidth: 150, render: function (row) {
                   return IvuUI.tag(STATUS_LABELS[row.status] || row.status, STATUS_TAG_TYPES[row.status] || 'default');
                 } },
@@ -181,11 +179,6 @@
                   var rc = row.request_counts || {};
                   return (rc.total || 0) + ' / ' + (rc.completed || 0) + ' / ' + (rc.failed || 0);
                 } },
-              { title: '用量' + helpIcon('输入 / 输出 tokens'), key: 'usage', minWidth: 150, render: function (row) {
-                  return (row.usage_input_tokens || 0) + ' / ' + (row.usage_output_tokens || 0);
-                } },
-              { title: '预留金额' + helpIcon('1e-8 定点整数 RMB，不做 ÷1e8 换算'), key: 'reserve_units', minWidth: 120 },
-              { title: '结算金额' + helpIcon('1e-8 定点整数 RMB，不做 ÷1e8 换算'), key: 'settle_units', minWidth: 120 },
               { title: '结算状态', key: 'settle_status', minWidth: 130, render: function (row) {
                   return IvuUI.tag(SETTLE_LABELS[row.settle_status] || row.settle_status || '-', SETTLE_TAG_TYPES[row.settle_status] || 'default');
                 } },
@@ -296,17 +289,13 @@
             '</div><div class="panel-body">' + rowsHtml + '</div></div>';
         }
 
-        function reviewRow(label, value, fieldTip) {
-          return '<ul class="clearFloat"><li class="title">' + IvuUI.escapeHtml(label) + ':' +
-            (fieldTip ? helpIcon(fieldTip) : '') +
-            '</li><li class="value">' +
+        function reviewRow(label, value) {
+          return '<ul class="clearFloat"><li class="title">' + IvuUI.escapeHtml(label) + ':</li><li class="value">' +
             (value != null && value !== '' ? IvuUI.escapeHtml(value) : '-') + '</li></ul>';
         }
 
-        function reviewRowHtml(label, htmlValue, fieldTip) {
-          return '<ul class="clearFloat"><li class="title">' + IvuUI.escapeHtml(label) + ':' +
-            (fieldTip ? helpIcon(fieldTip) : '') +
-            '</li><li class="value">' + (htmlValue || '-') + '</li></ul>';
+        function reviewRowHtml(label, htmlValue) {
+          return '<ul class="clearFloat"><li class="title">' + IvuUI.escapeHtml(label) + ':</li><li class="value">' + (htmlValue || '-') + '</li></ul>';
         }
 
         function openDetail(row) {
@@ -318,13 +307,13 @@
             reviewRow('批量任务ID', row.batch_id) +
             reviewRow('服务商', row.provider) +
             reviewRow('API Key ID', row.api_key_id) +
-            reviewRow('产品名称', row.product_name, 'product_name，中间件强制注入，只读') +
+            reviewRow('产品名称', row.product_name) +
             reviewRow('Entity ID', row.entity_id) +
             reviewRow('透传端点', row.endpoint);
 
           var statusRows =
             reviewRowHtml('状态', IvuUI.tag(STATUS_LABELS[row.status] || row.status, STATUS_TAG_TYPES[row.status] || 'default')) +
-            reviewRow('请求总数', rc.total, 'request_counts.total') +
+            reviewRow('请求总数', rc.total) +
             reviewRow('已完成请求数', rc.completed) +
             reviewRow('失败请求数', rc.failed) +
             reviewRow('估算行数', row.est_lines);
@@ -332,19 +321,19 @@
           var usageRows =
             reviewRow('输入 token 数', row.usage_input_tokens) +
             reviewRow('输出 token 数', row.usage_output_tokens) +
-            reviewRow('用量来源', row.usage_source, 'usage_source：download=输出文件下载回读 / reconcile=对账') +
-            reviewRow('预留金额', row.reserve_units, 'reserve_units，1e-8 定点整数 RMB，不做 ÷1e8 换算') +
-            reviewRow('结算金额', row.settle_units, 'settle_units，1e-8 定点整数 RMB，不做 ÷1e8 换算') +
+            reviewRow('用量来源', row.usage_source) +
+            reviewRow('预留金额', row.reserve_units) +
+            reviewRow('结算金额', row.settle_units) +
             reviewRowHtml('结算状态', IvuUI.tag(SETTLE_LABELS[row.settle_status] || row.settle_status || '-', SETTLE_TAG_TYPES[row.settle_status] || 'default')) +
-            reviewRow('预留结余', row.over_reserved == null ? '' : String(row.over_reserved), 'over_reserved，预留金额 > 结算金额 表示结算后仍有剩余') +
-            reviewRow('同步来源', row.sync_source, 'sync_source：redis=BATCH_TASK 回源 / log=日志对账落库');
+            reviewRow('预留结余', row.over_reserved == null ? '' : String(row.over_reserved)) +
+            reviewRow('同步来源', row.sync_source);
 
           var timeRows =
             reviewRow('输入文件ID', row.input_file_id) +
-            reviewRow('输出文件ID', row.output_file_id, 'output_file_id，未完成时为空') +
+            reviewRow('输出文件ID', row.output_file_id) +
             reviewRow('创建时间', row.created_at) +
             reviewRow('更新时间', row.updated_at) +
-            reviewRow('终结时间', row.terminal_at, 'terminal_at，未终结为空');
+            reviewRow('终结时间', row.terminal_at);
 
           var files = row.batch_files || [];
           var filesTable = files.length
@@ -353,7 +342,7 @@
                 '<th>服务商</th>' +
                 '<th>用途</th>' +
                 '<th>文件名</th>' +
-                '<th>大小' + helpIcon('bytes，单位字节') + '</th>' +
+                '<th>大小</th>' +
                 '<th>创建时间</th>' +
               '</tr></thead><tbody>' +
               files.map(function (f) {

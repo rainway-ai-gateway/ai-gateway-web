@@ -20,7 +20,7 @@
 | Entity 类型 | 组织层级定义（级别数字越小层级越高） |
 | API Key | 调用凭证，请求头 `Authorization: <Key>`（不需要 Bearer 前缀） |
 | 批量任务 | 经数据面透传创建的 provider 原生批量任务（OpenAI Batch API），控制台只做列表 / 详情 / 取消，见 [13.1 节](13-batch-tasks.md#131-列表页) |
-| 预留金额 / 结算金额 | 批量任务的 `reserve_units` / `settle_units`，1e-8 定点整数、单位 RMB，界面原样展示不换算，见 [13.4 节](13-batch-tasks.md#134-状态与金额口径) |
+| 预留金额 / 结算金额 | 批量任务的 `reserve_units` / `settle_units`，1e-8 定点整数、单位 RMB，详情抽屉中原样展示不换算（列表不展示金额），见 [13.4 节](13-batch-tasks.md#134-状态与金额口径) |
 | 终态 | 批量任务的 `completed` / `expired` / `failed` / `cancelled`，进入终态后不可取消，见 [13.4 节](13-batch-tasks.md#134-状态与金额口径) |
 | 路由表 | Global / Entity / API-Key 三级，优先级依次升高 |
 | 首条命中生效 | 集合级规则按数组顺序匹配，命中首条即停止，数组顺序即优先级 |

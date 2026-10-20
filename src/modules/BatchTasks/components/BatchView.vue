@@ -33,14 +33,7 @@
             <li class="value">{{ text(detail.api_key_id) }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.productName') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.productNameTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.productName') }}:</li>
             <li class="value">{{ text(detail.product_name) }}</li>
           </ul>
           <ul class="clearFloat">
@@ -67,14 +60,7 @@
             </li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.requestTotal') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.requestTotalTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.requestTotal') }}:</li>
             <li class="value">{{ text(requestCounts.total) }}</li>
           </ul>
           <ul class="clearFloat">
@@ -105,37 +91,16 @@
             <li class="value">{{ text(detail.usage_output_tokens) }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.usageSource') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.usageSourceTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.usageSource') }}:</li>
             <li class="value">{{ text(detail.usage_source) }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.reserveUnits') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.reserveUnitsTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.reserveUnits') }}:</li>
             <!-- 1e-8 定点整数 RMB，原样展示，禁止 ÷1e8 或格式化 -->
             <li class="value">{{ text(detail.reserve_units) }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.settleUnits') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.settleUnitsTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.settleUnits') }}:</li>
             <li class="value">{{ text(detail.settle_units) }}</li>
           </ul>
           <ul class="clearFloat">
@@ -147,25 +112,11 @@
             </li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.overReserved') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.overReservedTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.overReserved') }}:</li>
             <li class="value">{{ overReservedText }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.syncSource') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.syncSourceTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.syncSource') }}:</li>
             <li class="value">{{ text(detail.sync_source) }}</li>
           </ul>
         </div>
@@ -180,14 +131,7 @@
             <li class="value">{{ text(detail.input_file_id) }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.outputFileId') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.outputFileIdTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.outputFileId') }}:</li>
             <li class="value">{{ text(detail.output_file_id) }}</li>
           </ul>
           <ul class="clearFloat">
@@ -199,14 +143,7 @@
             <li class="value">{{ text(detail.updated_at) }}</li>
           </ul>
           <ul class="clearFloat">
-            <li class="title">
-              {{ $t('batchTasks.terminalAt') }}:
-              <span
-                class="batch-help-icon"
-                :title="$t('batchTasks.terminalAtTip')"
-                >?</span
-              >
-            </li>
+            <li class="title">{{ $t('batchTasks.terminalAt') }}:</li>
             <li class="value">{{ text(detail.terminal_at) }}</li>
           </ul>
         </div>
@@ -226,14 +163,7 @@
                     <th>{{ $t('batchTasks.provider') }}</th>
                     <th>{{ $t('batchTasks.purpose') }}</th>
                     <th>{{ $t('batchTasks.filename') }}</th>
-                    <th>
-                      {{ $t('batchTasks.size') }}
-                      <span
-                        class="batch-help-icon"
-                        :title="$t('batchTasks.sizeTip')"
-                        >?</span
-                      >
-                    </th>
+                    <th>{{ $t('batchTasks.size') }}</th>
                     <th>{{ $t('batchTasks.createdAt') }}</th>
                   </tr>
                 </thead>
@@ -420,23 +350,6 @@ export default {
                 padding-top: 8px;
             }
         }
-    }
-
-    .batch-help-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 14px;
-        height: 14px;
-        border: 1px solid #2d8cf0;
-        border-radius: 50%;
-        color: #2d8cf0;
-        font-size: 11px;
-        font-style: normal;
-        line-height: 1;
-        margin-left: 4px;
-        cursor: help;
-        vertical-align: middle;
     }
 
     .empty-text {

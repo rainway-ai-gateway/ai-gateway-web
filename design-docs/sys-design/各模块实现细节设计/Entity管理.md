@@ -50,7 +50,7 @@
 | `parent_id` | 可选；选项为 level 低于当前类型的 Entity，不可选自己 | 父级实体。 |
 | `allow_models` | 多选；`*` 与具体模型互斥 | 模型白名单。 |
 | `block_models` | 多选；空时提交为 `['*']` | 模型黑名单。 |
-| `quota_plan` / `rate_limit` | 与 API Key 类似；`quota_plan.unit` 支持 `total_token` / `RMB` | 配额与限流。`total_token` 上限 9,999,999,999；RMB 上限 90,000,000.00，4 位小数。 |
+| `quota_plan` / `rate_limit` | 与 API Key 类似；`quota_plan.unit` 支持 `total_token` / `RMB`；限流启用时至少配置 TPM/RPM/最大并发/批量限流之一 | 配额与限流。`total_token` 上限 9,999,999,999；RMB 上限 90,000,000.00，4 位小数。 |
 
 ### 5.2 EntityTypeUpsert
 

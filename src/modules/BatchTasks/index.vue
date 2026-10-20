@@ -225,21 +225,6 @@ export default {
                     minWidth: 170
                 },
                 {
-                    title: this.$t('batchTasks.provider'),
-                    key: 'provider',
-                    minWidth: 100
-                },
-                {
-                    title: this.$t('batchTasks.apiKeyId'),
-                    key: 'api_key_id',
-                    minWidth: 140
-                },
-                {
-                    title: this.$t('batchTasks.entityId'),
-                    key: 'entity_id',
-                    minWidth: 100
-                },
-                {
                     title: this.$t('batchTasks.status'),
                     key: 'status',
                     minWidth: 150,
@@ -271,49 +256,6 @@ export default {
                             `${rc.total || 0} / ${rc.completed || 0} / ${rc.failed || 0}`
                         );
                     }
-                },
-                {
-                    title: this.$t('batchTasks.usage'),
-                    key: 'usage',
-                    minWidth: 150,
-                    renderHeader: h =>
-                        this.renderHelpHeader(
-                            h,
-                            this.$t('batchTasks.usage'),
-                            this.$t('batchTasks.usageTip')
-                        ),
-                    render: (h, params) =>
-                        h(
-                            'span',
-                            `${params.row.usage_input_tokens || 0} / ${params.row.usage_output_tokens || 0}`
-                        )
-                },
-                {
-                    title: this.$t('batchTasks.reserveUnits'),
-                    key: 'reserve_units',
-                    minWidth: 140,
-                    renderHeader: h =>
-                        this.renderHelpHeader(
-                            h,
-                            this.$t('batchTasks.reserveUnits'),
-                            this.$t('batchTasks.unitsTip')
-                        ),
-                    // 1e-8 定点整数 RMB，原样展示，禁止 ÷1e8 或格式化
-                    render: (h, params) =>
-                        h('span', this.text(params.row.reserve_units))
-                },
-                {
-                    title: this.$t('batchTasks.settleUnits'),
-                    key: 'settle_units',
-                    minWidth: 140,
-                    renderHeader: h =>
-                        this.renderHelpHeader(
-                            h,
-                            this.$t('batchTasks.settleUnits'),
-                            this.$t('batchTasks.unitsTip')
-                        ),
-                    render: (h, params) =>
-                        h('span', this.text(params.row.settle_units))
                 },
                 {
                     title: this.$t('batchTasks.settleStatus'),
@@ -425,33 +367,43 @@ export default {
             return TERMINAL_STATUSES.indexOf(status) !== -1;
         },
 
-        // 表头帮助 icon（inline style，避免作用域样式对子组件渲染节点失效）
+        // 表头帮助 icon：走 iView Tooltip（inline style，避免作用域样式对子组件渲染节点失效）
         renderHelpHeader(h, label, tip) {
-            return h('span', [
-                label,
-                h(
-                    'span',
-                    {
-                        attrs: { title: tip },
-                        style: {
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '14px',
-                            height: '14px',
-                            border: '1px solid #2d8cf0',
-                            borderRadius: '50%',
-                            color: '#2d8cf0',
-                            fontSize: '11px',
-                            lineHeight: '1',
-                            marginLeft: '4px',
-                            cursor: 'help',
-                            verticalAlign: 'middle'
-                        }
-                    },
-                    '?'
-                )
-            ]);
+            return h(
+                'span',
+                {
+                    style: {
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                    }
+                },
+                [
+                    label,
+                    h(
+                        'Tooltip',
+                        {
+                            props: {
+                                content: tip,
+                                placement: 'top',
+                                transfer: true,
+                                maxWidth: 320
+                            }
+                        },
+                        [
+                            h('Icon', {
+                                props: { type: 'ios-help-circle-outline' },
+                                style: {
+                                    marginLeft: '4px',
+                                    fontSize: '14px',
+                                    color: '#2d8cf0',
+                                    cursor: 'help',
+                                    verticalAlign: 'middle'
+                                }
+                            })
+                        ]
+                    )
+                ]
+            );
         },
 
         toUnixTimestamp(date) {

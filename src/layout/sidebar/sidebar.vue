@@ -31,7 +31,7 @@
 <template>
     <div class="bfe-sidebar">
         <div class="header">
-            <p class="text">{{ $t('login.gateway') }}</p>
+            <p class="text">{{ brandingTitle }}</p>
         </div>
 
         <div class="Menu">
@@ -41,11 +41,17 @@
 </template>
 <script>
 import sidebarNav from './sidebarNav';
+import { getBrandingTitle } from '@/utils/branding';
 export default {
     name: 'sidebar',
 
     components: {
         'sidebar-nav': sidebarNav
+    },
+    computed: {
+        brandingTitle() {
+            return getBrandingTitle(this.$i18n.locale);
+        }
     },
     data() {
         return {

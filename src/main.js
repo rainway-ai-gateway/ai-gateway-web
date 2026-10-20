@@ -43,6 +43,7 @@ import JsonViewer from 'vue-json-viewer';
 
 import '@/utils/Element';
 import requestPlugin from '@/utils/request';
+import { loadBranding } from '@/utils/branding';
 import '@/assets/css/main.less';
 import './utils/directive';
 
@@ -51,7 +52,7 @@ Vue.use(requestPlugin);
 Vue.prototype.$urlFormat = urlFormat;
 Vue.prototype.$BFEProductLineId = 1;
 Vue.prototype.$store = store;
-Vue.prototype.Version = '0.11.0@20261010104743';
+Vue.prototype.Version = '_VERSION_';
 
 Vue.use(VueClipboard);
 Vue.use(JsonViewer);
@@ -126,9 +127,11 @@ router.afterEach(() => {
   NProgress.done();
 });
 
-new Vue({
-  el: '#app',
-  router,
-  i18n,
-  render: (h) => h(layoutApp),
+loadBranding().then(() => {
+  new Vue({
+    el: '#app',
+    router,
+    i18n,
+    render: (h) => h(layoutApp),
+  });
 });

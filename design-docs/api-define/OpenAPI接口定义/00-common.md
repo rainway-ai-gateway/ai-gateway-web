@@ -242,12 +242,12 @@
 
 ## 9. 限流规则配置（RateLimitPolicy）
 
-限流策略配置，包含 TPM、RPM 和最大并发数限制。
+限流策略配置，包含 TPM、RPM、最大并发数和批量限流限制。
 
 | 字段 | 类型 | 必填 | 说明 | 合法性条件 |
 |------|------|------|------|------------|
 | `enabled` | bool | N | 是否启用 | 默认 `false` |
-| `rules` | object | N | 限流规则详情 | `enabled=true` 时必填，且 `tpm`、`rpm`、`max_concurrency(>=0)` 三者至少配置其一 |
+| `rules` | object | N | 限流规则详情 | `enabled=true` 时必填，且 `tpm`、`rpm`、`max_concurrency(>=0)`、`batch_limits` 四者至少配置其一 |
 
 `rules` 结构：
 

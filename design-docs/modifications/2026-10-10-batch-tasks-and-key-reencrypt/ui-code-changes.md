@@ -25,9 +25,9 @@
 
 | 页面 / 模块 | 变更要点 | 状态 |
 | ----------- | -------- | ---- |
-| 批量任务（`BatchTask.list`） | 全新列表页：筛选栏（任务状态 / 服务商 / API Key ID / 创建时间起止）+ **主键游标分页**（`cursor`/`limit`/`next_cursor`）表格；列 = 批量任务ID / 服务商 / API Key ID / Entity ID / 状态(tag) / 请求计数 / 用量 / 预留金额 / 结算金额 / 结算状态(tag) / 创建时间 / 操作（详情 / 取消）；**详情抽屉（70% 宽，Review 5 卡片）** = 基本信息 / 状态与计数 / 用量与记账 / 文件与时间 / 批量文件表格；**取消**走二次确认，置 `status=cancelling` + `settle_status=released`，终态任务取消按钮 `disabled` | ✅ 原型 · ⬜ UI |
+| 批量任务（`BatchTask.list`） | 全新列表页：筛选栏（任务状态 / 服务商 / API Key ID / 创建时间起止）+ **主键游标分页**（`cursor`/`limit`/`next_cursor`）表格；列 = 批量任务ID / 状态(tag) / 请求计数 / 结算状态(tag) / 创建时间 / 操作（详情 / 取消）（2026-10-20 精简：服务商 / API Key ID / Entity ID / 用量 / 预留金额 / 结算金额 移入详情抽屉）；**详情抽屉（70% 宽，Review 5 卡片）** = 基本信息 / 状态与计数 / 用量与记账 / 文件与时间 / 批量文件表格；**取消**走二次确认，置 `status=cancelling` + `settle_status=released`，终态任务取消按钮 `disabled` | ✅ 原型 · ⬜ UI |
 | 密钥收敛（`ReencryptSweep.list`） | 全新页面：**触发区**（变换方向 `mode` / 扫描范围 `scope` / 预演模式 `dry_run` switch + 触发按钮 + 409 互斥提示区）；**运行中任务横幅**（唯一 running，每 800ms 轮询进度）；**历史任务表格**（终态，无 TTL 累积）；**详情抽屉（60% 宽）** = 任务ID / 状态 / 变换方向 / 预演模式 / 扫描范围 / 活跃密钥ID / 起止时间 / 耗时 / providers 统计 / api_keys 统计 / 错误 | ✅ 原型 · ⬜ UI |
-| API Key / Entity · 批量限流 | 限流编辑区新增「批量限流」section（4 个 InputNumber：`max_create_rpm` / `max_active_batches` / `max_file_bytes` / `max_file_lines`），按 API-Key 计、与模型无关；留空或 ≤0 不提交；查看态新增「批量限流」只读区 | ✅ 原型 · ⬜ UI |
+| API Key / Entity · 批量限流 | 限流编辑区新增「批量限流」section（4 个 InputNumber：`max_create_rpm` / `max_active_batches` / `max_file_bytes` / `max_file_lines`），按 API-Key 计、与模型无关；留空或 ≤0 不提交；查看态新增「批量限流」只读区 | ✅ 原型 · ✅ UI（仅批量限流无法保存的校验缺陷见 [2026-10-20 修复](../2026-10-20-batch-limits-validation-fix/ui-code-changes.md)） |
 | 模型定价 · 批量折扣 | 查看态新增「批量折扣系数」信息行；编辑态新增批量折扣系数输入（`batch_discount`，placeholder `0.5`）；`mode` 枚举新增 `batch`；`mode=batch` 行不渲染批量折扣系数（显示「-（mode=batch 的价格行不配置批量折扣系数）」）；校验 `(0,1]` 浮点 | ✅ 原型 · ⬜ UI |
 | 集群 · 上游错误归一 | LLM 配置新增「上游错误归一」卡片：是否启用（`enabled`）/ 流式归一 SSE（`stream_enabled`）/ 凭证脱敏（`redact_secrets`）；`enabled=true` 时才显示「未识别错误体处理」（`unrecognized_action` 两枚举）与「错误响应体读取上限(字节)」（`max_body_bytes` 0-4194304）；复查行同步 | ✅ 原型 · ⬜ UI |
 | 操作日志 · 资源类型 | `RESOURCE_TYPE_LABELS` 中文映射新增 `batch`（批量任务）/ `batch_file`（批量文件）；列表 `resource_type` 列与筛选 options、详情抽屉资源类型均以中文展示 | ✅ 原型 · ⬜ UI |
@@ -295,8 +295,8 @@ quota_plan / model_price / batch / batch_file / user / token
 
 - [ ] 列表筛选栏 5 项（任务状态 / 服务商 / API Key ID / 创建时间起止）与 `GET /batches` Query 一致；`status` 为单值枚举
 - [ ] 分页为**游标分页**（`cursor`/`limit`/`next_cursor`），非 `page`/`page_size`；`next_cursor` 为 `0` 时「下一页」置灰
-- [ ] 表格 12 列与 §2.1 字段一致；状态 / 结算状态以 tag 展示且颜色语义正确
-- [ ] 金额列（预留 / 结算）**原样展示 1e-8 定点整数**，不做 ÷1e8 换算；help 提示与原型一致
+- [ ] 表格 6 列（批量任务ID / 状态 / 请求计数 / 结算状态 / 创建时间 / 操作）与 §2.1 字段一致；状态 / 结算状态以 tag 展示且颜色语义正确
+- [ ] 详情抽屉金额行（预留 / 结算）**原样展示 1e-8 定点整数**，不做 ÷1e8 换算；详情抽屉不展示帮助提示（2026-10-20 移除全部 `?` 图标，仅列表表头「请求计数」保留）
 - [ ] 详情抽屉含 `batch_files` 表格（file_id / provider / purpose / filename / bytes+formatBytes / created_at）；无文件时显示「-」
 - [ ] `sync_source=redis`（BATCH_TASK 回源）时结算类字段容许为空 / 未就绪，页面不报错
 - [ ] 取消走二次确认；成功后 `status=cancelling`、`settle_status=released`
@@ -458,7 +458,7 @@ quota_plan / model_price / batch / batch_file / user / token
 
    若 api 仓库亦维护 `nav_tree.toml`，需一并同步；否则新页面不可达（菜单不显示 + 直连 URL 被守卫拦截）。
 
-2. **金额口径不做换算**：`reserve_units` / `settle_units` 为 **1e-8 定点整数 RMB**，UI **原样展示**，禁止 ÷1e8 或格式化小数；help 文案须与原型一致。
+2. **金额口径不做换算**：`reserve_units` / `settle_units` 为 **1e-8 定点整数 RMB**，UI **原样展示**，禁止 ÷1e8 或格式化小数。
 
 3. **游标分页 vs 全局分页**：`/batches` 使用主键游标分页（`cursor`/`limit`/`next_cursor`），**不使用**全局 `page`/`page_size`；UI 不得套用既有 Page 组件默认分页逻辑。
 
@@ -509,3 +509,52 @@ quota_plan / model_price / batch / batch_file / user / token
 | `ai-gateway-api/design-docs/modifications/2026-10-02-report-clickhouse-backend/` / `2026-10-02-report-starrocks-backend/` | 后端侧变更记录（报表四后端） |
 | `ai-gateway-api/design-docs/modifications/2026-10-04-mgmt-ip-whitelist/change-summary.md` | 后端侧变更记录（管理面 IP 白名单，403） |
 | `design-docs/README.md` | 变更流程与代码实现顺序 |
+---
+
+## 9. 2026-10-20 增量变更：列表列精简与帮助提示调整（已实施）
+
+**动因**：批量任务列表 12 列实测最小宽度约 1710px，1280 分辨率下必然横向滚动；详情抽屉的字段级 `?` 提示信息量低、且原生 `title` 提示延迟且样式不可控。按「列表只留判读必需列，字段级说明进手册」收敛。
+
+### 9.1 列表列 12 → 6
+
+保留：批量任务ID / 状态 / 请求计数 / 结算状态 / 创建时间 / 操作。
+
+移除：服务商、API Key ID、Entity ID、用量、预留金额、结算金额。
+
+- 移除的字段仍可通过筛选栏（服务商 / API Key ID）定位，或进入详情抽屉查看；`GET /batches` 返回字段未变，前端只是不再渲染。
+- 金额不再出现在列表，`reserve_units` / `settle_units` 的「原样展示 1e-8 定点整数、不做 ÷1e8 换算」口径**仅对详情抽屉生效**。
+- 表格最小宽度降至约 940px，1280 分辨率不再横向滚动。
+
+### 9.2 帮助提示
+
+- 列表表头「请求计数」：由手绘 `?` + 原生 `title` 改为 iView `Tooltip + Icon`（`ios-help-circle-outline`，`transfer: true`，popper 挂 `body`），hover 显示「总数 / 完成 / 失败」。与安全、集群、模型定价等模块的既有写法一致。
+- 详情抽屉：移除全部 10 处 `?` 帮助图标（产品名称 / 请求总数 / 用量来源 / 预留金额 / 结算金额 / 预留结余 / 同步来源 / 输出文件ID / 终结时间 / 批量文件「大小」表头），标题行恢复单行。
+- 同步删除 13 条失效 i18n 文案（10 条 `*Tip` + 列表瘦身后遗留的 `usage` / `usageTip` / `unitsTip`）。
+
+### 9.3 文件清单
+
+| 文件 | 变更 |
+| --- | --- |
+| `src/modules/BatchTasks/index.vue` | 列定义 12 → 6；`renderHelpHeader` 改为 Tooltip + `ios-help-circle-outline` |
+| `src/modules/BatchTasks/components/BatchView.vue` | 删除 10 处帮助图标及 `.batch-help-icon` 样式 |
+| `src/i18n/zh.js` / `src/i18n/en.js` | 删除 13 条失效文案（中英各一份） |
+| `design-docs/prototype-design/pages/batches.html` | 列定义同步 6 列；`helpIcon` 改为图标 + CSS 悬浮提示；详情去掉字段提示参数与「大小」提示 |
+| `ai-gateway-web-test/pages/batch-tasks/BatchTaskPage.js` | 列头常量 12 → 6；新增 `columnIndex()` 派生列索引；`getHeaderHelpMap` 改读 Tooltip；删除 `detailFieldHelpTip`，新增 `expectDetailNoHelpIcons` |
+| `ai-gateway-web-test/tests/batch-tasks/test_01~03` | 列索引 / 列断言 / help 断言按新 UI 更新；BT-L-09（列表金额列）删除，金额口径由 BT-D-08 覆盖；BT-D-02 改为断言抽屉内无帮助图标（`test_04` 无需改动） |
+| `ai-gateway-web-test/docs/batch-tasks/**` | 场景概览、列表页、详情页、索引与映射同步 6 列与「无字段帮助图标」 |
+| `ai-gateway-web-test/scripts/capture-docs-new-modules.js` | 批量任务采集补齐详情抽屉 / 取消确认 / 终态行三张图（抽屉截图前临时解除高度锚定，`screenshotElement` 采集完整 5 卡片） |
+| `docs/zh-cn/13-batch-tasks.md` | 列表列说明改 6 列；删除详情字段的 `?` 提示描述；金额口径限定为详情；13.7 截图清单按重拍结果重写 |
+| `docs/zh-cn/images/19-batch-tasks-*.png` | 重拍 5 张：列表 / 只读列表（6 列 + 造数样本）、详情抽屉（1344×1530）、取消确认弹窗（1920×1080）、终态行特写（1629×52） |
+
+### 9.4 验证
+
+- 前端：`eslint` 通过；`npm run build`（Node 20）通过。
+- 控制面实测（Playwright，`http://localhost:8180`，system_admin 登录）：列表表头 6 列；「请求计数」hover 出现 `body .ivu-tooltip-popper`，文本「总数 / 完成 / 失败」；详情抽屉 `.ivu-tooltip` 与问号图标数量均为 0，25 个字段标签完整。
+- 原型实测（`file://.../prototype-design/pages/batches.html`）：表格 6 列 6 单元格；表头仅 1 个帮助图标，`::after` 提示文本「总数 / 完成 / 失败」；详情抽屉帮助图标数量 0。
+- 测试用例复跑（2026-10-20，`PW_WORKERS=1`，跑前 `node scripts/seed-batch-task-data.cjs --execute` 恢复样本）：`test_01` **11 通过**、`test_02` **8 通过**、`test_03` **5 通过 / 1 跳过**（BT-C-02 为无出网 502 的历史同口径环境跳过）、`test_04` **3 通过**；合计 27 通过 / 0 失败 / 1 跳过。`docs/batch-tasks/02-功能测试用例/00-索引与映射.md` 四行生命周期已回写 `已通过`、`最近通过` 2026-10-20。
+- 手册截图（2026-10-20 重拍）：列表 1920×1080、只读列表 1920×1080、详情抽屉 1344×1530、取消确认 1920×1080、终态行 1629×52；采集命令 `TEST_BASE_URL=http://localhost:8180 node scripts/capture-docs-new-modules.js --only=batch-tasks` 与 `--only=batch-readonly`。
+
+### 9.5 待办
+
+- 5 张截图已于 2026-10-20 用造数样本全部重拍（列表 / 只读列表 / 详情抽屉 / 取消确认 / 终态行），截图脚本已补齐采集逻辑；终态行图片不含「终态任务不可取消」浮层（原生 `title` 无法入镜，手册已注明）。
+- `docs/zh-cn/site/` 尚未生成，手册站点可执行 `node docs/scripts/build-manual-site.js` + `verify-manual-site.js` 生成并自检（会新建 `docs/zh-cn/site/` 产物目录）。
