@@ -38,6 +38,43 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.0.11] - 2026-10-20
+
+### Added
+
+- AI cache rules module: collection-level rule table in view/edit dual mode (enter/exit edit, apply changes), per-rule semantic-cache toggle, and a global semantic settings tab (`top_k` / `threshold` / `threshold_relation`)
+- Traffic mirror rules module: rule table with condition, mirror cluster, sample ratio, header strip and path rewrite, plus KV / body / header-injection drawers and the same view/edit dual mode
+- Intent config module: global confidence threshold and question table (choice / score types, options 1–10) with a publish flow
+- AI context compression module: single page with "compression rules" and "global settings" tabs, both in view/edit dual mode
+- Batch tasks module (`/batches`): filter bar, primary-key cursor pagination, 6-column list, 70% detail drawer (basic info / status and counts / usage and billing / files and time / batch files) and cancel with confirmation; `batch` / `batch_file` operation-log resource types
+- Key re-encryption module (`/security`): trigger area (`mode` / `scope` / `dry_run`), running-task banner with polling, history list with `created_by`, and a detail drawer
+- Read-only system administrator role: `role` enum replaces `is_admin`, role switching via `PATCH /auth/users/{user_name}/role`, key masking on read endpoints, and write-action hiding across all pages
+- EPP runtime parameters (`epp_runtime.check` / `timeout`) in the cluster EPP section, summarized on the review page
+- Report: cache-hit / mirror-hit / intent metric cards, `cache_tokens` series, `ai_intent_answer` / `ai_cache_status` / `mirror_hit` dimensions, 3 detail columns, 5 filters and 9 detail fields, plus chart dimension drill-down
+- Entity organization "level" column with level filter and numeric sorting
+- Batch limits on API Key / Entity, model price batch discount (`batch_discount`, `mode=batch`), cluster upstream-error normalization, and user reserved names / password strength rules
+- Runtime branding directory (`branding.json` + `favicon.ico`): `title` / `titleEn` / `favicon` configurable after deploy without rebuilding
+- Rule modules: drag-and-drop row ordering, unsaved-change leave guard and row copy; route-table list defaults to the "enabled" filter
+- User manual: new AI cache, traffic mirror, intent config, AI context, batch tasks and key re-encryption chapters (20 chapters in total)
+
+### Changed
+
+- Provider instance source: manual instance pool vs K8s pool (`k8s_pool_name`); K8s mode only accepts a pool name, and the mirrored pool is read-only in the detail view
+- EPP allocation collapsed to instance groups with exactly one instance each: the assignment list shows "N / 1" and drops the primary / backup / degraded columns and the override selector
+- Batch task list trimmed from 12 to 6 columns (provider, API Key ID, Entity ID, usage, reserved and settled amounts moved into the detail drawer); the request-count help icon is now a real tooltip and the detail drawer no longer shows field-level "?" icons
+- Expression condition primitives aligned with BFE v1.8.9-dev (`time_weekday_in`, `req_ai_intent_in`) and grouped by stage
+- Cluster EPP parameters reworked: `load_profile` / `affinity` renames, waiting / running request limits, `fallback_on_empty` and metrics staleness; flow-control eviction locked to disabled
+- Report overview drops three never-wired filters; report detail content completed; route-table type column maps `api_key` to "API-Key"
+- User manual reordered and expanded to 20 chapters, screenshots refreshed, design docs and modification records synced
+
+### Fixed
+
+- Provider edit drawer did not show the previously configured instance source (#125)
+- Provider "Discover models" button stayed permanently disabled because it read an undefined instance-pool source
+- Read-only mode leaked write buttons after list filtering; table rows kept `draggable="true"` after leaving edit mode; re-encryption dry-run reset still sent `dry_run=false`; enum filters compared rendered labels; route-table detail fell back to the raw `api_key` enum
+- API Key / Entity batch limits could not be saved when they were the only rate-limit rule
+- Intent config navigation was missing the unsaved-change guard
+
 ## [v0.0.10] - 2026-09-23
 
 ### Added
@@ -278,6 +315,7 @@ AI Gateway Web v0.0.2 — Instance pool & build refresh. Focuses on EPP instance
 - Consumer management: API Key lifecycle with model allowlist, token quota, expiry, IP whitelist
 - User & access: system/tenant views, user management, token management
 
+[v0.0.11]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.11
 [v0.0.10]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.10
 [v0.0.9]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.9
 [v0.0.8]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.8
