@@ -19,6 +19,9 @@ import { getLang } from './i18n';
 const BRANDING_DIR = '/branding';
 const CONFIG_URL = BRANDING_DIR + '/branding.json';
 const DEFAULT_FAVICON = BRANDING_DIR + '/favicon.ico';
+// 图标不存在时用它占位：显式声明「无图标」，避免浏览器回退请求 /favicon.ico
+const EMPTY_FAVICON = 'data:,';
+const FAVICON_STATE_KEY = '__BRANDING_FAVICON_STATE__';
 const FETCH_TIMEOUT = 3000;
 const DEFAULT_TITLES = {
     zh: '壬远 AI网关',
@@ -49,10 +52,15 @@ export function getBrandingTitle(lang) {
     return branding.title || branding.titleEn || DEFAULT_TITLES.zh;
 }
 
-function applyFavicon(href) {
-    if (window.__BRANDING_FAVICON_URL__ === href) {
-        return;
-    }
+function isExternalUrl(path) {
+    return /^(https?:)?\/\//.test(path);
+}
+
+function withVersion(href) {
+    return href + (href.indexOf('?') === -1 ? '?v=' : '&v=') + Date.now();
+}
+
+function ensureFaviconLink() {
     let link = document.getElementById('branding-favicon');
     if (!link) {
         link = document.createElement('link');
@@ -60,8 +68,58 @@ function applyFavicon(href) {
         link.rel = 'icon';
         document.head.appendChild(link);
     }
-    link.href = href;
-    window.__BRANDING_FAVICON_URL__ = href;
+    return link;
+}
+
+function showFavicon(href) {
+    ensureFaviconLink().href = withVersion(href);
+}
+
+function hideFavicon() {
+    ensureFaviconLink().href = EMPTY_FAVICON;
+}
+
+function probeAsset(href) {
+    if (typeof fetch !== 'function') {
+        return Promise.resolve(true);
+    }
+    return fetch(href, { method: 'HEAD', cache: 'no-store' })
+        .then(response => {
+            if (response.status === 405 || response.status === 501) {
+                return fetch(href, { method: 'GET', cache: 'no-store' });
+            }
+            return response;
+        })
+        .then(response => !!(response && response.ok))
+        .catch(() => false);
+}
+
+// 图标资源存在才挂载；不存在则显式声明「无图标」，不展示任何 ico
+function applyFavicon(href) {
+    if (!href) {
+        hideFavicon();
+        return;
+    }
+    const state = window[FAVICON_STATE_KEY];
+    if (state && state.href === href) {
+        return;
+    }
+    window[FAVICON_STATE_KEY] = { href, exists: false };
+
+    if (isExternalUrl(href) || typeof fetch !== 'function') {
+        showFavicon(href);
+        window[FAVICON_STATE_KEY] = { href, exists: true };
+        return;
+    }
+
+    probeAsset(withVersion(href)).then(exists => {
+        if (exists) {
+            showFavicon(href);
+            window[FAVICON_STATE_KEY] = { href, exists: true };
+        } else {
+            hideFavicon();
+        }
+    });
 }
 
 export function applyBranding(config) {
