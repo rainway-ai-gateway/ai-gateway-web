@@ -607,6 +607,10 @@ export default {
             this.formData = {
                 name: data.name || '',
                 description: data.description || '',
+                instance_source: data.instance_source === 'k8s_pool'
+                    ? 'k8s_pool'
+                    : 'instance_pool',
+                k8s_pool_name: data.k8s_pool_name || '',
                 model_protocols: (data.model_protocols && data.model_protocols.length)
                     ? data.model_protocols.slice()
                     : ['openai'],
