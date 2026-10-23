@@ -494,6 +494,9 @@
           };
         }
                     if (entityState.drawerMode !== 'view') EntityUpsert.initUpsertForm();
+                    if (entityState.drawerMode !== 'view' && typeof ApiKeyUpsert.bindBatchLimitInputs === 'function') {
+                      ApiKeyUpsert.bindBatchLimitInputs();
+                    }
                     var resetBtn = document.getElementById('btn-entity-reset-quota');
                     if (resetBtn) resetBtn.onclick = openEntityResetQuotaModal;
                   }

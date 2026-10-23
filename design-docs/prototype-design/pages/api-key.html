@@ -322,12 +322,28 @@
             if (closeBtn) closeBtn.onclick = function () { Prototype.closeDrawer('drawer-api-key'); };
             if (submitBtn) {
               submitBtn.onclick = function () {
+                var batchErr = typeof ApiKeyUpsert.validateBatchLimitsForm === 'function'
+                  ? ApiKeyUpsert.validateBatchLimitsForm()
+                  : null;
+                if (batchErr) { Prototype.toast(batchErr, 'error'); return; }
+                // 批量限流：留空/为 0 的维度不提交，全部未配置时省略整个 batch_limits
+                if (state.currentRow && typeof ApiKeyUpsert.collectBatchLimits === 'function') {
+                  var policy = state.currentRow.rate_limit_policy;
+                  if (policy && policy.rules) {
+                    var collected = ApiKeyUpsert.collectBatchLimits();
+                    if (collected) policy.rules.batch_limits = collected;
+                    else delete policy.rules.batch_limits;
+                  }
+                }
                 Prototype.closeDrawer('drawer-api-key');
                 Prototype.toast(state.drawerMode === 'add' ? '添加成功！' : '编辑成功！');
               };
             }
             if (state.drawerMode !== 'view' && typeof ApiKeyUpsert.initUpsertForm === 'function') {
               ApiKeyUpsert.initUpsertForm();
+              if (typeof ApiKeyUpsert.bindBatchLimitInputs === 'function') {
+                ApiKeyUpsert.bindBatchLimitInputs();
+              }
             }
             var resetBtn = document.getElementById('btn-api-reset-quota');
             if (resetBtn) resetBtn.onclick = openResetQuotaModal;

@@ -196,8 +196,11 @@
             ],
             rows: pageRows,
             cursorPaging: true,
+            firstDisabled: !hasPrev,
             prevDisabled: !hasPrev,
-            nextDisabled: !hasNext
+            nextDisabled: !hasNext,
+            pageIndex: state.cursorStack.length,
+            pageCount: pageRows.length
           });
 
           bindTableEvents(pageRows);
@@ -232,6 +235,14 @@
           };
 
           var tableRoot = document.getElementById('batch-page-table');
+          var firstBtn = tableRoot ? tableRoot.querySelector('.proto-page-first') : null;
+          if (firstBtn) firstBtn.onclick = function () {
+            if (state.cursorStack.length > 1) {
+              state.cursorStack = [''];
+              renderTable();
+            }
+          };
+
           var prevBtn = tableRoot ? tableRoot.querySelector('.proto-page-prev') : null;
           if (prevBtn) prevBtn.onclick = function () {
             if (state.cursorStack.length > 1) {

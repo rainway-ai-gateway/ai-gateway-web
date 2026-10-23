@@ -479,16 +479,11 @@ export default {
       return match ? parseInt(match[1], 10) : -1;
     },
 
-    getDuplicateErrorMessage(clusterName, model, currentType, duplicateType) {
+    // 仅列表内重复会走这里：targets / fallbacks 各自去重，互不比较（issue #128）
+    getDuplicateErrorMessage(clusterName, model, currentType) {
       const modelText = model || this.$t('route.modelTransparent') || '-';
-      if (currentType === duplicateType) {
-        // 同类型重复
-        const msgKey = currentType === 'target' ? 'route.targetDuplicate' : 'route.fallbackDuplicate';
-        return `${this.$t(msgKey)}：${clusterName} / ${modelText}`;
-      }
-      // 跨类型重复
-      const msgKey = duplicateType === 'target' ? 'route.clusterModelUsedInTarget' : 'route.clusterModelUsedInFallback';
-      return this.$t(msgKey, { cluster: clusterName, model: modelText });
+      const msgKey = currentType === 'target' ? 'route.targetDuplicate' : 'route.fallbackDuplicate';
+      return `${this.$t(msgKey)}：${clusterName} / ${modelText}`;
     },
 
     validateTargetModelUnique(rule, value, callback) {
@@ -511,19 +506,11 @@ export default {
         return `${item.cluster_name}|${item.model || ''}` === currentKey;
       });
       if (duplicateTarget) {
-        callback(new Error(this.getDuplicateErrorMessage(duplicateTarget.cluster_name, duplicateTarget.model, 'target', 'target')));
+        callback(new Error(this.getDuplicateErrorMessage(duplicateTarget.cluster_name, duplicateTarget.model, 'target')));
         return;
       }
 
-      // 与备用集群比较
-      const duplicateFallback = (this.formData.fallbacks || []).find(item => {
-        if (!item.cluster_name) return false;
-        return `${item.cluster_name}|${item.model || ''}` === currentKey;
-      });
-      if (duplicateFallback) {
-        callback(new Error(this.getDuplicateErrorMessage(duplicateFallback.cluster_name, duplicateFallback.model, 'target', 'fallback')));
-        return;
-      }
+      // 与备用集群不做跨列表比较：targets / fallbacks 各自列表内去重即可（issue #128）
 
       callback();
     },
@@ -548,19 +535,11 @@ export default {
         return `${item.cluster_name}|${item.model || ''}` === currentKey;
       });
       if (duplicateFallback) {
-        callback(new Error(this.getDuplicateErrorMessage(duplicateFallback.cluster_name, duplicateFallback.model, 'fallback', 'fallback')));
+        callback(new Error(this.getDuplicateErrorMessage(duplicateFallback.cluster_name, duplicateFallback.model, 'fallback')));
         return;
       }
 
-      // 与目标集群比较
-      const duplicateTarget = (this.formData.targets || []).find(item => {
-        if (!item.cluster_name) return false;
-        return `${item.cluster_name}|${item.model || ''}` === currentKey;
-      });
-      if (duplicateTarget) {
-        callback(new Error(this.getDuplicateErrorMessage(duplicateTarget.cluster_name, duplicateTarget.model, 'fallback', 'target')));
-        return;
-      }
+      // 与目标集群不做跨列表比较：targets / fallbacks 各自列表内去重即可（issue #128）
 
       callback();
     },

@@ -641,6 +641,17 @@ export default {
         return;
       }
 
+      const condDuplicated = this.rules.some((rule, index) => {
+        if (index === excludeIndex) {
+          return false;
+        }
+        return rule.cond === data.cond;
+      });
+      if (condDuplicated) {
+        this.$Message.error(this.$t('aiCache.tipCondDuplicate'));
+        return;
+      }
+
       if (this.formMode === 'add') {
         this.rules.unshift(data);
       } else if (this.currentRuleIndex >= 0) {
@@ -659,6 +670,13 @@ export default {
       const uniqueNames = [...new Set(names)];
       if (names.length !== uniqueNames.length) {
         this.$Message.error(this.$t('aiCache.tipNameDuplicate'));
+        return;
+      }
+
+      const conds = (this.rules || []).map(rule => rule.cond).filter(Boolean);
+      const uniqueConds = [...new Set(conds)];
+      if (conds.length !== uniqueConds.length) {
+        this.$Message.error(this.$t('aiCache.tipCondDuplicate'));
         return;
       }
 

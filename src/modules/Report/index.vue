@@ -404,7 +404,6 @@ export default {
 
       const params = { start, end };
       const dimensions = [
-        { key: 'model', field: 'modelOptions' },
         { key: 'apikey', field: 'apikeyOptions' },
         { key: 'provider', field: 'providerOptions' },
         { key: 'host', field: 'hostOptions' },
@@ -417,6 +416,25 @@ export default {
             }
           }).catch(() => {});
       });
+      this.loadTargetModelOptions();
+    },
+
+    // 「目标模型」筛选项只列各集群实际支持的模型（llm_config.models），
+    // 不再从日志排行取值——否则仅作为请求别名出现的模型名也会混进下拉（issue #129）
+    loadTargetModelOptions() {
+      this.$request({ url: 'clusters', method: 'get', openapi: true })
+        .then(res => {
+          if (res.status !== 200) return;
+          const models = new Set();
+          (res.data.Data || []).forEach(cluster => {
+            const list = (cluster.llm_config && cluster.llm_config.models) || [];
+            list.forEach(model => {
+              if (model) models.add(model);
+            });
+          });
+          this.modelOptions = Array.from(models).sort();
+        })
+        .catch(() => {});
     },
   },
 };

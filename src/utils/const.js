@@ -320,12 +320,24 @@ export function CertNameRegCheck(value) {
 }
 
 /**
- * 检查证书描述是否不符合 API 规范
+ * 计算字符串的 UTF-8 字节长度
+ * 描述类字段的上限按字节计（后端按字节校验），不能直接用 String.length
+ * @param {string} value - 待计算的值
+ * @returns {number} - UTF-8 字节数
+ */
+export function utf8ByteLength(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  return new TextEncoder().encode(String(value)).length;
+}
+
+/**
+ * 检查证书描述是否不符合 API 规范（2-256 UTF-8 字节，不能包含控制字符）
  * @param {string} value - 需要检查的描述
  * @returns {boolean} - 不合法返回 true，合法返回 false
  */
 export function CertDescriptionRegCheck(value) {
-  if (!value || value.length < 2 || value.length > 256) {
+  const bytes = utf8ByteLength(value);
+  if (!value || bytes < 2 || bytes > 256) {
     return true;
   }
   return /[\x00-\x1f\x7f]/.test(value);

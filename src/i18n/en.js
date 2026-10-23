@@ -32,6 +32,12 @@
 export default {
   com: {
     close: 'Close',
+    // Cursor pagination labels (CursorPager)
+    firstPage: 'First',
+    prevPage: 'Previous',
+    nextPage: 'Next',
+    pageIndicator: 'Page {page}',
+    pageCount: '{count} on this page',
     del: 'Delete',
     delX: 'Delete {obj}',
     create: 'Add',
@@ -427,10 +433,6 @@ export default {
     fallbackDuplicate:
       'Backup (ClusterName, Model) combination cannot be duplicated',
     clusterModelDuplicate: 'Cluster and Model combination cannot be duplicated',
-    clusterModelUsedInTarget:
-      'This combination is already used in target cluster: {cluster} / {model}',
-    clusterModelUsedInFallback:
-      'This combination is already used in fallback cluster: {cluster} / {model}',
     noBackup: 'No backup clusters yet',
   },
   cluster: {
@@ -500,7 +502,7 @@ export default {
       'Request write buffer size must be greater than 0',
     tipsValueMax: 'Input value too big',
     tipHashHeaderRequired: 'Hash header cannot be empty',
-    descriptionLengthError: 'Description cannot exceed 256 characters',
+    descriptionLengthError: 'Description cannot exceed 256 bytes (UTF-8)',
     descriptionControlCharsError:
       'Description cannot contain control characters',
     tipClusterNameRule:
@@ -769,8 +771,11 @@ export default {
     nameLengthError: 'Entity name cannot exceed 64 characters',
     nameControlCharsError: 'Entity name cannot contain control characters',
     entityDescriptionPlaceholder: 'Please enter Entity description',
-    descriptionLengthError: 'Entity description cannot exceed 255 characters',
+    descriptionLengthError: 'Entity description cannot exceed 255 bytes (UTF-8)',
     descriptionControlCharsError: 'Entity description cannot contain control characters',
+    typeDescriptionTip: 'Up to 255 bytes (UTF-8); control characters are not allowed',
+    typeDescriptionLengthError: 'Type description cannot exceed 255 bytes (UTF-8)',
+    typeDescriptionControlCharsError: 'Type description cannot contain control characters',
     selectType: 'Please select type',
     selectParentEntity: 'Please select parent Entity',
     noParent: 'None',
@@ -1283,7 +1288,7 @@ export default {
     tipCertNameRule:
       'Certificate name must be 2-64 characters, allow letters, digits, _, -, ., and cannot start or end with _, -, or .',
     tipDescriptionRule:
-      'Description must be 2-256 characters and cannot contain control characters',
+      'Description must be 2-256 bytes (UTF-8) and cannot contain control characters',
     tipCannotDeleteDefault: 'Default certificate cannot be deleted',
     tipExpiredDateAuto:
       'Parsed automatically from the uploaded certificate for preview only',
@@ -1431,8 +1436,8 @@ export default {
     dimensions: 'Filters',
     startTime: 'Start Time',
     endTime: 'End Time',
-    models: 'Models',
-    modelsPlaceholder: 'Select models',
+    models: 'Target model',
+    modelsPlaceholder: 'Select target model',
     apikeyIds: 'API Key',
     apikeyIdsPlaceholder: 'Select API Key',
     providers: 'Providers',
@@ -1577,6 +1582,7 @@ export default {
     tipMaxBodyPositive: 'Max request body must be greater than 0',
     tipMaxValuePositive: 'Max cache value must be greater than 0',
     tipNameDuplicate: 'Rule name already exists; it must be unique within the collection',
+    tipCondDuplicate: 'Matching condition already exists; it must be unique within the collection',
     deleteConfirm: 'Delete this cache rule? You must submit to take effect after deletion.',
     exitConfirm: 'There are unsaved changes. Exiting edit mode will discard them. Continue?',
     dragToChangeOrder: 'Drag rows to change the matching order',
@@ -1816,8 +1822,6 @@ export default {
     endTime: 'Created before',
     query: 'Query',
     reset: 'Reset',
-    prevPage: 'Previous',
-    nextPage: 'Next',
     detailTitle: 'Batch Task Detail',
     batchId: 'Batch Task ID',
     entityId: 'Entity ID',

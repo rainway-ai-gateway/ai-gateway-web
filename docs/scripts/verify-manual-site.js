@@ -162,7 +162,12 @@ function main() {
     if (sidebarHtml && countMatches(sidebarHtml[1], /<h1[\s>]/g) !== 1) {
       problems.push(name + ': 侧边导航栏品牌标题缺失');
     }
-    if (/<script|<link\s|https?:\/\/[^"']*\.(?:js|css)/i.test(html)) {
+    // 代码块与行内代码（<pre> / <code>）里的命令、示例常含 .js 文本，先剔除再检查离线零依赖；
+    // 真正的 <script> 标签在正文中会被渲染为转义文本（&lt;script&gt;），剔除代码块不会漏检
+    const htmlWithoutCodeBlocks = html
+      .replace(/<pre[\s\S]*?<\/pre>/gi, '')
+      .replace(/<code[\s\S]*?<\/code>/gi, '');
+    if (/<script|<link\s|https?:\/\/[^"']*\.(?:js|css)/i.test(htmlWithoutCodeBlocks)) {
       problems.push(name + ': 存在脚本 / 外部样式引用（应保持离线零依赖）');
     }
   }

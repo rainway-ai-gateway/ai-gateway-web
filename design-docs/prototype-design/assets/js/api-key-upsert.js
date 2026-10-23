@@ -1441,7 +1441,8 @@ window.ApiKeyUpsert = {
               : '') +
             (rpmRules.length
               ? ApiKeyUpsert.renderRulesDetail('RPM规则', rpmRules, 'rpm')
-              : '')
+              : '') +
+            (ApiKeyUpsert.renderBatchLimitsDetail(batchLimits) || '')
           : ''),
     );
 
