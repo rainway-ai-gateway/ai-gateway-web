@@ -7,7 +7,7 @@
 ```json
 {
   "user_name": "user_demo",
-  "is_admin": true
+  "role": "system_admin"
 }
 ```
 
@@ -16,7 +16,7 @@
 | 字段 | 类型 | 说明 | 可能取值 |
 |------|------|------|----------|
 | `user_name` | string | 用户名 | - |
-| `is_admin` | bool | 是否为系统管理员 | `true`：System 权限；`false` 暂不支持 |
+| `role` | string | 用户角色 | `system_admin`（系统管理员）；`system_admin_readonly`（系统管理员（只读）） |
 
 **Token**
 
@@ -34,7 +34,7 @@
 |------|------|------|----------|
 | `name` | string | Token 名称 | 全局唯一 |
 | `token` | string | Token 值 | 用于请求头鉴权 |
-| `scope` | string | 权限范围 | `System` / `Support` |
+| `scope` | string | 权限范围 | `System`（全部权限）/ `SystemReadonly`（全部只读）/ `Support`（仅导出类资源） |
 
 **认证方式**
 
@@ -47,6 +47,7 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 | Scope | 说明 |
 |------|------|
 | `System` | 全部权限，包括全局配置、产品线资源和导出资源 |
+| `SystemReadonly` | 全部资源的只读权限：所有读类接口放行，写类接口（创建/修改/删除/导出/取消）拒绝；密钥类字段（api-keys `key`、providers `keys[].key`、tokens `token`）仅返回掩码值 |
 | `Support` | 仅导出类资源，供 BFE 数据面模块导出配置 |
 
 **约束**
@@ -70,9 +71,9 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 用户名 | Y | - | 必填；类型为 [UserName](#12-用户名username) |
-| password | string | 用户密码 | Y | - | 必填；类型为 [Password](#13-用户密码password)；不能等于 `user_name` 或其逆序 |
-| is_admin | bool | 是否为系统管理员 | N | 固定为 `true`，暂不支持 `false`；若未传则默认填充为 `true` | 必须为 `true` |
+| user_name | string | 用户名 | Y | - | 必填；类型为 [UserName](00-common.md#12-用户名username) |
+| password | string | 用户密码 | Y | - | 必填；类型为 [Password](00-common.md#13-用户密码password)；不能等于 `user_name` 或其逆序 |
+| role | string | 用户角色 | Y | 决定用户权限范围 | 必填；枚举值：`system_admin`、`system_admin_readonly` |
 
 **HTTP BODY参数示例**
 
@@ -80,14 +81,14 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 {
     "user_name": "user_demo",
     "password": "password@baidu.com",
-    "is_admin": true
+    "role": "system_admin"
 }
 ```
 
 **执行逻辑**
 
 1. 校验参数合法性。
-2. 创建用户记录，`is_admin` 固定为 `true`（System 权限），暂不支持其他 Scope。
+2. 创建用户记录，按 `role` 写入对应 Scope（`system_admin`→`System`；`system_admin_readonly`→`SystemReadonly`）。
 3. 返回成功状态（Data 为 null）。
 
 **返回数据（Data内容）**
@@ -109,7 +110,7 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 待删除的用户名 | Y | - | 必填；类型为 [UserName](#12-用户名username)；对应用户必须存在 |
+| user_name | string | 待删除的用户名 | Y | - | 必填；类型为 [UserName](00-common.md#12-用户名username)；对应用户必须存在 |
 
 **执行逻辑**
 
@@ -137,14 +138,14 @@ API 请求时需在 Header 的 `Authorization` 中携带凭证：
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 待修改密码的用户名 | Y | - | 必填；类型为 [UserName](#12-用户名username)；对应用户必须存在 |
+| user_name | string | 待修改密码的用户名 | Y | - | 必填；类型为 [UserName](00-common.md#12-用户名username)；对应用户必须存在 |
 
 **输入参数（Body）**
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
 | old_password | string | 旧的用户密码 | N | 当被修改的用户为当前登录用户，需要填入旧密码 | 修改当前登录用户密码时必填，且必须与当前密码一致 |
-| password | string | 用户新密码 | Y | - | 必填；类型为 [Password](#13-用户密码password)；不能等于 `user_name` 或其逆序 |
+| password | string | 用户新密码 | Y | - | 必填；类型为 [Password](00-common.md#13-用户密码password)；不能等于 `user_name` 或其逆序 |
 
 **HTTP BODY参数示例**
 
@@ -189,7 +190,7 @@ Data为数组，每个元素为一个用户。
 | 参数名 | 类型 | 参数含义 | 补充描述 |
 | - | - | - | - |
 | user_name | string | 用户名 | - |
-| is_admin | bool | 是否为系统管理员 | 固定返回 `true`，暂不支持 `false` |
+| role | string | 用户角色 | `system_admin` / `system_admin_readonly`；响应不含 `session_key` |
 
 **成功返回示例**
 
@@ -200,20 +201,20 @@ Data为数组，每个元素为一个用户。
     "Data": [
         {
             "user_name": "user_demo",
-            "is_admin": true
+            "role": "system_admin"
         }
     ]
 }
 ```
 
-### 2.5 设置用户是否具有管理员权限
+### 2.5 变更用户角色
 
 **基本信息**
 
 | 项目 | 值 | 说明 |
 | - | - | - |
-| 含义 | 设置用户是否有管理员权限 | - |
-| 端点 | /auth/users/{user_name}/is_admin | - |
+| 含义 | 变更用户角色（系统管理员 / 系统管理员（只读）） | 仅系统管理员可调用 |
+| 端点 | /auth/users/{user_name}/role | - |
 | 版本 | v1 | - |
 | method | PATCH | - |
 
@@ -221,19 +222,19 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| user_name | string | 待修改权限的用户的用户名 | Y | - | 必填；长度≥1；对应用户必须存在 |
+| user_name | string | 待变更角色的用户的用户名 | Y | - | 必填；长度≥1；对应用户必须存在 |
 
 **输入参数（Body）**
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| is_admin | bool | 是否为系统管理员 | Y | 固定为 `true`，暂不支持设置为 `false` | 必须为 `true` |
+| role | string | 用户角色 | Y | - | 必填；枚举值：`system_admin`、`system_admin_readonly` |
 
 **HTTP BODY参数示例**
 
 ```json
 {
-    "is_admin": true
+    "role": "system_admin_readonly"
 }
 ```
 
@@ -241,8 +242,9 @@ Data为数组，每个元素为一个用户。
 
 1. 校验参数合法性
 2. 根据 `user_name` 查找用户
-3. 更新用户 `is_admin` 字段，固定为 `true`（System 权限），暂不支持其他 Scope
-4. 返回成功状态（Data 为 null）
+3. **内置账号保护**：`user_name` 为 `admin`（内置账号，大小写不敏感）时，role 固定为 `system_admin`，请求变更为其他值返回 422（`user "admin" role is fixed to system_admin`）
+4. 更新用户角色（写入对应 Scope），并记录操作日志
+5. 返回成功状态（Data 为 null）
 
 **返回数据（Data内容）**
 
@@ -279,15 +281,15 @@ Data为数组，每个元素为一个用户。
 
 1. 校验用户名与密码正确性
 2. 生成 session key
-3. 返回 session key、用户名及管理员标识
+3. 返回 session key、用户名及用户角色
 
 **返回数据（Data内容）**
 
 | 参数名 | 类型 | 参数含义 | 补充描述 |
 | - | - | - | - |
-| session_key | string | 会话密钥 | 在后续请求中需要在Header中带上该值，格式为 "Authorization: Session iMQW0z5ZwK_6FnPPT7Xj" |
+| session_key | string | 会话密钥 | 在后续请求中需要在Header中带上该值，格式为 "Authorization: Session iMQW0z5ZwK_6FnPPT7Xj"；仅返回**本人**会话密钥 |
 | user_name | string | 用户名 | - |
-| is_admin | bool | 是否是系统管理员 | 固定返回 `true`（暂不支持非管理员用户） |
+| role | string | 用户角色 | `system_admin` / `system_admin_readonly` |
 
 **成功返回示例**
 
@@ -298,7 +300,7 @@ Data为数组，每个元素为一个用户。
     "Data": {
         "user_name": "user_demo",
         "session_key": "iMQW0z5ZwK_6FnPPT7Xj",
-        "is_admin": true
+        "role": "system_admin"
     }
 }
 ```
@@ -345,8 +347,8 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| name | string | token名字 | Y | name必须全局唯一 | 必填；类型为 [TokenName](#14-token-名称tokenname) |
-| scope | string | scope | Y | 只能指定一个scope；取值 `System` / `Support` | 必填；枚举值：`System`、`Support` |
+| name | string | token名字 | Y | name必须全局唯一 | 必填；类型为 [TokenName](00-common.md#14-token-名称tokenname) |
+| scope | string | scope | Y | 只能指定一个scope | 必填；枚举值：`System`、`SystemReadonly`、`Support`。`SystemReadonly` 为只读档：读类接口放行、密钥字段脱敏、写类接口拒绝 |
 
 **HTTP BODY参数示例**
 
@@ -397,7 +399,7 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| token_name | string | 待删除的token name | Y | - | 必填；类型为 [TokenName](#14-token-名称tokenname)；对应Token必须存在 |
+| token_name | string | 待删除的token name | Y | - | 必填；类型为 [TokenName](00-common.md#14-token-名称tokenname)；对应Token必须存在 |
 
 **执行逻辑**
 
@@ -424,14 +426,14 @@ Data为数组，每个元素为一个用户。
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| token_name | string | token name | Y | - | 必填；类型为 [TokenName](#14-token-名称tokenname)；对应Token必须存在 |
+| token_name | string | token name | Y | - | 必填；类型为 [TokenName](00-common.md#14-token-名称tokenname)；对应Token必须存在 |
 
 **返回数据（Data内容）**
 
 | 参数名 | 类型 | 参数含义 | 补充描述 |
 | - | - | - | - |
 | name | string | token名字 | - |
-| token | string | token的值 | - |
+| token | string | token的值 | 系统管理员返回明文；**系统管理员（只读）返回掩码值**（长度>8：前4+`********`+后4；4<长度≤8：前2+`****`+后2；长度≤4：全掩码），掩码值不可用于鉴权 |
 | scope | string | scope | - |
 
 **成功返回示例**
@@ -465,7 +467,7 @@ Data为数组，每个元素为一个用户。
 
 **返回数据（Data内容）**
 
-Data为数组，每个元素为Token（详见“查看Token详情”）。
+Data为数组，每个元素为Token（详见“查看Token详情”）。`token` 字段的角色可见性同 Token 详情：系统管理员（只读）视角为掩码值。
 
 **成功返回示例**
 
@@ -505,7 +507,7 @@ Data为数组，每个元素为Token（详见“查看Token详情”）。
 | 参数名 | 类型 | 参数含义 | 补充描述 |
 | - | - | - | - |
 | user_name | string | 用户名 | - |
-| is_admin | bool | 是否为系统管理员 | 固定返回 `true` |
+| role | string | 用户角色 | `system_admin` / `system_admin_readonly`；响应不含 `session_key` |
 
 ---
 

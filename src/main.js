@@ -43,6 +43,7 @@ import JsonViewer from 'vue-json-viewer';
 
 import '@/utils/Element';
 import requestPlugin from '@/utils/request';
+import { loadBranding } from '@/utils/branding';
 import '@/assets/css/main.less';
 import './utils/directive';
 
@@ -126,9 +127,11 @@ router.afterEach(() => {
   NProgress.done();
 });
 
-new Vue({
-  el: '#app',
-  router,
-  i18n,
-  render: (h) => h(layoutApp),
+loadBranding().then(() => {
+  new Vue({
+    el: '#app',
+    router,
+    i18n,
+    render: (h) => h(layoutApp),
+  });
 });

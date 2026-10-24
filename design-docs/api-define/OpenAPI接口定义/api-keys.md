@@ -68,7 +68,7 @@
 | 字段 | 类型 | 说明 | 可能取值 |
 |------|------|------|----------|
 | `id` | string | API-Key唯一标识（内部使用） | 系统生成，如`apikey-001` |
-| `key` | string | API-Key值（用于请求头鉴权） | 系统生成，如`ak-2v8x9k3m7p` |
+| `key` | string | API-Key值（用于请求头鉴权） | 系统生成，如`ak-2v8x9k3m7p`。**角色可见性**：系统管理员返回明文；系统管理员（只读）返回掩码值（长度>8：前4+`********`+后4；4<长度≤8：前2+`****`+后2；长度≤4：全掩码），掩码值不可用于鉴权 |
 | `description` | string | 描述 | 自定义 |
 | `enabled` | bool | 是否启用 | `true`（启用）、`false`（禁用） |
 | `create_time` | int64 | 创建时间 | Unix时间戳（秒） |
@@ -129,6 +129,7 @@
 **约束**
 
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
+- `rate_limit_policy.rules` 中的 `batch_limits` 段（批量任务限流维度）与独立策略资源一致生效：四维度均按发起请求的 API-Key 计数、与 `model` 无关，省略/`null` 表示该策略不参与批量限流，不配置不代表批量不限流（仍受数据面 `mod_ai_batch.data` 全局硬顶约束）；字段定义见 [RateLimitPolicy](./00-common.md#公共参数类型)。
 - 若 `entity_id` 不为空，该Entity必须存在。
 - 若传入 `key`，其值需在系统中全局唯一，长度 1-128 字符，且仅允许大小写字母、数字、连字符(-)、下划线(_)；若重复或格式非法，返回422。
 - `description` 必填，长度不超过 512 字符。
@@ -161,7 +162,13 @@
             "rpm": [
                 {"name": "rpm_1min", "model": "*", "window_minutes": 1, "max_requests": 100}
             ],
-            "max_concurrency": 50
+            "max_concurrency": 50,
+            "batch_limits": {
+                "max_create_rpm": 60,
+                "max_active_batches": 10,
+                "max_file_bytes": 104857600,
+                "max_file_lines": 1000000
+            }
         }
     },
     "route_rules": {
@@ -344,6 +351,7 @@
 **约束**
 
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
+- `rate_limit_policy.rules` 中的 `batch_limits` 段（批量任务限流维度）与独立策略资源一致生效：四维度均按发起请求的 API-Key 计数、与 `model` 无关，省略/`null` 表示该策略不参与批量限流，不配置不代表批量不限流（仍受数据面 `mod_ai_batch.data` 全局硬顶约束）；字段定义见 [RateLimitPolicy](./00-common.md#公共参数类型)。
 - 若将 `entity_id` 修改为非空（挂载到新Entity），该Entity必须存在。
 - 注：配额扣减遵循 [workflows.md](./workflows.md) §5——当 `unlimited_quota=false` 且 `quota_plan.unlimited=false` 时，Key 自身的 QuotaPlan 已计入扣减列表并扣减其自身 QuotaBalance，因此不要求新Entity或其祖先链上存在有效的Quota Plan。若 Key 自身余额不足，请求按 §5 step 6/8 拒绝（429002），与挂载目标的配额类型无关。
 
@@ -397,6 +405,7 @@
 **约束**
 
 - `quota_plan`、`rate_limit_policy`、`route_rules` 的字段及合法性条件分别见 [QuotaPlan](./00-common.md#公共参数类型)、[RateLimitPolicy](./00-common.md#公共参数类型)、[RouteRules](./00-common.md#公共参数类型) 公共类型定义。
+- `rate_limit_policy.rules` 中的 `batch_limits` 段（批量任务限流维度）与独立策略资源一致生效：四维度均按发起请求的 API-Key 计数、与 `model` 无关，省略/`null` 表示该策略不参与批量限流，不配置不代表批量不限流（仍受数据面 `mod_ai_batch.data` 全局硬顶约束）；字段定义见 [RateLimitPolicy](./00-common.md#公共参数类型)。
 - 若将 `entity_id` 修改为非空（挂载到新Entity），该Entity必须存在。不要求新Entity或其祖先链上存在有效的Quota Plan（依据 [workflows.md](./workflows.md) §5，Key 自身的 QuotaPlan 始终计入扣减列表）。
 - 修改 `quota_plan.quota`（单位不变）时，保留 `balance.used`，按 `新quota - used` 重新计算 `balance.remaining`；修改 `quota_plan.unit` 或 `quota_plan.unlimited` 时，会重置 `balance.used = 0`；仅修改 `quota_plan` 其他字段不会调整 balance。
 - 若修改 `route_rules`，视为全量替换该路由规则配置。

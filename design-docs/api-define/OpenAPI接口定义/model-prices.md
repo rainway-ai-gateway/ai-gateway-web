@@ -28,6 +28,7 @@
       "cache_read_input_token_cost": 0.000001
     }
   },
+  "batch_discount": 0.5,
   "price_currency": "RMB",
   "metadata": {
     "source": "https://platform.deepseek.com/pricing",
@@ -52,6 +53,7 @@
 | `limits` | object | 限制对象 | 默认空对象；键名应为枚举值；所有限制字段必须为非负整数 |
 | `prices` | object | 价格对象 | 必填；至少包含一个价格字段；所有价格字段必须为非负数；键名应为枚举值；未命中 tier 时作为 fallback 价格；支持科学计数法与十进制表示法（如 `1.5e-6` 与 `0.0000015` 等价），按 float64 解析 |
 | `tier_prices` | object | 分时段价格对象 | 非必填；键为 tier name（**初期只支持 `peak`**），值为价格对象；内部键名应为 `prices` 枚举；与 provider 的 `tiers` 不做强制引用校验；同样支持科学计数法与十进制表示法 |
+| `batch_discount` | float | 批量折扣系数：导出时将本行各 token 价格键 × 系数展开生成 `(provider, model, mode=batch)` 价格行随 ModelTable 下发 BFE；tier 价同样逐档展开 | 非必填；默认 `0.5`；取值范围 `(0,1]`；仅从 `mode != batch` 的记录展开；手工维护的 `mode=batch` 行优先于系数展开（冲突检测见 [1.3](#13-批量价格展开语义batch_discount-与-modebatch)） |
 | `price_currency` | string | 价格货币 | 固定为 `RMB`，请求体中无需传入 |
 | `metadata` | object | 元数据 | 默认空对象；键名应为枚举值 |
 | `create_time` | int64 | 创建时间 | Unix 时间戳（秒） |
@@ -76,6 +78,9 @@
 | `ocr` | OCR |
 | `search` | 搜索 |
 | `realtime` | 实时交互 |
+| `batch` | 批量任务（Batch API，/v1/batches 类请求） |
+
+> **说明**：`file` 不进价格体系——文件上传/删除/下载等 `/v1/files` 请求不设 `file` 价格模式，不生成 `mode=file` 价格行；批量任务统一按 `mode=batch` 价格计费。
 
 `capabilities` 枚举值：
 
@@ -209,6 +214,48 @@
 > 说明：早期版本（issue-102）曾强制价格以十进制表示法序列化；v0.6 起放开学
 > 计数法，标准 encoder 对极小值（如 `1.5e-6`）可能输出科学计数法，属正常行为。
 
+### 1.3 批量价格展开语义（`batch_discount` 与 `mode=batch`）
+
+`batch_discount` 描述非批量价格行对应的批量折扣。控制面在集群 conf 导出（InnerAPI 组装 `AIConf.ModelTable`）时执行展开：
+
+1. 对每条 `mode != batch` 且配置了 `batch_discount` 的价格行，将 `prices` 内**各 token 价格键**（如 `input_cost_per_token`、`output_cost_per_token`、`cache_read_input_token_cost` 等，键集合同 `prices` 枚举）逐键 × `batch_discount`，生成一条 `(provider, model, mode=batch)` 价格行，随 `ModelTable` 下发 BFE；
+2. `tier_prices` 各 tier 档价格按同一系数逐档展开，生成的批量 tier 价随批量行一同下发；
+3. **手工维护的 `mode=batch` 行优先于系数展开**：`model_prices` 中已存在 `(provider, model, mode=batch)` 记录时，以手工行为准、不做系数展开；导出时检测到此类冲突记录**告警日志**（手工行优先），不阻塞导出；
+4. `batch_discount` 默认 `0.5`，合法性 `(0,1]`；`mode=batch` 的价格行本身不再配置 `batch_discount`（系数展开只从非批量行生成）。
+
+**请求/响应示例**（携带 `batch_discount` 的记录）：
+
+```json
+{
+    "provider": "deepseek",
+    "model": "deepseek-v3",
+    "base_model": "deepseek-v3",
+    "mode": "chat",
+    "prices": {
+        "input_cost_per_token": 0.000002,
+        "output_cost_per_token": 0.000008
+    },
+    "batch_discount": 0.5
+}
+```
+
+**展开后随 ModelTable 下发的批量价格行**（等价于手工维护的 `(deepseek, deepseek-v3, batch)` 行）：
+
+```json
+{
+    "provider": "deepseek",
+    "model": "deepseek-v3",
+    "base_model": "deepseek-v3",
+    "mode": "batch",
+    "prices": {
+        "input_cost_per_token": 0.000001,
+        "output_cost_per_token": 0.000004
+    }
+}
+```
+
+> **向后兼容**：`batch_discount` 为可选字段，存量记录为 `NULL`（= 不展开），导入/查询/导出行为均不变；`mode=batch` 为 `mode` 枚举新增值，InnerAPI 导出的 `ModelTable` 中因此可能新增批量价格行，旧版本 BFE 忽略未识别字段/枚举安全。
+
 ---
 
 ## 2. `model-list.yaml` 源格式说明
@@ -247,6 +294,7 @@ models:
         input_cost_per_token: 0.000004
         output_cost_per_token: 0.000016
         cache_read_input_token_cost: 0.000001
+    batch_discount: 0.5
     metadata:
       source: "https://platform.deepseek.com/pricing"
       notes: "DeepSeek V3"
@@ -265,13 +313,14 @@ models:
 | `limits` | N | 限制对象，键名枚举值同第 1 节 `limits` 枚举；所有限制字段必须为非负整数 |
 | `prices` | Y | 价格对象，键名枚举值同第 1 节 `prices` 枚举；至少包含一个价格字段；未命中 tier 时作为 fallback 价格；支持科学计数法与十进制表示法 |
 | `tier_prices` | N | 分时段价格对象，键为 tier name（**初期只支持 `peak`**），值为价格对象；内部键名枚举值同第 1 节 `prices` 枚举；支持科学计数法与十进制表示法 |
+| `batch_discount` | N | 批量折扣系数，默认 `0.5`，合法性 `(0,1]`；导出时展开生成 `(provider, model, mode=batch)` 价格行，语义见 [1.3](#13-批量价格展开语义batch_discount-与-modebatch) |
 | `metadata` | N | 元数据，键名枚举值同第 1 节 `metadata` 枚举 |
 
 > **唯一性约束**：`(provider, model, mode)` 三元组必须唯一。
 > 
 > **币种说明**：v0.4 仅支持 `RMB`，`default_currency` 与单条 `price_currency`（若填写）均须为 `RMB`。
 > 
-> **merge 导入的字段语义**：`mode=merge` 对已存在 `(provider, model, mode)` 记录执行**整行覆盖**——条目未提供的可选字段（`capabilities` / `supported_parameters` / `limits` / `tier_prices` / `metadata` 等）会被清空，不会保留原值；merge 导入已有记录时必须携带希望保留的完整字段集。字段级合并请使用按 ID / 组合键 `PUT` 路径（省略字段保留原值）。详见 §3.1 处理逻辑第 9、10 步。
+> **merge 导入的字段语义**：`mode=merge` 对已存在 `(provider, model, mode)` 记录执行**整行覆盖**——条目未提供的可选字段（`capabilities` / `supported_parameters` / `limits` / `tier_prices` / `batch_discount` / `metadata` 等）会被清空，不会保留原值；merge 导入已有记录时必须携带希望保留的完整字段集。字段级合并请使用按 ID / 组合键 `PUT` 路径（省略字段保留原值）。详见 §3.1 处理逻辑第 10、11 步。
 
 ### 2.3 完整示例
 
@@ -301,6 +350,7 @@ models:
         input_cost_per_token: 0.000004
         output_cost_per_token: 0.000016
         cache_read_input_token_cost: 0.000001
+    batch_discount: 0.5
     metadata:
       source: "https://platform.deepseek.com/pricing"
       notes: "DeepSeek V3 官方 API"
@@ -356,10 +406,11 @@ models:
    - 每个 tier 对应的价格对象中，键名须为 `prices` 枚举；
    - 所有 tier 价格字段必须为非负数。
 6. 校验 `limits` 中所有限制字段值为非负整数；
-7. `replace` 模式：先清空 `model_prices` 表，再写入新数据；
-8. `merge` 模式：对已有 `(provider, model, mode)` 记录更新，新增记录插入；
-9. **`merge` 模式的记录级语义为完全覆盖（整行替换）**：命中已有记录时，以导入条目为权威定义，条目中的全部字段（含可选字段 `capabilities` / `supported_parameters` / `limits` / `tier_prices` / `metadata` 等）整体写入；**条目未提供的可选字段会被清空为空值，不会保留原值**。调用方进行 merge 导入时必须为已有记录携带希望保留的完整字段集，仅传必填五项的最小记录等同于重置该记录的可选字段；
-10. 该语义与按 ID / 组合键 `PUT` 更新路径（`endpoints/openapi_v1/model_price/update.go` 的 `mergeModelPrice`，非空字段叠加、省略保留）**刻意不同**：`PUT` 面向单记录的局部补丁，`merge` 导入面向整表批量的声明式覆盖——如需字段级合并请使用 `PUT` 路径；如需整体重置整表请使用 `replace` 模式。
+7. 若记录包含 `batch_discount`，校验取值在 `(0,1]` 区间内（缺省按 `0.5` 处理）；
+8. `replace` 模式：先清空 `model_prices` 表，再写入新数据；
+9. `merge` 模式：对已有 `(provider, model, mode)` 记录更新，新增记录插入；
+10. **`merge` 模式的记录级语义为完全覆盖（整行替换）**：命中已有记录时，以导入条目为权威定义，条目中的全部字段（含可选字段 `capabilities` / `supported_parameters` / `limits` / `tier_prices` / `batch_discount` / `metadata` 等）整体写入；**条目未提供的可选字段会被清空为空值，不会保留原值**。调用方进行 merge 导入时必须为已有记录携带希望保留的完整字段集，仅传必填五项的最小记录等同于重置该记录的可选字段；
+11. 该语义与按 ID / 组合键 `PUT` 更新路径（`endpoints/openapi_v1/model_price/update.go` 的 `mergeModelPrice`，非空字段叠加、省略保留）**刻意不同**：`PUT` 面向单记录的局部补丁，`merge` 导入面向整表批量的声明式覆盖——如需字段级合并请使用 `PUT` 路径；如需整体重置整表请使用 `replace` 模式。
 
 **权限**
 
@@ -694,6 +745,7 @@ Data 为 null。
 9. `capabilities`、`supported_parameters` 若传入，其元素应取自对应枚举值（非枚举值可接收但建议告警或记录，便于后续收敛）；
 10. `limits`、`prices`、`tier_prices.<tier>`、`metadata` 的键名应取自对应枚举值（非枚举键可接收但建议告警或记录，便于后续收敛）；
 11. `limits` 中所有限制字段值必须为非负整数；
-12. `/v1/model-prices/import` 仅接受 YAML 文件，且 `default_currency` 必须为 `RMB`；导入时不再校验 `provider` 是否已存在于 `/providers`。
+12. `batch_discount` 非必填；若传入，必须为 `(0,1]` 区间浮点数（缺省 `0.5`）；仅从 `mode != batch` 的记录生效（`mode=batch` 的记录不配置本字段）；手工维护的 `(provider, model, mode=batch)` 记录优先于系数展开，导出时冲突检测并记录告警日志（见 [1.3](#13-批量价格展开语义batch_discount-与-modebatch)）；
+13. `/v1/model-prices/import` 仅接受 YAML 文件，且 `default_currency` 必须为 `RMB`；导入时不再校验 `provider` 是否已存在于 `/providers`。
 
 ---

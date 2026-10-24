@@ -1,10 +1,12 @@
 # UI 代码变更文档
 
-> **对照**：[openapi-doc-diff.md](./openapi-doc-diff.md)、[prototype-ui-compare.md](./prototype-ui-compare.md)  
+> **对照**：`openapi-doc-diff.md`、`prototype-ui-compare.md`  
 > **接口**：`design-docs/api-define/OpenAPI接口定义/`  
 > **原型**：`design-docs/prototype-design/assets/js/cluster-upsert.js`  
 > **核对日期**：2026-08-01  
 > **状态**：已实施（2026-08-01 与源码对齐）
+>
+> **文档维护**：2026-10-17 移除 4 处失效链接 `openapi-doc-diff.md`、`prototype-ui-compare.md`（两文件在 `ai-gateway-web` / `ai-gateway-api` 全仓及本工作区均不存在，从未提交），按纯文件名引用保留。
 
 ---
 
@@ -270,8 +272,8 @@ return list.map(instance => `${instance.addr}:${instance.port}`).filter(Boolean)
 
 | 文档 | 路径 |
 | ------ | ------ |
-| 接口差异 | [openapi-doc-diff.md](./openapi-doc-diff.md) |
-| 原型对比 | [prototype-ui-compare.md](./prototype-ui-compare.md) |
+| 接口差异 | `openapi-doc-diff.md` |
+| 原型对比 | `prototype-ui-compare.md` |
 | API 变更总结 | `ai-gateway-api/design-docs/modifications/2026-07-31-api-define-modification-and-bugfix/change-summary.md` |
 | clusters 定义 | `design-docs/api-define/OpenAPI接口定义/clusters.md` |
 | 上一轮已完成 | `design-docs/modifications/2026-07-31-ui-optimize/ui-code-changes.md` |

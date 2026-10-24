@@ -37,9 +37,10 @@
         <Input
           v-model="formData.description"
           :placeholder="$t('entity.descriptionPlaceholder')"
-          :maxlength="1024"
+          :maxlength="255"
           show-word-limit
         ></Input>
+        <p class="form-tip">{{ $t('entity.typeDescriptionTip') }}</p>
       </FormItem>
 
       <FormItem :label="$t('entity.level')" prop="level">
@@ -59,6 +60,7 @@
 
 <script>
 import { cloneDeep } from 'lodash';
+import { utf8ByteLength } from '@/utils/const';
 export default {
     props: {
         currentData: {
@@ -74,6 +76,22 @@ export default {
     },
     data() {
       const that = this;
+        const validateDescription = (rule, value, callback) => {
+            const val = value === null || value === undefined ? '' : String(value);
+            if (val === '') {
+                callback();
+                return;
+            }
+            if (utf8ByteLength(val) > 255) {
+                callback(new Error(that.$t('entity.typeDescriptionLengthError')));
+                return;
+            }
+            if (/[\x00-\x1F\x7F]/.test(val)) {
+                callback(new Error(that.$t('entity.typeDescriptionControlCharsError')));
+                return;
+            }
+            callback();
+        };
         return {
             formData: {
                 type_name: '',
@@ -86,7 +104,7 @@ export default {
                     { pattern: /^[a-z0-9]([a-z0-9_-]{0,30}[a-z0-9])?$/, message: that.$t('entity.typeNameFormatError'), trigger: 'blur' }
                 ],
                 description: [
-                    { max: 1024, message: that.$t('apiKey.descriptionLengthError'), trigger: 'blur' }
+                    { validator: validateDescription, trigger: 'blur' }
                 ],
                 level: [
                     { required: true, type: 'number', message: that.$t('entity.selectLevel'), trigger: 'change' }

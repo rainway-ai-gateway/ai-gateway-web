@@ -36,26 +36,55 @@
 
     <Card :title="$t('instancePool.name')" class="info-card">
       <div class="info-row">
-        <span class="info-label">{{ $t('instancePool.instanceMode') }}</span>
-        <span class="info-value">{{ instanceModeText }}</span>
+        <span class="info-label">{{ $t('provider.instanceSource') }}</span>
+        <span class="info-value">{{ instanceSourceText }}</span>
       </div>
-      <table v-if="instances.length" class="kv-table">
-        <thead>
-          <tr>
-            <th>{{ $t('instancePool.ipAddress') }}</th>
-            <th>{{ $t('instancePool.port') }}</th>
-            <th>{{ $t('instancePool.weight') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(item, index) in instances" :key="'inst-' + index">
-            <td>{{ item.addr || '-' }}</td>
-            <td>{{ item.port }}</td>
-            <td>{{ item.weight }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <span v-else class="empty-text">-</span>
+      <template v-if="isK8sPool">
+        <div class="info-row">
+          <span class="info-label">{{ $t('provider.k8sPoolName') }}</span>
+          <span class="info-value">{{ currentData.k8s_pool_name || '-' }}</span>
+        </div>
+        <table v-if="instances.length" class="kv-table">
+          <thead>
+            <tr>
+              <th>{{ $t('instancePool.ipAddress') }}</th>
+              <th>{{ $t('instancePool.port') }}</th>
+              <th>{{ $t('instancePool.weight') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, index) in instances" :key="'k8s-' + index">
+              <td>{{ item.addr || '-' }}</td>
+              <td>{{ item.port }}</td>
+              <td>{{ item.weight != null ? item.weight : 100 }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <span v-else class="empty-text">{{ $t('provider.k8sPoolEmpty') }}</span>
+      </template>
+      <template v-else>
+        <div class="info-row">
+          <span class="info-label">{{ $t('instancePool.instanceMode') }}</span>
+          <span class="info-value">{{ instanceModeText }}</span>
+        </div>
+        <table v-if="instances.length" class="kv-table">
+          <thead>
+            <tr>
+              <th>{{ $t('instancePool.ipAddress') }}</th>
+              <th>{{ $t('instancePool.port') }}</th>
+              <th>{{ $t('instancePool.weight') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, index) in instances" :key="'inst-' + index">
+              <td>{{ item.addr || '-' }}</td>
+              <td>{{ item.port }}</td>
+              <td>{{ item.weight }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <span v-else class="empty-text">-</span>
+      </template>
     </Card>
 
     <Card :title="$t('gatewayConfig.modelServiceConfig')" class="info-card">
@@ -172,8 +201,19 @@ export default {
     },
 
     computed: {
+        isK8sPool() {
+            return this.currentData.instance_source === 'k8s_pool';
+        },
+        instanceSourceText() {
+            return this.isK8sPool
+                ? this.$t('provider.instanceSourceK8s')
+                : this.$t('provider.instanceSourceManual');
+        },
         instances() {
-            return parseInstancePool(this.currentData.instance_pool);
+            const pool = this.isK8sPool
+                ? this.currentData.k8s_instance_pool
+                : this.currentData.instance_pool;
+            return parseInstancePool(pool);
         },
         instanceModeText() {
             const { mode } = detectInstanceMode(this.instances);

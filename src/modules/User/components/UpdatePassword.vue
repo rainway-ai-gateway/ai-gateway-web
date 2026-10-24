@@ -38,7 +38,7 @@
                 v-model="formData.new_password"
                 type="password"
                 autocomplete="off"
-                :placeholder="$t('user.tipPasswordRule')"
+                :placeholder="$t('user.passwordPlaceholder')"
                 class="com-create-input"
             />
         </FormItem>
@@ -106,7 +106,16 @@ export default {
                 return;
             }
             if (!PasswordRegCheck(value, this.formData.user_name)) {
-                callback(new Error(this.$t('user.tipPasswordRule')));
+                const byteLength = new TextEncoder().encode(value).length;
+                if (byteLength < 8 || byteLength > 72) {
+                    callback(new Error(this.$t('user.tipPasswordLength')));
+                    return;
+                }
+                if (/\s/.test(value)) {
+                    callback(new Error(this.$t('user.tipPasswordWhitespace')));
+                    return;
+                }
+                callback(new Error(this.$t('user.tipPasswordUserName')));
                 return;
             }
             if (this.formData.confirmPass !== '') {

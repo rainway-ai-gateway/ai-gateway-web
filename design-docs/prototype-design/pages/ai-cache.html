@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../assets/static/css/app.css" />
+    <link rel="stylesheet" href="../assets/static/css/ai-rule.css" />
+    <link rel="stylesheet" href="../assets/font/iconfont.css" />
+    <link rel="stylesheet" href="../assets/css/prototype-overrides.css" />
+    <style>
+      #ai-cache-table .ivu-table-sort { display: inline-block; height: 12px; margin-left: 4px; vertical-align: middle; width: 14px; }
+      #ai-cache-table .ivu-table-sort i { color: #c5c8ce; display: block; font-size: 14px; height: 6px; line-height: 6px; overflow: hidden; }
+      .ai-cache-view-list { color:#515a6e; font-size:14px; line-height:1.8; }
+      .ai-cache-view-list .ai-cache-view-item { padding:4px 0; border-bottom:1px dashed #e8eaec; }
+      .ai-cache-view-list .ai-cache-view-item:last-child { border-bottom:none; }
+      .route-editor-header { position:relative; margin-bottom:16px; }
+      .route-owner-label { color:#515a6e; font-size:14px; margin-bottom:12px; }
+      .route-header-actions { display:flex; align-items:center; gap:8px; }
+      .route-header-submit { position:absolute; top:0; right:0; display:flex; align-items:center; gap:8px; }
+    </style>
+    <script src="../assets/js/mock-data.js"></script>
+    <script src="../assets/js/ivu-ui.js"></script>
+    <script src="../assets/js/layout.js"></script>
+    <script src="../assets/js/prototype.js"></script>
+  </head>
+  <body>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var root = Layout.render({ pageId: 'AICacheRule.list', basePath: '../' });
+        root.innerHTML = '<div id="ai-cache-page"></div>';
+
+        var isReadonly = Prototype.isReadonly();
+
+        var STRATEGY_LABELS = {
+          lastQuestion: '仅最后一个问题（lastQuestion）',
+          allQuestions: '全部问题（allQuestions）',
+          disabled: '缓存豁免（disabled）'
+        };
+
+        var RELATION_LABELS = {
+          lt: '小于（lt，<）',
+          lte: '小于等于（lte，≤）',
+          gt: '大于（gt，>）',
+          gte: '大于等于（gte，≥）'
+        };
+
+        var state = {
+          rows: cloneRows((MockData.aiCacheRules && MockData.aiCacheRules.rules) || []),
+          filteredRows: [],
+          search: { name: '', cond: '', cache_key_strategy: '' },
+          pageSize: 20,
+          currentPage: 1,
+          sortKey: '',
+          sortOrder: '',
+          mode: 'view',
+          originalRows: null,
+          drawerMode: 'add',
+          editIndex: -1,
+          drawerSemanticEnabled: false,
+          activeTab: 'rules',
+          semantic: cloneRows(
+            MockData.aiCacheSemanticSettings || { top_k: 1, threshold: 0.15, threshold_relation: 'lt' }
+          ),
+          originalSemantic: null
+        };
+
+        function cloneRows(list) {
+          return JSON.parse(JSON.stringify(list || []));
+        }
+
+        function formatBytes(value) {
+          if (value == null) return '-';
+          return String(value) + ' B';
+        }
+
+        function formatTtl(value) {
+          if (value == null) return '-';
+          return value === 0 ? '不过期（0）' : String(value) + ' 秒';
+        }
+
+        // ======= Filter & Sort =======
+        function filterRows() {
+          state.filteredRows = state.rows.filter(function (row) {
+            return Object.keys(state.search).every(function (key) {
+              var keyword = String(state.search[key] || '').trim();
+              if (!keyword) return true;
+              if (key === 'cache_key_strategy') return String(row.cache_key_strategy || '') === keyword;
+              return String(row[key] == null ? '' : row[key]).toUpperCase().indexOf(keyword.toUpperCase()) !== -1;
+            });
+          });
+        }
+
+        function sortRows(rows) {
+          if (!state.sortKey || !state.sortOrder) return rows;
+          var arr = rows.slice();
+          var order = state.sortOrder;
+          var key = state.sortKey;
+          arr.sort(function (a, b) {
+            var va = getSortValue(a, key);
+            var vb = getSortValue(b, key);
+            if (typeof va === 'number' && typeof vb === 'number') {
+              return order === 'asc' ? va - vb : vb - va;
+            }
+            var sa = String(va);
+            var sb = String(vb);
+            return order === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
+          });
+          return arr;
+        }
+
+        function getSortValue(row, key) {
+          if (key === 'cache_ttl' || key === 'max_body_bytes' || key === 'max_value_bytes') {
+            return row[key] == null ? 0 : row[key];
+          }
+          if (key === 'strategyText') return STRATEGY_LABELS[row.cache_key_strategy] || row.cache_key_strategy || '';
+          return row[key] == null ? '' : row[key];
+        }
+
+        function getPageRows() {
+          var sorted = sortRows(state.filteredRows);
+          var start = (state.currentPage - 1) * state.pageSize;
+          return sorted.slice(start, start + state.pageSize);
+        }
+
+        function findRowIndex(row) {
+          if (!row) return -1;
+          return state.rows.findIndex(function (item) {
+            return item === row || item.name === row.name;
+          });
+        }
+
+        // ======= Header =======
+        function renderHeader(tab) {
+          var editing = state.mode === 'edit';
+          var prefix = tab === 'rules' ? 'rules' : 'semantic';
+          var addHtml = !isReadonly && editing && tab === 'rules'
+            ? IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-cache-' + prefix + '-add"')
+            : '';
+          var editingLabels = tab === 'rules'
+            ? { enter: '进入编辑模式', exit: '退出编辑模式', submit: '提交并生效' }
+            : { enter: '编辑', exit: '取消', submit: '保存' };
+          var submitHtml = isReadonly
+            ? ''
+            : (editing
+              ? IvuUI.btn(editingLabels.exit, 'default', 'small', '', 'id="btn-cache-' + prefix + '-exit"') +
+                IvuUI.btn(editingLabels.submit, 'success', 'small', '', 'id="btn-cache-' + prefix + '-submit"')
+              : IvuUI.btn(editingLabels.enter, 'primary', 'small', '', 'id="btn-cache-' + prefix + '-enter"'));
+          var subtitle = tab === 'rules'
+            ? 'AI 缓存规则（集合级，按优先级顺序匹配，首条命中生效）'
+            : '语义缓存全局设置（单例，全局生效）';
+          return '<div class="route-editor-header">' +
+            '<div class="route-owner-label">' + subtitle + '</div>' +
+            '<div class="route-header-actions">' + addHtml + '</div>' +
+            '<div class="route-header-submit">' + submitHtml + '</div>' +
+            '</div>';
+        }
+
+        // ======= Page (with tabs) =======
+        function renderPage() {
+          filterRows();
+          var totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
+          if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+          document.getElementById('ai-cache-page').innerHTML =
+            IvuUI.tabs(
+              [
+                { name: 'rules', label: '缓存规则' },
+                { name: 'semantic', label: '语义设置' }
+              ],
+              IvuUI.tabPane('rules', '<div id="rules-pane"></div>', state.activeTab === 'rules') +
+                IvuUI.tabPane('semantic', '<div id="semantic-pane"></div>', state.activeTab === 'semantic')
+            ) + drawerAICache();
+
+          renderRulesPane();
+          renderSemanticPane();
+
+          Prototype.initTabs(document.getElementById('ai-cache-page'));
+          document.getElementById('ai-cache-page').querySelectorAll('.ivu-tabs-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+              state.activeTab = tab.getAttribute('data-tab');
+            });
+          });
+        }
+
+        function renderRulesPane() {
+          var pane = document.getElementById('rules-pane');
+          if (!pane) return;
+          pane.innerHTML = renderHeader('rules') + '<div id="ai-cache-table"></div>';
+
+          document.getElementById('ai-cache-table').innerHTML = IvuUI.pageTable({
+            tableId: 'ai-cache-page-table',
+            columns: [
+              { title: '规则名称', key: 'name', minWidth: 160, sortable: true, searchable: true, searchPlaceholder: '请输入规则名称查询' },
+              { title: '生效条件', key: 'cond', minWidth: 260, sortable: true, searchable: true, searchPlaceholder: '请输入条件表达式查询' },
+              {
+                title: '缓存键策略', key: 'strategyText', minWidth: 180, sortable: true, searchable: true,
+                searchType: 'select', searchPlaceholder: '请选择策略',
+                searchFilters: [
+                  { label: 'lastQuestion', value: 'lastQuestion' },
+                  { label: 'allQuestions', value: 'allQuestions' },
+                  { label: 'disabled', value: 'disabled' }
+                ],
+                render: function (row) {
+                  var type = row.cache_key_strategy === 'disabled' ? 'warning' : 'primary';
+                  return IvuUI.tag(STRATEGY_LABELS[row.cache_key_strategy] || row.cache_key_strategy, type);
+                }
+              },
+              { title: '缓存 TTL', key: 'cache_ttl', minWidth: 130, sortable: true, render: function (row) { return formatTtl(row.cache_ttl); } },
+              { title: '最大请求体', key: 'max_body_bytes', minWidth: 130, sortable: true, render: function (row) { return formatBytes(row.max_body_bytes); } },
+              { title: '最大缓存值', key: 'max_value_bytes', minWidth: 130, sortable: true, render: function (row) { return formatBytes(row.max_value_bytes); } },
+              {
+                title: '语义缓存', key: 'enable_semantic_cache', minWidth: 110,
+                render: function (row) {
+                  return row.enable_semantic_cache ? IvuUI.tag('开启', 'success') : IvuUI.tag('关闭', 'default');
+                }
+              },
+              {
+                title: '操作', key: 'action', width: 220,
+                render: function (row, rowIndex) {
+                  var pageStart = (state.currentPage - 1) * state.pageSize;
+                  var globalIndex = pageStart + rowIndex;
+                  if (isReadonly) {
+                    return IvuUI.btn('查看', 'primary', 'small', '', 'data-ai-cache-view="' + globalIndex + '"');
+                  }
+                  if (state.mode === 'edit') {
+                    return IvuUI.btn('编辑', 'primary', 'small', '', 'data-ai-cache-edit="' + globalIndex + '"') + ' ' +
+                      IvuUI.btn('删除', 'error', 'small', '', 'data-ai-cache-delete="' + globalIndex + '"');
+                  }
+                  return IvuUI.btn('查看', 'primary', 'small', '', 'data-ai-cache-view="' + globalIndex + '"');
+                }
+              }
+            ],
+            rows: getPageRows(),
+            total: state.filteredRows.length,
+            pageSize: state.pageSize,
+            currentPage: state.currentPage,
+            searchValues: state.search
+          });
+
+          bindTableEvents();
+          highlightSortIcons();
+        }
+
+        function renderSemanticPane() {
+          var pane = document.getElementById('semantic-pane');
+          if (!pane) return;
+          pane.innerHTML = renderHeader('semantic') + renderSemanticCard();
+          bindSemanticActions(pane);
+        }
+
+        function renderSemanticCard() {
+          var editing = state.mode === 'edit';
+          var s = state.semantic || {};
+          var body;
+          if (editing) {
+            var relationOpts = ['lt', 'lte', 'gt', 'gte'].map(function (value) {
+              return '<option value="' + value + '"' + (s.threshold_relation === value ? ' selected' : '') + '>' +
+                RELATION_LABELS[value] + '</option>';
+            }).join('');
+            body = IvuUI.formTop(
+              IvuUI.formTopItem('Top K（1-10，默认 1）',
+                IvuUI.inputNumber(s.top_k != null ? s.top_k : 1, 'id="semantic-top-k" min="1" max="10" step="1"'), true) +
+              IvuUI.formTopItem('相似度阈值（0-2，默认 0.15）',
+                IvuUI.inputNumber(s.threshold != null ? s.threshold : 0.15, 'id="semantic-threshold" min="0" max="2" step="0.01"'), true) +
+              IvuUI.formTopItem('阈值比较关系（命中条件：相似度 <关系> 阈值）',
+                '<div class="ivu-select ivu-select-single" style="width:100%;"><div class="ivu-select-selection">' +
+                  '<select id="semantic-relation" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    relationOpts +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div></div>', true)
+            );
+          } else {
+            body = '<ul class="ai-cache-view-list">' +
+              '<li class="ai-cache-view-item">Top K：' + IvuUI.escapeHtml(s.top_k) + '</li>' +
+              '<li class="ai-cache-view-item">相似度阈值：' + IvuUI.escapeHtml(s.threshold) + '</li>' +
+              '<li class="ai-cache-view-item">阈值比较关系：' + (RELATION_LABELS[s.threshold_relation] || IvuUI.escapeHtml(s.threshold_relation)) + '</li>' +
+              '</ul>';
+          }
+          return '<div class="llm-card" style="margin-top:16px;"><div class="llm-card-title">语义缓存全局设置</div><div class="llm-card-body">' + body + '</div></div>';
+        }
+
+        function bindSemanticActions(pane) {
+          var enterBtn = pane.querySelector('#btn-cache-semantic-enter');
+          if (enterBtn) enterBtn.onclick = enterEditMode;
+          var exitBtn = pane.querySelector('#btn-cache-semantic-exit');
+          if (exitBtn) exitBtn.onclick = exitEditMode;
+          var submitBtn = pane.querySelector('#btn-cache-semantic-submit');
+          if (submitBtn) submitBtn.onclick = submitSemantic;
+        }
+
+        function highlightSortIcons() {
+          var tableRoot = document.getElementById('ai-cache-page-table');
+          if (!tableRoot) return;
+          var sortKeys = ['name', 'cond', 'strategyText', 'cache_ttl', 'max_body_bytes', 'max_value_bytes', null, null];
+          tableRoot.querySelectorAll('th').forEach(function (th, idx) {
+            var sortIcons = th.querySelectorAll('.ivu-table-sort i');
+            if (sortIcons.length < 2) return;
+            sortIcons[0].style.color = '#c5c8ce';
+            sortIcons[1].style.color = '#c5c8ce';
+            if (state.sortKey === sortKeys[idx]) {
+              if (state.sortOrder === 'asc') sortIcons[0].style.color = '#2d8cf0';
+              else if (state.sortOrder === 'desc') sortIcons[1].style.color = '#2d8cf0';
+            }
+          });
+        }
+
+        function bindTableEvents() {
+          var tableRoot = document.getElementById('ai-cache-page-table');
+          if (!tableRoot) return;
+          var pane = document.getElementById('rules-pane');
+
+          Prototype.bindPageTableSearch(tableRoot, function (key, value) {
+            state.search[key] = value;
+            state.currentPage = 1;
+            renderPage();
+          });
+
+          var sortKeys = ['name', 'cond', 'strategyText', 'cache_ttl', 'max_body_bytes', 'max_value_bytes', null, null];
+          tableRoot.querySelectorAll('th').forEach(function (th, idx) {
+            if (sortKeys[idx] != null) {
+              th.style.cursor = 'pointer';
+              th.onclick = function () {
+                var key = sortKeys[idx];
+                if (state.sortKey === key) {
+                  if (state.sortOrder === 'asc') state.sortOrder = 'desc';
+                  else if (state.sortOrder === 'desc') { state.sortKey = ''; state.sortOrder = ''; }
+                  else state.sortOrder = 'asc';
+                } else {
+                  state.sortKey = key;
+                  state.sortOrder = 'asc';
+                }
+                state.currentPage = 1;
+                renderPage();
+              };
+            }
+          });
+
+          tableRoot.querySelectorAll('[data-page]').forEach(function (item) {
+            item.onclick = function () {
+              state.currentPage = parseInt(item.getAttribute('data-page'), 10);
+              renderPage();
+            };
+          });
+
+          var sizeSelect = tableRoot.querySelector('.proto-page-size');
+          if (sizeSelect) {
+            sizeSelect.onchange = function () {
+              state.pageSize = parseInt(sizeSelect.value, 10);
+              state.currentPage = 1;
+              renderPage();
+            };
+          }
+
+          var prevBtn = tableRoot.querySelector('.proto-page-prev');
+          if (prevBtn) {
+            prevBtn.onclick = function () {
+              if (state.currentPage > 1) { state.currentPage -= 1; renderPage(); }
+            };
+          }
+
+          var nextBtn = tableRoot.querySelector('.proto-page-next');
+          if (nextBtn) {
+            nextBtn.onclick = function () {
+              var totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
+              if (state.currentPage < totalPages) { state.currentPage += 1; renderPage(); }
+            };
+          }
+
+          tableRoot.querySelectorAll('[data-ai-cache-view]').forEach(function (btn) {
+            btn.onclick = function () { openDrawer('view', parseInt(btn.getAttribute('data-ai-cache-view'), 10)); };
+          });
+
+          tableRoot.querySelectorAll('[data-ai-cache-edit]').forEach(function (btn) {
+            btn.onclick = function () { openDrawer('edit', parseInt(btn.getAttribute('data-ai-cache-edit'), 10)); };
+          });
+
+          tableRoot.querySelectorAll('[data-ai-cache-delete]').forEach(function (btn) {
+            btn.onclick = function () {
+              var index = parseInt(btn.getAttribute('data-ai-cache-delete'), 10);
+              var row = state.filteredRows[index];
+              if (!row) return;
+              Prototype.confirm({
+                title: '提示',
+                content: '确认删除该缓存规则？删除后需提交并生效。',
+                onOk: function () {
+                  var rowIndex = findRowIndex(row);
+                  if (rowIndex >= 0) state.rows.splice(rowIndex, 1);
+                  renderPage();
+                  Prototype.toast('删除成功!');
+                },
+                onCancel: function () { Prototype.toast('取消删除', 'info'); }
+              });
+            };
+          });
+
+          var addBtn = pane.querySelector('#btn-cache-rules-add');
+          if (addBtn) addBtn.onclick = function () { openDrawer('add'); };
+
+          var submitBtn = pane.querySelector('#btn-cache-rules-submit');
+          if (submitBtn) submitBtn.onclick = submitRules;
+
+          var enterBtn = pane.querySelector('#btn-cache-rules-enter');
+          if (enterBtn) enterBtn.onclick = enterEditMode;
+
+          var exitBtn = pane.querySelector('#btn-cache-rules-exit');
+          if (exitBtn) exitBtn.onclick = exitEditMode;
+        }
+
+        function hasUnsavedChanges() {
+          return JSON.stringify(state.originalRows) !== JSON.stringify(state.rows) ||
+            JSON.stringify(state.originalSemantic) !== JSON.stringify(state.semantic);
+        }
+
+        function enterEditMode() {
+          state.originalRows = cloneRows(state.rows);
+          state.originalSemantic = cloneRows(state.semantic);
+          state.mode = 'edit';
+          renderPage();
+        }
+
+        function exitEditMode() {
+          if (hasUnsavedChanges()) {
+            Prototype.confirm({
+              title: '提示',
+              content: '当前有未提交的改动，取消将丢弃这些改动，确认取消？',
+              onOk: function () {
+                state.rows = cloneRows(state.originalRows || []);
+                state.semantic = cloneRows(state.originalSemantic || {});
+                state.mode = 'view';
+                state.originalRows = null;
+                state.originalSemantic = null;
+                renderPage();
+                Prototype.toast('已放弃未保存的改动', 'info');
+              },
+              onCancel: function () { Prototype.toast('已取消', 'info'); }
+            });
+            return;
+          }
+          state.mode = 'view';
+          state.originalRows = null;
+          state.originalSemantic = null;
+          renderPage();
+        }
+
+        function commitAll() {
+          // 生效条件集合内唯一：重复集合后端整单 422（duplicate ai cache rule cond），提交前拦截
+          var seenCond = {};
+          for (var i = 0; i < state.rows.length; i++) {
+            var c = state.rows[i].cond;
+            if (seenCond[c]) {
+              Prototype.toast('生效条件已存在，集合内必须唯一', 'error');
+              return;
+            }
+            seenCond[c] = true;
+          }
+          MockData.aiCacheRules = MockData.aiCacheRules || {};
+          MockData.aiCacheRules.rules = cloneRows(state.rows);
+          MockData.aiCacheSemanticSettings = cloneRows(state.semantic);
+          state.mode = 'view';
+          state.originalRows = null;
+          state.originalSemantic = null;
+          renderPage();
+          Prototype.toast('提交并生效成功！');
+        }
+
+        function submitRules() {
+          commitAll();
+        }
+
+        function submitSemantic() {
+          var topK = parseInt(document.getElementById('semantic-top-k').value, 10);
+          var threshold = parseFloat(document.getElementById('semantic-threshold').value);
+          var relation = document.getElementById('semantic-relation').value;
+          if (isNaN(topK) || topK < 1 || topK > 10) { Prototype.toast('Top K 须为 1-10 的整数', 'error'); return; }
+          if (isNaN(threshold) || threshold < 0 || threshold > 2) { Prototype.toast('相似度阈值须在 0-2 之间', 'error'); return; }
+          if (['lt', 'lte', 'gt', 'gte'].indexOf(relation) === -1) { Prototype.toast('阈值比较关系不合法', 'error'); return; }
+          state.semantic = { top_k: topK, threshold: threshold, threshold_relation: relation };
+          commitAll();
+        }
+
+        // ======= Drawer =======
+        function viewDrawerBody(row) {
+          return '<div class="forward-rule-upsert"><form class="ivu-form ivu-form-label-top">' +
+            IvuUI.formTopItem('规则名称', IvuUI.escapeHtml(row.name || '-')) +
+            IvuUI.formTopItem('生效条件', IvuUI.escapeHtml(row.cond || '-')) +
+            IvuUI.formTopItem('缓存键策略', STRATEGY_LABELS[row.cache_key_strategy] || IvuUI.escapeHtml(row.cache_key_strategy || '')) +
+            IvuUI.formTopItem('缓存 TTL', formatTtl(row.cache_ttl)) +
+            IvuUI.formTopItem('最大请求体', formatBytes(row.max_body_bytes)) +
+            IvuUI.formTopItem('最大缓存值', formatBytes(row.max_value_bytes)) +
+            IvuUI.formTopItem('语义缓存', (row.enable_semantic_cache ? '开启' : '关闭') + (row.cache_key_strategy === 'disabled' ? '（策略为 disabled，忽略）' : '')) +
+            '</form></div>';
+        }
+
+        function editDrawerBody() {
+          var strategyOpts = ['lastQuestion', 'allQuestions', 'disabled'].map(function (value) {
+            return '<option value="' + value + '">' + STRATEGY_LABELS[value] + '</option>';
+          }).join('');
+          return '<div class="forward-rule-upsert"><form class="ivu-form ivu-form-label-top">' +
+            IvuUI.formTopItem('规则名称',
+              '<div class="ivu-input-wrapper ivu-input-type-text">' +
+                '<input type="text" id="ai-cache-name" class="ivu-input" placeholder="请输入规则名称，1-128字符，集合内唯一" maxlength="128" />' +
+              '</div>', true) +
+            IvuUI.formTopItem('生效条件', IvuUI.expressionEditor('ai-cache-expression'), true) +
+            IvuUI.formTopItem('缓存键策略',
+              '<div class="ivu-select ivu-select-single" style="width:100%;">' +
+                '<div class="ivu-select-selection">' +
+                  '<select id="ai-cache-strategy" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    strategyOpts +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div>' +
+              '</div>', true) +
+            IvuUI.formTopItem('缓存 TTL（秒，0 表示不过期）', IvuUI.inputNumber('', 'id="ai-cache-ttl" min="0" placeholder="0"'), false) +
+            IvuUI.formTopItem('最大请求体（字节）', IvuUI.inputNumber('', 'id="ai-cache-max-body" min="1" placeholder="1048576"'), false) +
+            IvuUI.formTopItem('最大缓存值（字节）', IvuUI.inputNumber('', 'id="ai-cache-max-value" min="1" placeholder="1048576"'), false) +
+            IvuUI.formTopItem('语义缓存',
+              '<div class="ivu-switch" id="ai-cache-semantic-switch">' +
+                '<span class="ivu-switch-inner"></span>' +
+              '</div>' +
+              '<span style="color:#999;margin-left:8px;font-size:12px;">缓存键策略为 disabled 时忽略此项</span>', false) +
+            '</form></div>';
+        }
+
+        function setDrawerTitle(mode) {
+          var titleEl = document.querySelector('#drawer-ai-cache .ivu-drawer-header-inner');
+          if (!titleEl) return;
+          titleEl.textContent = mode === 'view' ? '查看缓存规则' : (mode === 'add' ? '添加缓存规则' : '编辑缓存规则');
+        }
+
+        function fillEditDrawerForm(row) {
+          document.getElementById('ai-cache-name').value = row ? (row.name || '') : '';
+          document.getElementById('ai-cache-expression').value = row ? (row.cond || '') : '';
+          document.getElementById('ai-cache-strategy').value = row ? (row.cache_key_strategy || 'lastQuestion') : 'lastQuestion';
+          document.getElementById('ai-cache-ttl').value = row && row.cache_ttl != null ? row.cache_ttl : 0;
+          document.getElementById('ai-cache-max-body').value = row && row.max_body_bytes != null ? row.max_body_bytes : 1048576;
+          document.getElementById('ai-cache-max-value').value = row && row.max_value_bytes != null ? row.max_value_bytes : 1048576;
+          state.drawerSemanticEnabled = row ? !!row.enable_semantic_cache : false;
+          var semanticSwitch = document.getElementById('ai-cache-semantic-switch');
+          if (semanticSwitch) semanticSwitch.classList.toggle('ivu-switch-checked', state.drawerSemanticEnabled);
+        }
+
+        function openDrawer(mode, filteredIndex) {
+          state.drawerMode = mode;
+          var row = null;
+          if ((mode === 'edit' || mode === 'view') && typeof filteredIndex === 'number') {
+            row = state.filteredRows[filteredIndex];
+            state.editIndex = mode === 'edit' ? findRowIndex(row) : -1;
+          } else {
+            state.editIndex = -1;
+          }
+
+          var drawerContent = document.querySelector('#drawer-ai-cache .ivu-drawer-content');
+          var bodyEl = drawerContent.querySelector('.ivu-drawer-body');
+          var footerEl = drawerContent.querySelector('.ivu-drawer-footer');
+
+          if (mode === 'view') {
+            bodyEl.innerHTML = viewDrawerBody(row || {});
+            if (footerEl) footerEl.style.display = 'none';
+          } else {
+            bodyEl.innerHTML = editDrawerBody();
+            if (footerEl) footerEl.style.display = '';
+            fillEditDrawerForm(mode === 'edit' ? row : null);
+            IvuUI.initExpressionEditor('#drawer-ai-cache .proto-expression-editor');
+            bindDrawerActions();
+          }
+
+          setDrawerTitle(mode);
+          Prototype.openDrawer('drawer-ai-cache');
+        }
+
+        function bindDrawerActions() {
+          var saveBtn = document.getElementById('btn-ai-cache-save');
+          if (saveBtn) saveBtn.onclick = onDrawerSave;
+          var resetBtn = document.getElementById('btn-ai-cache-reset');
+          if (resetBtn) resetBtn.onclick = onDrawerReset;
+          var semanticSwitch = document.getElementById('ai-cache-semantic-switch');
+          if (semanticSwitch) semanticSwitch.onclick = function () {
+            state.drawerSemanticEnabled = !state.drawerSemanticEnabled;
+            semanticSwitch.classList.toggle('ivu-switch-checked', state.drawerSemanticEnabled);
+          };
+        }
+
+        function onDrawerSave() {
+          var name = document.getElementById('ai-cache-name').value.trim();
+          var cond = document.getElementById('ai-cache-expression').value.trim();
+          var strategy = document.getElementById('ai-cache-strategy').value;
+          var ttl = parseInt(document.getElementById('ai-cache-ttl').value, 10);
+          var maxBody = parseInt(document.getElementById('ai-cache-max-body').value, 10);
+          var maxValue = parseInt(document.getElementById('ai-cache-max-value').value, 10);
+
+          if (!name) { Prototype.toast('请输入规则名称', 'error'); return; }
+          if (name.length < 1 || name.length > 128) { Prototype.toast('规则名称长度必须为 1-128 字符', 'error'); return; }
+          if (!cond) { Prototype.toast('请输入生效条件表达式', 'error'); return; }
+          if (isNaN(ttl) || ttl < 0) { Prototype.toast('缓存 TTL 不能小于 0', 'error'); return; }
+          if (isNaN(maxBody) || maxBody <= 0) { Prototype.toast('最大请求体必须大于 0', 'error'); return; }
+          if (isNaN(maxValue) || maxValue <= 0) { Prototype.toast('最大缓存值必须大于 0', 'error'); return; }
+
+          var excludeIndex = (state.drawerMode === 'edit' && state.editIndex >= 0) ? state.editIndex : null;
+          var duplicated = state.rows.some(function (r, idx) {
+            if (excludeIndex != null && idx === excludeIndex) return false;
+            return r.name === name;
+          });
+          if (duplicated) { Prototype.toast('规则名称已存在，请使用其他名称', 'error'); return; }
+          // 生效条件集合内唯一（逐字节比较），与后端 422 duplicate ai cache rule cond 对齐
+          var condDuplicated = state.rows.some(function (r, idx) {
+            if (excludeIndex != null && idx === excludeIndex) return false;
+            return r.cond === cond;
+          });
+          if (condDuplicated) { Prototype.toast('生效条件已存在，集合内必须唯一', 'error'); return; }
+
+          var data = {
+            name: name,
+            cond: cond,
+            cache_key_strategy: strategy,
+            cache_ttl: ttl,
+            max_body_bytes: maxBody,
+            max_value_bytes: maxValue,
+            enable_semantic_cache: !!state.drawerSemanticEnabled
+          };
+
+          if (state.drawerMode === 'add') {
+            state.rows.unshift(data);
+          } else if (state.editIndex >= 0) {
+            state.rows[state.editIndex] = data;
+          }
+
+          Prototype.closeDrawer('drawer-ai-cache');
+          renderPage();
+          Prototype.toast(state.drawerMode === 'add' ? '添加成功！' : '保存成功！');
+        }
+
+        function onDrawerReset() {
+          fillEditDrawerForm(state.drawerMode === 'edit' && state.editIndex >= 0 ? state.rows[state.editIndex] : null);
+        }
+
+        function drawerAICache() {
+          var footer =
+            '<div class="com-btn-box drawer-footer route-drawer-footer">' +
+              IvuUI.btn('本地保存', 'primary', 'small', '', 'id="btn-ai-cache-save"') + ' ' +
+              IvuUI.btn('重置', 'default', 'small', 'reset-btn', 'id="btn-ai-cache-reset"') +
+            '</div>';
+          return IvuUI.drawer('drawer-ai-cache', '添加缓存规则', '<div class="ivu-drawer-body-placeholder"></div>', footer, '60%');
+        }
+
+        Prototype.bindDrawerClose();
+        renderPage();
+      });
+    </script>
+  </body>
+</html>

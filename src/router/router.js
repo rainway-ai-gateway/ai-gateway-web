@@ -96,9 +96,59 @@ export default [
       },
       {
         component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/AICache')),
+            'ai-cache-rule',
+          ),
+        path: 'ai-cache-rules',
+        name: 'AICacheRule.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/AIContext')),
+            'ai-context-rule',
+          ),
+        path: 'ai-context-rules',
+        name: 'AIContextRule.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/TrafficMirror')),
+            'traffic-mirror-rule',
+          ),
+        path: 'traffic-mirror-rules',
+        name: 'TrafficMirrorRule.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/IntentConfig')),
+            'intent-config',
+          ),
+        path: 'intent-config',
+        name: 'IntentConfig.list',
+      },
+      {
+        component: (r) =>
           require.ensure([], () => r(require('../modules/APIKey')), 'APIKey'),
         path: 'api-key',
         name: 'APIKey.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/BatchTasks')),
+            'batch-task.list',
+          ),
+        path: 'batches',
+        name: 'BatchTask.list',
       },
       {
         component: (r) =>
@@ -139,6 +189,16 @@ export default [
           ),
         path: 'operation-logs',
         name: 'OperationLog.list',
+      },
+      {
+        component: (r) =>
+          require.ensure(
+            [],
+            () => r(require('../modules/Security')),
+            'security.list',
+          ),
+        path: 'security',
+        name: 'ReencryptSweep.list',
       },
       {
         component: r => require.ensure([], () => r(require('../modules/Cert')), 'certs.list'),

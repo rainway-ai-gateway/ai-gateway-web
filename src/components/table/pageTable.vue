@@ -136,6 +136,29 @@ export default {
     },
 
     watch: {
+        /**
+         * 退出可拖拽态时清掉行上残留的 draggable 属性。
+         *
+         * 背景：iView `table-tr.vue` 用 `v-if="draggable"` / `v-else` 两个**同标签、无 key**
+         * 的 `<tr>` 分支；切到 `v-else` 时新 vnode 完全不携带 attrs，而 Vue 对**枚举型属性**
+         * 在 `updateAttrs` 里刻意不 removeAttribute（`isEnumeratedAttr` 含 `draggable`：
+         * 枚举属性语义是「缺省 ≠ false」，正确做法是显式写 "false"）。于是属性会停在
+         * `draggable="true"`，表现为「退出编辑模式后行仍可被拖起」（2026-10-17 实测 5s 后仍为 true）。
+         * 属性在视图模式没有响应式属主（v-else 分支根本不含它），因此在此精确清理是安全的。
+         */
+        draggable(isDraggable) {
+            if (isDraggable) {
+                return;
+            }
+            this.$nextTick(() => {
+                const rows = this.$el
+                    ? this.$el.querySelectorAll(
+                          '.show-iView-Table tbody tr[draggable]',
+                      )
+                    : [];
+                rows.forEach(row => row.removeAttribute('draggable'));
+            });
+        },
         columns: {
             handler(data) {
                 const that = this;
@@ -143,6 +166,17 @@ export default {
                 data.forEach(item => {
                     const showTitle = item.showTitle ? item.searchMsg : item.title;
                     if (item.searchable) {
+                        // 服务端分页时，列上预置的 searchValue 需同步进 searchMessage：
+                        // 否则用户修改其他筛选条件时会丢掉该默认值（如路由表默认「启用」）
+                        if (
+                            this.serverPagination &&
+                            item.searchValue !== '' &&
+                            item.searchValue !== null &&
+                            item.searchValue !== undefined &&
+                            this.searchMessage[item.key] === undefined
+                        ) {
+                            this.$set(this.searchMessage, item.key, item.searchValue);
+                        }
                         // Support custom search control types
                         if (item.searchType === 'select' && item.searchFilters) {
                             // Dropdown search
@@ -225,6 +259,8 @@ export default {
                 if (this.serverPagination) {
                     this.showTableData = cloneDeep(data);
                     this.cloneShowData = cloneDeep(data);
+                    this.showSrcIndex = data.map((row, index) => index);
+                    this.cloneShowSrcIndex = this.showSrcIndex.slice();
                     this.handlePageData(this.showTableData, this.page);
                     return;
                 }
@@ -238,6 +274,8 @@ export default {
                 this.filterMessage = {};
                 this.showTableData = cloneDeep(data);
                 this.cloneShowData = cloneDeep(data);
+                this.showSrcIndex = data.map((row, index) => index);
+                this.cloneShowSrcIndex = this.showSrcIndex.slice();
                 if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
@@ -282,7 +320,10 @@ export default {
             searchColumns: [],
             showTableData: [],
             cloneShowData: [],
+            showSrcIndex: [],
+            cloneShowSrcIndex: [],
             pageData: [],
+            pageSrcIndex: [],
             needSerarchInput: false,
             showCurrentPage: 0,
             searchMessage: {},
@@ -323,6 +364,8 @@ export default {
             if (isEmpty(this.searchMessage) && isEmpty(this.filterMessage)) {
                 this.showTableData = cloneDeep(this.tableData);
                 this.cloneShowData = cloneDeep(this.showTableData);
+                this.showSrcIndex = this.tableData.map((row, index) => index);
+                this.cloneShowSrcIndex = this.showSrcIndex.slice();
                 if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
@@ -330,6 +373,7 @@ export default {
                 }
             } else {
                 this.showTableData = [];
+                this.showSrcIndex = [];
                 const sourceData = this.tableData || [];
                 for (let i = 0; i < sourceData.length; i++) {
                     let flag = true;
@@ -369,10 +413,22 @@ export default {
                                     }
                                 );
                                 const displayText = this.getRenderSearchText(render, itemValue);
+                                // 带 render 的列同时接受两种匹配口径：
+                                // ①「渲染文案」按**子串**匹配 —— 为「展示即搜索」的列（如 API-Key 掩码列
+                                //    按显示文本搜）保留既有行为；
+                                // ②「原始值」按**等值**匹配 —— 筛选值是枚举、渲染文案是中文的列
+                                //    （如用户角色列 system_admin →「系统管理员」）只比渲染文案会恒不命中，
+                                //    故兜一次原始值。**必须等值而非子串**：枚举之间会互为前缀
+                                //    （system_admin 是 system_admin_readonly 的前缀），子串比较会把
+                                //    「系统管理员（只读）」的行也带进「系统管理员」的筛选结果。
+                                const rawText =
+                                    itemValue === null || itemValue === undefined
+                                        ? ''
+                                        : String(itemValue);
+                                const upper = searchValue.toUpperCase();
                                 if (
-                                    displayText
-                                        .toUpperCase()
-                                        .indexOf(searchValue.toUpperCase()) === -1
+                                    displayText.toUpperCase().indexOf(upper) === -1 &&
+                                    rawText.toUpperCase() !== upper
                                 ) {
                                     flag = false;
                                     break l;
@@ -391,6 +447,7 @@ export default {
 
                     if (flag) {
                         this.showTableData.push(sourceData[i]);
+                        this.showSrcIndex.push(i);
                     }
                 }
                 if (this.page.currentPage !== 1) {
@@ -399,6 +456,7 @@ export default {
                     this.handlePageData(this.showTableData, this.page);
                 }
                 this.cloneShowData = cloneDeep(this.showTableData);
+                this.cloneShowSrcIndex = this.showSrcIndex.slice();
             }
         },
         getRenderSearchText(render, fallbackValue) {
@@ -446,6 +504,7 @@ export default {
         sortChange(data) {
             if (data.order === 'normal') {
                 this.showTableData = cloneDeep(this.cloneShowData);
+                this.showSrcIndex = this.cloneShowSrcIndex.slice();
                 if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
@@ -455,6 +514,9 @@ export default {
             }
             if (data.column.customSort) {
                 this.pageData = [];
+                // customSort 由父组件接管排序，展示顺序与原始下标无法对应，此时清空映射，
+                // 让 onDragDrop 放弃派发而不是移动错行
+                this.showSrcIndex = [];
                 this.$nextTick(() => {
                     this.showTableData = this.$parent.customSort(
                         data,
@@ -462,14 +524,19 @@ export default {
                     );
                 });
             } else {
-                const sortedData = cloneDeep(this.showTableData).sort((a, b) => {
+                const sortedRows = this.showTableData.map((row, index) => ({
+                    row: cloneDeep(row),
+                    srcIndex: this.showSrcIndex[index]
+                }));
+                sortedRows.sort((a, b) => {
                     return this.compareSortValues(
-                        this.getSortValue(a, data.key),
-                        this.getSortValue(b, data.key),
+                        this.getSortValue(a.row, data.key),
+                        this.getSortValue(b.row, data.key),
                         data.order
                     );
                 });
-                this.showTableData = sortedData;
+                this.showTableData = sortedRows.map(item => item.row);
+                this.showSrcIndex = sortedRows.map(item => item.srcIndex);
             }
             if (this.page.currentPage !== 1) {
                 this.page.currentPage = 1;
@@ -550,18 +617,23 @@ export default {
         handlePageData(data, page) {
             if (this.serverPagination) {
                 this.pageData = data;
+                this.pageSrcIndex = this.showSrcIndex.slice();
                 this.showCurrentPage = page.currentPage;
                 return;
             }
             const startIndex = (page.currentPage - 1) * page.pageSize;
             const endIndex = startIndex + page.pageSize;
             this.pageData = data.slice(startIndex, endIndex);
+            this.pageSrcIndex = this.showSrcIndex.slice(startIndex, endIndex);
             this.showCurrentPage = page.currentPage;
         },
         onDragDrop(a, b) {
-            const pageStartIndex = (this.page.currentPage - 1) * this.page.pageSize;
-            const startIndex = pageStartIndex + parseInt(a, 10);
-            const endIndex = pageStartIndex + parseInt(b, 10);
+            const startIndex = this.pageSrcIndex[parseInt(a, 10)];
+            const endIndex = this.pageSrcIndex[parseInt(b, 10)];
+            // 列筛选/列排序会改变展示顺序，按原始数组下标派发，避免移动错行
+            if (startIndex === undefined || endIndex === undefined) {
+                return;
+            }
             this.$emit('dragDrop', startIndex, endIndex);
         },
         handleRowClick(row, index) {

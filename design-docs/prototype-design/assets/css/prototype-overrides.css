@@ -294,6 +294,14 @@ body {
   white-space: nowrap;
 }
 
+/* 登录页原型角色提示：仅原型演示用，说明只读登录方式 */
+.bfe-login .login-role-tip {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #808695;
+}
+
 /* 侧栏标题：对齐 navBar.less .bfe-sidebar .header .text */
 .bfe-sidebar .header .text {
   font-size: 18px;
@@ -2394,4 +2402,20 @@ body {
   font-size: 14px;
   color: #515a6e;
   line-height: 32px;
+}
+
+/* 批量任务列表：主键游标分页条（首页 / 上一页 / 第 N 页 · 本页 M 条 / 下一页），左对齐 */
+#batch-page-table .el-pagination.page {
+  text-align: left;
+}
+#batch-page-table .proto-page-first + .proto-page-prev {
+  margin-left: 8px;
+}
+#batch-page-table .proto-page-info {
+  margin-left: 12px;
+  color: #808695;
+  font-size: 12px;
+}
+#batch-page-table .proto-page-next {
+  margin-left: 16px;
 }

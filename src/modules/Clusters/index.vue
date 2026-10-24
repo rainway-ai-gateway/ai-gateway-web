@@ -30,7 +30,7 @@
 */
 <template>
   <div class="clusters">
-    <Button type="primary" size="small" @click="onAdd">{{
+    <Button v-has type="primary" size="small" @click="onAdd">{{
             $t('com.createX', { obj: $t('cluster.name') })
     }}</Button>
     <pageTable
@@ -130,7 +130,7 @@ export default {
                     title: this.$t('com.operation'),
                     key: 'action',
                     render(h, params) {
-                        return h('div', [
+                        const buttons = [
                             h(
                                 'Button',
                                 {
@@ -148,7 +148,9 @@ export default {
                                     }
                                 },
                                 that.$t('com.detail')
-                            ),
+                            )
+                        ];
+                        buttons.push(
                             h(
                                 'Button',
                                 {
@@ -156,6 +158,7 @@ export default {
                                         type: 'primary',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     style: {
                                         marginRight: '5px'
                                     },
@@ -174,6 +177,7 @@ export default {
                                         type: 'error',
                                         size: 'small'
                                     },
+                                    directives: [{ name: 'has' }],
                                     on: {
                                         click: () => {
                                             that.onDel(params);
@@ -182,7 +186,8 @@ export default {
                                 },
                                 that.$t('com.del')
                             )
-                        ]);
+                        );
+                        return h('div', buttons);
                     }
                 }
             ];
@@ -296,7 +301,8 @@ export default {
             this.llmConfigData = tmpData.llm_config || {};
             this.balanceModeData = {
                 balance_mode: tmpData.balance_mode || 'WRR',
-                epp_config: tmpData.epp_config || null
+                epp_config: tmpData.epp_config || null,
+                epp_runtime: tmpData.epp_runtime || null
             };
             this.infoVisible = true;
         },

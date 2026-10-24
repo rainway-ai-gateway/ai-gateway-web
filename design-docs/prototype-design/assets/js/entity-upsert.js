@@ -57,7 +57,7 @@ window.EntityUpsert = {
   validateEntityDescription(value) {
     var val = String(value == null ? '' : value);
     if (val === '') return null;
-    if (val.length > 255) return '描述不能超过255个字符';
+    if (Prototype.utf8Bytes(val) > 255) return '描述不能超过255字节（按 UTF-8 字节计）';
     if (/[\x00-\x1F\x7F]/.test(val)) return '描述不能包含控制字符';
     return null;
   },
@@ -206,6 +206,7 @@ window.EntityUpsert = {
       maxConc === 0 ? 'banned' : maxConc > 0 ? 'limited' : 'unlimited';
     var tpmRules = (policy.rules && policy.rules.tpm) || [];
     var rpmRules = (policy.rules && policy.rules.rpm) || [];
+    var batchLimits = (policy.rules && policy.rules.batch_limits) || null;
     var typeOptions = (MockData.entityTypes || []).map(function (t) {
       return t.type_name;
     });
@@ -363,6 +364,7 @@ window.EntityUpsert = {
             maxMode,
             maxConc,
             isAdd,
+            batchLimits,
           ) +
           '</div>',
       ) +
@@ -383,6 +385,7 @@ window.EntityUpsert = {
     var maxConc = policy.rules && policy.rules.max_concurrency;
     var tpmRules = (policy.rules && policy.rules.tpm) || [];
     var rpmRules = (policy.rules && policy.rules.rpm) || [];
+    var batchLimits = (policy.rules && policy.rules.batch_limits) || null;
     var isRMB = plan.unit === 'RMB';
     var quotaDecimals = isRMB ? 4 : 0;
     var quotaUnitText = isRMB ? '¥' : ' tokens';
@@ -447,15 +450,17 @@ window.EntityUpsert = {
             percent +
             '%"></div></div>' +
             '</div>' +
-            '<div style="margin-top:16px;">' +
-            IvuUI.btn(
-              '重置配额',
-              'primary',
-              'small',
-              '',
-              'type="button" id="btn-entity-reset-quota"',
-            ) +
-            '</div>'
+            (Prototype.isReadonly()
+              ? ''
+              : '<div style="margin-top:16px;">' +
+                IvuUI.btn(
+                  '重置配额',
+                  'primary',
+                  'small',
+                  '',
+                  'type="button" id="btn-entity-reset-quota"',
+                ) +
+                '</div>')
           : ''),
     );
 
@@ -478,7 +483,8 @@ window.EntityUpsert = {
               : '') +
             (rpmRules.length
               ? ApiKeyUpsert.renderRulesDetail('RPM规则', rpmRules, 'rpm')
-              : '')
+              : '') +
+            (ApiKeyUpsert.renderBatchLimitsDetail(batchLimits) || '')
           : ''),
     );
 
@@ -532,11 +538,11 @@ window.EntityUpsert = {
       IvuUI.formTopItem(
         '描述',
         '<div class="ivu-input-wrapper ivu-input-type-text">' +
-          '<input type="text" id="entity-type-desc" class="ivu-input" maxlength="1024" value="' +
+          '<input type="text" id="entity-type-desc" class="ivu-input" maxlength="255" value="' +
           IvuUI.escapeHtml(data.description || '') +
           '" placeholder="例如：一级部门" />' +
           '</div>' +
-          '<p class="form-tip">最多1024字符</p>',
+          '<p class="form-tip">最多255字节（按 UTF-8 字节计），不能包含控制字符</p>',
       ) +
       IvuUI.formTopItem(
         '级别',
@@ -759,6 +765,12 @@ window.EntityUpsert = {
       valid = false;
     }
 
+    // 批量限流数值校验
+    var batchErr = ApiKeyUpsert.validateBatchLimitsForm();
+    if (batchErr) {
+      valid = false;
+    }
+
     if (!valid) {
       Prototype.toast('请检查表单填写是否正确');
     }
@@ -808,11 +820,14 @@ window.EntityUpsert = {
       }
     }
 
-    // 描述校验
+    // 描述校验（0-255 UTF-8 字节，不能包含控制字符）
     if (descInput) {
       var desc = descInput.value;
-      if (desc.length > 1024) {
-        setFieldError(descInput, '描述不能超过1024个字符');
+      if (Prototype.utf8Bytes(desc) > 255) {
+        setFieldError(descInput, '描述不能超过255字节（按 UTF-8 字节计）');
+        valid = false;
+      } else if (/[\x00-\x1F\x7F]/.test(desc)) {
+        setFieldError(descInput, '描述不能包含控制字符');
         valid = false;
       } else {
         setFieldError(descInput, null);

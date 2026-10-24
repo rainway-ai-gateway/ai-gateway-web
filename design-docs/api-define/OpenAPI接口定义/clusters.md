@@ -65,12 +65,20 @@
             "redis_prefix": "bfe:ai:key_affinity",
             "penalty_enable": true
         },
+        "normalize_upstream_error": {
+            "enabled": true,
+            "stream_enabled": false,
+            "unrecognized_action": "passthrough",
+            "max_body_bytes": 65536,
+            "redact_secrets": true
+        },
         "provider": "deepseek",
         "match_prefix": "deepseek/",
         "strip_prefix": true
     },
     "balance_mode": "WRR",
-    "epp_config": null
+    "epp_config": null,
+    "epp_runtime": null
 }
 ```
 
@@ -82,17 +90,34 @@
     "description": "EPP 调度集群",
     "balance_mode": "EPP",
     "epp_config": {
-        "scheduling_profile": "balanced",
-        "cache_affinity": "medium",
+        "load_profile": "balanced",
+        "affinity": "medium",
         "prefix_cache_affinity": true,
         "session_affinity_enabled": true,
         "session_affinity_header": "x-session-id",
         "kv_cache_utilization_max": 0.9,
+        "waiting_queue_max": 0,
+        "running_requests_max": 0,
+        "fallback_on_empty": false,
+        "metrics_staleness_threshold_ms": 200,
         "flow_control": {
             "max_requests": 1000,
             "queue_ttl": 30,
             "no_endpoint_queue_ttl": 600,
             "enable_eviction": false
+        }
+    },
+    "epp_runtime": {
+        "check": {
+            "disabled": false,
+            "check_interval": "2s",
+            "fail_threshold": 3,
+            "cooldown": "45s",
+            "success_threshold": 2
+        },
+        "timeout": {
+            "connect": "500ms",
+            "call": "3s"
         }
     },
     "llm_config": {
@@ -107,13 +132,14 @@
 | 字段 | 类型 | 说明 | 可能取值 | 合法性条件 |
 |------|------|------|----------|----------|
 | `name` | string | 集群名 | 全局唯一 | 必填；类型为 [ClusterName](./00-common.md#15-集群名称clustername) |
-| `description` | string | 集群描述信息 | - | 非必填；若传入，长度 0-256 字符；不能包含控制字符 |
+| `description` | string | 集群描述信息 | - | 非必填；若传入，长度 0-256 字节（按 UTF-8 字节计）；不能包含控制字符 |
 | `basic` | object | 基本参数 | 见下方 表：连接设置、表：重试设置、表：超时设置 | 非必填；未传时使用 AI 网关场景默认值 |
 | `sticky_sessions` | object | 会话保持 | 见下方 表：会话保持 | 非必填；未传时使用默认值 |
 | `passive_health_check` | object | 被动健康检查 | 见下方 表：被动健康检查 | 非必填；未传时使用默认值 |
 | `llm_config` | object | AI LLM 服务配置 | 见下方 表：LLM配置 | 必填 |
 | `balance_mode` | string | 集群均衡模式 | `WRR`、`EPP` | 非必填；默认值为 `WRR`；有效枚举：`WRR`、`EPP` |
-| `epp_config` | object | EPP 调度配置（简化用户形态：调度档位 + 少量调优参数，见下方 表：EPP调度配置）。仅 `balance_mode=EPP` 时生效；`WRR` 时保留但不生效（休眠），便于 EPP ↔ WRR 来回切换不丢配置 | - | 条件必填：`balance_mode=EPP` 时必填且通过字段校验；`balance_mode=WRR` 时可选（传入则保留并做格式校验，但不生效） |
+| `epp_config` | object | EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队，见下方 表：EPP调度配置）。仅 `balance_mode=EPP` 时生效；`WRR` 时保留但不生效（休眠），便于 EPP ↔ WRR 来回切换不丢配置 | - | 条件必填：`balance_mode=EPP` 时必填且通过字段校验；`balance_mode=WRR` 时可选（传入则保留并做格式校验，但不生效） |
+| `epp_runtime` | object | EPP 运行时参数（BFE 访问 EPP 的健康检查与超时，见下方 表：EPP运行时配置）。仅 `balance_mode=EPP` 时导出到 BFE；`WRR` 时保留但不生效（休眠） | - | 非必填；传入即整体替换并做字段校验（`check`/`timeout` 未设置的子字段按默认补齐）；`tls`/`breaker` 不接受（携带则 422） |
 
 **表：连接设置**
 
@@ -165,6 +191,7 @@
 | keys| []ClusterKeyRef |  Key 引用与权重列表 | N | 一个 cluster 支持配置多个 Key，按权重做路由；通过 `name` 引用 provider 中定义的 key；为空数组表示不配置 API-Key | 非必填；默认值为空数组 `[]`；元素须满足 表：ClusterKeyRef 结构 |
 | key_policy| object |  Key 路由策略 | N | 多 Key 时的选择策略、重试与退避配置 | 非必填；默认见下方 表：Key 路由策略；`strategy` 本版仅支持 `weighted_random` |
 | key_affinity| object |  Key 亲和性配置 | N | 基于 Redis + `ClientKeyId` 的会话级 Key 亲和性 | 非必填；默认见下方 表：Key 亲和性配置 |
+| normalize_upstream_error| object |  上游错误体归一配置 | N | 上游厂商错误归一为网关统一错误码与 OpenAI 兼容错误体（含状态码重映射、凭证脱敏、SSE 错误事件改写），按集群独立灰度 | 非必填；默认见下方 表：上游错误归一配置；缺省 = 关闭（上游错误原样透传） |
 | provider| string |  所属 provider | Y | 用于关联 provider、解析后端实例池/key 明文/生成 `ModelTable` | 必填；非空；必须引用 `/providers` 中已存在的 provider |
 | match_prefix| string |  需要匹配的 provider/model 前缀 | N | 例如 `openrouter/`；用于 OpenRouter 等聚合 provider 场景；必须以 `/` 结尾 | 非必填；`strip_prefix=true` 时必填 |
 | strip_prefix| bool |  是否裁剪 `match_prefix` 指定前缀 | N | `true` 时转发给下游前会从请求 `model` 字段中去掉该前缀；`false` 时仅用于路由标识，不裁剪 | 非必填；默认 `false` |
@@ -200,6 +227,18 @@
 | redis_prefix | string | Redis key 前缀 | N | 默认 `"bfe:ai:key_affinity"` | 非必填；若传入，必须非空 |
 | penalty_enable | bool | 是否开启 Key 惩罚 | N | 默认 `true`；为 `true` 时，近期返回 429/401/403 的 Key 会被跳过 | 非必填；必须为 bool |
 
+**表：上游错误归一配置（`llm_config.normalize_upstream_error`）**
+
+| 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
+| - | - | - | - | - | - |
+| enabled | bool | 非流式归一开关 | N | `true` 时上游 4xx/5xx 错误重写为统一错误体（OpenAI 兼容），状态码按统一映射表重映射（如上游 401/402/403 → 502 `UPSTREAM_AUTH_ERROR`，与客户端自身凭证错误的 401 区分）；默认 `false`（透传，历史行为） | 非必填；必须为 bool |
+| stream_enabled | bool | 流式（SSE）归一开关 | N | 独立于 `enabled` 灰度；`true` 时流内错误事件 data 载荷改写为统一错误 JSON（响应状态保持 200），并对流截断（EOF 缺失协议终止事件）打访问日志标记；默认 `false` | 非必填；必须为 bool |
+| unrecognized_action | string | 未识别错误体的处理 | N | `passthrough`（默认：原样透传，仍做凭证脱敏）/ `rewrite_generic`（重写为 `UPSTREAM_UNKNOWN` 通用错误）；流式未识别事件始终透传 | 非必填；取值仅支持 `passthrough`、`rewrite_generic` |
+| max_body_bytes | int | 错误响应体读取上限（字节） | N | 超限按未识别处理；`0`/缺省用 BFE 默认 `65536` | 非必填；须为 ∈ [0, 4194304] 的整数 |
+| redact_secrets | bool | 凭证脱敏开关 | N | 外发错误内容（客户端响应与访问日志，含归一重写与透传路径）中出现的本集群 API-Key 各编码形态（原文/base64/URL 编码/JSON 转义）替换为掩码 `••••••••`；默认 `true`，显式 `false` 关闭 | 非必填；必须为 bool |
+
+> **行为说明：** 归一仅在转发重试（fallback）结束、最终结果确定后生效，不影响重试与 Key 罚分决策；网关自生成错误（认证/限流/配额等）已是统一格式，不参与归一；上游原始状态码与原始错误码记录于响应 `error.details.upstream_status`/`upstream_code` 与访问日志字段（`ai_upstream_status` 等，bfe-access-pb 字段 810-815）。
+
 **表：模型映射**
 
 | 参数名 | 类型 |参数含义 | 必填 | 补充描述 | 合法性条件 |
@@ -211,13 +250,17 @@
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | -  | - | - | - | - |
-| scheduling_profile | string | 调度策略档位：调度激进程度/优化目标的预设组合 | N | `latency-first`（低延迟优先：队列等待权重最高）、`balanced`（均衡）、`throughput-first`（吞吐优先：KV cache 亲和最高） | 非必填；默认值为 `balanced`；有效枚举：`latency-first`、`balanced`、`throughput-first` |
-| cache_affinity | string | scorer 权重覆盖项，显式指定 KV cache 亲和强度 | N | 缺省（未显式设置）= `medium`，语义为**跟随 `scheduling_profile`，不覆盖其权重**；显式设置后覆盖 `scheduling_profile` 的 scorer 权重 | 非必填；有效枚举：`low`、`medium`、`high` |
-| prefix_cache_affinity | bool | 前缀缓存亲和（prefix-cache-scorer）：相同 prompt 前缀的请求经前缀哈希匹配**尽力收敛**到同一后端，提升 KV cache 复用；零参数、自主学习；**软亲和，不保证一定命中匹配后端** | N | 为 `true` 时注入亲和 scorer；为 `false` 时不注入 | 非必填；默认值为 `true`；必须为 bool |
-| session_affinity_enabled | bool | 会话亲和开关（session-affinity-scorer，session_id 策略）：开启后同一 session 的请求**尽力粘住**同一后端（有 binding 状态，亲和强度高于 prefix；但仍受利用率过滤与加权总分影响，非硬路由），绑定端点摘除后自动迁移重粘 | N | 为 `true` 时注入亲和 scorer（header 取 `session_affinity_header`）；为 `false` 时不注入 | 非必填；默认值为 `false`；必须为 bool |
+| load_profile | string | **实例负载画像**：多个后端都可用时，偏向**排队短**还是 **KV 空闲**（仅调节 kv/queue 两个基础 scorer 的权重） | N | `queue-first`：偏向排队短（通常更低延迟）；`balanced`：均衡（默认）；`kv-first`：偏向 KV 空闲（通常更高吞吐） | 非必填；默认值为 `balanced`；有效枚举：`queue-first`、`balanced`、`kv-first` |
+| affinity | string | **亲和强度**：把"相同前缀 / 同一会话"的请求往同一后端聚的力度（作用于 `prefix-cache-scorer` / `session-affinity-scorer` 的权重） | N | `off`：不注入亲和 scorer（关闭亲和，即使特性开关为 `true` 也不注入）；`low` / `medium` / `high`：亲和 scorer 权重分别为 `0.3` / `0.6` / `1.0` | 非必填；默认值为 `medium`；有效枚举：`off`、`low`、`medium`、`high` |
+| prefix_cache_affinity | bool | 前缀缓存亲和（prefix-cache-scorer）：相同 prompt 前缀的请求经前缀哈希匹配**尽力收敛**到同一后端，提升 KV cache 复用；零参数、自主学习；**软亲和，不保证一定命中匹配后端** | N | 为 `true` 时注入亲和 scorer；为 `false` 时不注入；`affinity=off` 时同样不注入 | 非必填；默认值为 `true`；必须为 bool |
+| session_affinity_enabled | bool | 会话亲和开关（session-affinity-scorer，session_id 策略）：开启后同一 session 的请求**尽力粘住**同一后端（有 binding 状态，亲和强度高于 prefix；但仍受利用率过滤与加权总分影响，非硬路由），绑定端点摘除后自动迁移重粘 | N | 为 `true` 时注入亲和 scorer（header 取 `session_affinity_header`）；为 `false` 时不注入；`affinity=off` 时同样不注入 | 非必填；默认值为 `false`；必须为 bool |
 | session_affinity_header | string | session id 来源请求头（如 `x-session-id`），scorer 从该 header 解析 session id；`enabled=false` 时保留但不生效（休眠） | 条件必填 | 仅在 `session_affinity_enabled=true` 时生效 | `session_affinity_enabled=true` 时**必填**（非空 HTTP header 名）；`enabled=false`/缺省时可保留（非空 header 名，格式校验照常，不生效） |
-| kv_cache_utilization_max | float | 端点过滤阈值：KV cache 利用率超过该值的端点被过滤 | N | - | 非必填；默认值为 `0.9`；取值范围 `(0, 1]` |
-| flow_control | object | 流控参数；缺省则不下发流控段（EPP 用系统默认） | N | 见下方 表：epp_config.flow_control | 非必填；若传入，须满足 flow_control 结构约束 |
+| kv_cache_utilization_max | float | 端点过滤阈值：KV cache 利用率超过该值的端点被过滤；该值作为KV 阈值单一来源 | N | - | 非必填；默认值为 `0.9`；取值范围 `(0, 1]` |
+| waiting_queue_max | number | 端点过滤阈值：后端排队长度超过该值的端点被过滤 | N | `0` = **不启用**该项过滤（非"上限为 0"）；`>0` 时，该值作为队列阈值单一来源 | 非必填；默认值为 `0`；须为 `>= 0` 的数 |
+| running_requests_max | number | 端点过滤阈值：后端运行中请求数超过该值的端点被过滤 | N | `0` = **不启用**该项过滤（非"上限为 0"） | 非必填；默认值为 `0`；须为 `>= 0` 的数 |
+| fallback_on_empty | bool | 所有端点都被过滤时的行为：`false` = 无端点可选、不派发；`true` = 回退派给"最不差"的端点 | N | 透传 `utilization-filter.fallbackOnEmpty` | 非必填；默认值为 `false`；必须为 bool |
+| metrics_staleness_threshold_ms | int | **坏后端剔除**：后端指标超过该时长未更新，即从调度候选剔除，直到恢复抓取 | N | EPP 周期抓取各后端 `/metrics`（周期约 50ms）；默认 `200ms` ≈ 连续 4 次抓取失败；建议取值 100–500ms | 非必填；默认值为 `200`；须为 `> 0` 的整数（单位 ms） |
+| flow_control | object | 流控参数；**编译产物始终包含流控段**（含检测器声明与 priority band 0），但仅当传入 `flow_control` 时才启用排队/背压 featureGate | N | 见下方 表：epp_config.flow_control | 非必填；若传入，须满足 flow_control 结构约束 |
 
 **表：epp_config.flow_control**
 
@@ -226,14 +269,36 @@
 | max_requests | int | 全局并发上限（跨全部优先级带）；`-1` 为显式"不限"（更新时用于明确恢复不限） | N | 缺省表示不限；`-1` 也表示不限 | 非必填；若传入，取值 `>0` 或 `-1` |
 | queue_ttl | int | 池**有端点**时的排队预算（**单位：秒**），超期以可重试背压错误拒绝 | N | 缺省由 EPP 决定（llm-d 默认 60 秒）；`0` 为显式禁用驱逐 | 非必填；取值 ≥ 0 的整数 |
 | no_endpoint_queue_ttl | int | 池**无端点**（冷启动扩容）时的排队预算（**单位：秒**），regime 切换时重新起算 | N | 默认值为跟随 `queue_ttl` | 非必填；同 `queue_ttl` |
-| enable_eviction | bool | 需求驱动驱逐：高优先级被饱和阻塞时终止负优先级在飞请求回收容量 | N | - | 非必填；默认值为 `false`；必须为 bool |
+| enable_eviction | bool | 需求驱动驱逐：高优先级被饱和阻塞时终止负优先级在飞请求回收容量 | N | **当前 EPP 未接线，请保持 `false`**；编译产物不下发该字段 | 非必填；默认值为 `false`；**建议仅允许 `false`（`true` 拒绝）** |
 
-> **注意**：`epp_config` 为简化用户形态，api 导出时编译为完整 `EndpointPickerConfig`，详细编译规则见 modifications 目录 `2026-09-08-epp-scheduling-integration/api-changes.md` §3.2.1。存储保留用户原始 JSON——未显式携带的字段不落盘、GET 回读与写入一致；默认值只体现在导出编译时。
+**表：EPP运行时配置（`epp_runtime`）**
+
+> 控制面 → BFE `GslbBasic` 运行时参数映射。仅 `balance_mode=EPP` 时导出到 `server_data_conf`；`WRR` 时保留但不生效（休眠）。`tls`（`EPPTLS`）与 `breaker`（`EPPBreaker`）不在本表中，由 api 固定下发（见下方说明），不接受用户配置。
+
+| 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
+| - | - | - | - | - | - |
+| check | object | EPP 后台健康检查与失败滞回 | N | 对应 BFE `GslbBasic.EPPCheck` | 非必填；若传入，子字段见本表 |
+| check.disabled | bool | 是否关闭后台健康检查 | N | 不建议生产关闭 | 非必填；默认 `false` |
+| check.check_interval | string | 健康检查探活间隔，duration 字符串 | N | 对应 `EPPCheck.CheckInterval` | 非必填；默认 `2s`；须为 `>0` 的合法 duration |
+| check.fail_threshold | int | 主地址连续失败次数阈值（达到后触发切换） | N | 对应 `EPPCheck.FailThreshold` | 非必填；默认 `3`；须为 `>=1` 的整数 |
+| check.cooldown | string | 冷却期，duration 字符串，期内不切回已失败地址 | N | 对应 `EPPCheck.Cooldown` | 非必填；默认 `45s`；须为 `>0` 的合法 duration |
+| check.success_threshold | int | 连续成功次数阈值（达到后切回高优先级地址） | N | 对应 `EPPCheck.SuccessThreshold` | 非必填；默认 `2`；须为 `>=1` 的整数 |
+| timeout | object | EPP 调用超时 | N | 对应 BFE `GslbBasic.EPPTimeout` | 非必填；若传入，子字段见本表 |
+| timeout.connect | string | 建立 gRPC 连接/流超时，duration 字符串 | N | 对应 `EPPTimeout.Connect` | 非必填；默认 `500ms`；须为 `>0` 的合法 duration |
+| timeout.call | string | 首条消息（RequestHeaders 收发）超时，duration 字符串 | N | 对应 `EPPTimeout.Call` | 非必填；默认 `3s`；须为 `>0` 的合法 duration |
+
+> **固定下发（不可配置）**：
+> - `EPPTLS`：恒为 `{ "Plaintext": true }`（统一明文接入 EPP），取代 BFE legacy `{Insecure:true}` 默认。
+> - `EPPBreaker`：恒为 `{ "Disabled": true }`（关闭熔断）；`window_size` / `min_volume` / `error_rate_percent` / `open_timeout` 暂不开放。
+> - 请求中携带 `epp_runtime.tls` 或 `epp_runtime.breaker` 会因**未知字段**返回 `422`。
+> - `check` / `timeout` 整体未配置时不下发，由 BFE 加载期补同样的默认值。
+> - EPP cluster 分配缺失导致导出降级为 `WRR` 时，不导出任何 `epp_runtime` 字段。
+
 
 **约束**
 
 - `name` 必填，类型为 [ClusterName](./00-common.md#15-集群名称clustername)，全局唯一。
-- `description` 可选；若传入，长度 0-256 字符，不能包含控制字符。
+- `description` 可选；若传入，长度 0-256 字节（按 UTF-8 字节计），不能包含控制字符。
 - `llm_config` 必填；`provider` 必填且必须引用 `/providers` 中已存在的 provider。
 - `llm_config.models` 至少包含 1 个非空模型名且不能重复；每个模型名必须存在于所属 provider 的 `models` 中。
 - `llm_config.model_mappings` 中 `source_model` 不能重复。
@@ -251,14 +316,22 @@
   - `ttl` 须为 `>0` 的整数；
   - `redis_prefix` 若传入须非空；
   - `penalty_enable` 必须为 bool。
+- `llm_config.normalize_upstream_error` 若传入：
+  - `enabled` / `stream_enabled` / `redact_secrets` 必须为 bool；
+  - `unrecognized_action` 取值仅支持 `passthrough`、`rewrite_generic`；
+  - `max_body_bytes` 须为 ∈ [0, 4194304] 的整数（`0` = 用 BFE 默认 65536）；
+  - 校验规则与 BFE `AIConfCheck` 逐条对齐（防止"控制面放行、BFE 加载失败"的配置穿透）。
 - `llm_config.match_prefix` / `strip_prefix`：
   - `strip_prefix=true` 时，`match_prefix` 必填且非空；
   - `match_prefix` 若传入，必须以 `/` 结尾。
 - `llm_config.model_table` 不在 OpenAPI `/clusters` 端点中展示，调用方传入时忽略或返回 `422`；该字段由 InnerAPI 根据 `provider` 自动填充后下发给 BFE。
 - `balance_mode` 非必填，默认值为 `WRR`；有效枚举：`WRR`（BFE 本地加权轮询）、`EPP`（由 EPP 调度器接管后端选择）；`balance_mode` 是 EPP 模式的唯一判定来源。
-- `epp_config` 条件必填：`balance_mode=EPP` 时必填且通过字段校验（简化字段校验：枚举、数值范围、秒数取值范围，全部 api 侧强制，不合法拒绝提交）；`balance_mode=WRR` 时可选——传入则保留并做格式校验，但不编译、不导出（休眠）。
+- `epp_config` 条件必填：`balance_mode=EPP` 时必填且通过字段校验（简化字段校验：`load_profile`/`affinity` 枚举、`kv_cache_utilization_max` ∈ `(0,1]`、`waiting_queue_max`/`running_requests_max` ≥ 0、`metrics_staleness_threshold_ms` > 0、`flow_control` 秒数取值范围及 `enable_eviction=false`，全部 api 侧强制，不合法拒绝提交）；`balance_mode=WRR` 时可选——传入则保留并做格式校验，但不编译、不导出（休眠）。
 - `balance_mode` 更新规则：允许 `WRR → EPP`（须同时提供合法 `epp_config`）；`EPP → WRR` 仅改 `balance_mode` 即可，`epp_config` 与分配记录保留（休眠，不编译/不导出），再切回 `EPP` 时原配置与原分配继续生效（分配如已悬空由 `/epp-pool` 变更时的自动修复处理）。**任一写入中 `epp_config` 非空即须通过字段校验，与 `balance_mode` 无关**（含 `EPP → WRR` 时随请求一并携带或休眠保留的配置）。
 - 生效语义：`epp_config` 仅在 `balance_mode=EPP` 时生效；停用 EPP 调度 = 将 `balance_mode` 改回 `WRR`（无需清空 `epp_config`）。
+- `epp_runtime` 非必填；传入即**整体替换**（`check`/`timeout` 未设置的子字段按 §1 表：EPP运行时配置 的默认值补齐后落盘），不传则保留存储值。校验：`check.check_interval`/`check.cooldown`/`timeout.connect`/`timeout.call` 须为 >0 的合法 duration，`check.fail_threshold`/`check.success_threshold` 须 >=1。
+- `epp_runtime` 仅在 `balance_mode=EPP` 时导出到 BFE；`balance_mode=WRR` 时保留但不生效（休眠），**非空即校验**（与 `epp_config` 一致）。校验规则与 BFE `EPPCheckConfCheck`/`EPPTimeoutConfCheck` 逐条对齐。
+- `epp_runtime.tls`、`epp_runtime.breaker` **不接受**（属未知字段，携带返回 `422`）：`EPPTLS` 固定 `{ "Plaintext": true }`、`EPPBreaker` 固定 `{ "Disabled": true }`，由 api 下发，用户不可配置。
 - `basic`、`sticky_sessions`、`passive_health_check` 若未传则使用 AI 网关场景默认值。
 - `basic.protocol` 有效值为 `http`、`https`。
 - `basic.connection.max_idle_conn_per_rs` 须为 >=0 的整数。
@@ -289,13 +362,14 @@
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | -  | - | - | - | - |
 | name| string |  集群名 | Y | 集群名必须全局唯一 | 必填；类型为 [ClusterName](./00-common.md#15-集群名称clustername) |
-| description| string |  集群描述信息| N |  | 非必填；若传入，长度 0-256 字符；不能包含控制字符 |
+| description| string |  集群描述信息| N |  | 非必填；若传入，长度 0-256 字节（按 UTF-8 字节计）；不能包含控制字符 |
 | basic| object |  基本参数| N | AI网关场景默认推荐值：protocol=https；connection.max_idle_conn_per_rs=0、cancel_on_client_close=false；retries.max_retry_in_cluster=2；buffers.req_write_buffer_size=512；timeouts.timeout_conn_serv=50000、timeout_response_header=50000、timeout_readbody_client=30000、timeout_read_client_again=30000、timeout_write_client=60000 | 非必填；未传时使用 AI 网关场景默认值；子字段合法性见 1 中各表 |
 | sticky_sessions| object |  会话保持| N | AI网关场景默认推荐值：enabled=false；若开启，hash_strategy=CLIENT_ID_ONLY、hash_header为空 | 非必填；未传时使用默认值；子字段合法性见 1 中各表 |
 | passive_health_check| object |  被动健康检查| N | AI网关场景默认推荐值：failnum=3、interval=1000ms、host为空（使用provider首个实例addr）、uri="/"、statuscode=0 | 非必填；未传时使用默认值；子字段合法性见 1 中各表 |
 | llm_config| object |  AI LLM服务配置| Y | 见 1 数据模型中表：LLM配置 | 必填；`provider` 必填且引用已存在 provider；`models` 至少1个非空元素且不能重复；子字段合法性见 1 中各表 |
 | balance_mode| string |  集群均衡模式| N | `WRR`：BFE 本地加权轮询；`EPP`：由 EPP 调度器接管后端选择 | 非必填；默认值为 `WRR`；有效枚举：`WRR`、`EPP` |
-| epp_config| object |  EPP 调度配置（简化用户形态）| N | 见 1 数据模型中表：EPP调度配置 | 条件必填：`balance_mode=EPP` 时必填且通过字段校验；`balance_mode=WRR` 时可选（传入则保留并做格式校验，不生效）；子字段合法性见 1 中各表 |
+| epp_config| object |  EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队）| N | 见 1 数据模型中表：EPP调度配置 | 条件必填：`balance_mode=EPP` 时必填且通过字段校验；`balance_mode=WRR` 时可选（传入则保留并做格式校验，不生效）；子字段合法性见 1 中各表 |
+| epp_runtime| object |  EPP 运行时参数（健康检查 + 超时）| N | 见 1 数据模型中表：EPP运行时配置；`check`/`timeout` 未设置的子字段按默认补齐；`tls`/`breaker` 不可配置 | 非必填；传入即整体替换并做字段校验；子字段合法性见 1 中各表 |
 
 **HTTP BODY参数示例**
 
@@ -397,17 +471,34 @@
     "llm_config": { "provider": "p1", "models": ["m1"] },
     "balance_mode": "EPP",
     "epp_config": {
-        "scheduling_profile": "balanced",
-        "cache_affinity": "medium",
+        "load_profile": "balanced",
+        "affinity": "medium",
         "prefix_cache_affinity": true,
         "session_affinity_enabled": true,
         "session_affinity_header": "x-session-id",
         "kv_cache_utilization_max": 0.9,
+        "waiting_queue_max": 0,
+        "running_requests_max": 0,
+        "fallback_on_empty": false,
+        "metrics_staleness_threshold_ms": 200,
         "flow_control": {
             "max_requests": 1000,
             "queue_ttl": 30,
             "no_endpoint_queue_ttl": 600,
             "enable_eviction": false
+        }
+    },
+    "epp_runtime": {
+        "check": {
+            "disabled": false,
+            "check_interval": "2s",
+            "fail_threshold": 3,
+            "cooldown": "45s",
+            "success_threshold": 2
+        },
+        "timeout": {
+            "connect": "500ms",
+            "call": "3s"
         }
     }
 }
@@ -436,7 +527,8 @@
 | sticky_sessions | object | 会话保持 |
 | passive_health_check | object | 被动健康检查 |
 | balance_mode | string | 集群均衡模式；默认 `WRR` |
-| epp_config | object \| null | EPP 调度配置（简化用户形态）；未配置过时为 `null`。**原样返回存储值**：`balance_mode=WRR` 时若创建/更新中传入过 `epp_config`，仍原样返回（休眠保留、不生效），切回 `EPP` 后继续生效 |
+| epp_config | object \| null | EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队）；未配置过时为 `null`。**原样返回存储值**：`balance_mode=WRR` 时若创建/更新中传入过 `epp_config`，仍原样返回（休眠保留、不生效），切回 `EPP` 后继续生效 |
+| epp_runtime | object \| null | EPP 运行时参数（健康检查 + 超时）；未配置过时为 `null`。**原样返回存储值**（含默认补齐值）：`balance_mode=WRR` 时若传入过仍原样返回（休眠保留、不生效），切回 `EPP` 后继续生效 |
 
 > **注意**：返回数据中不再包含 `instance_pool`；实例池信息通过 `llm_config.provider` 关联到 provider 获取。
 
@@ -453,7 +545,8 @@
         "sticky_sessions": { "...": "..." },
         "passive_health_check": { "...": "..." },
         "balance_mode": "WRR",
-        "epp_config": null
+        "epp_config": null,
+        "epp_runtime": null
     }
 }
 ```
@@ -526,7 +619,8 @@
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | -  | - | - | - | - |
 | balance_mode | string | 集群均衡模式 | N | 允许 `WRR → EPP`（须同时提供合法 `epp_config`）与 `EPP → WRR`（`epp_config` 与分配记录保留休眠） | 非必填；有效枚举：`WRR`、`EPP` |
-| epp_config | object | EPP 调度配置（简化用户形态） | N | `WRR → EPP` 时须同时提供合法 `epp_config`；`EPP → WRR` 无需清空（保留休眠）；变更后即时 bump server_data_conf version | 条件必填与字段校验同创建接口；`balance_mode=WRR` 时可选（传入保留、不生效）；**非空一律做字段校验，与 balance_mode 无关** |
+| epp_config | object | EPP 调度配置（简化用户形态：实例负载画像 + 准入水位 + 排队） | N | `WRR → EPP` 时须同时提供合法 `epp_config`；`EPP → WRR` 无需清空（保留休眠）；变更后即时 bump server_data_conf version | 条件必填与字段校验同创建接口；`balance_mode=WRR` 时可选（传入保留、不生效）；**非空一律做字段校验，与 balance_mode 无关** |
+| epp_runtime | object | EPP 运行时参数（健康检查 + 超时） | N | **整体替换**语义：传入即整体替换存储值（`check`/`timeout` 未设置的子字段按默认补齐），不传则保留原值；与 `balance_mode`、`epp_config` 相互独立；变更后即时 bump server_data_conf version | 非必填；传入即按创建接口同规则校验；`tls`/`breaker` 携带则 `422`；`balance_mode=WRR` 时可选（传入保留、不生效） |
 
 > **注意：**
 > - `sub_clusters` 与 `scheduler` 为系统内部自动生成，更新时不支持手动修改。

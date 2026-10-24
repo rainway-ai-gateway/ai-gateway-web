@@ -3,6 +3,8 @@
 > 说明：本文档基于 `openapi-doc-diff.md`（新旧 OpenAPI 接口定义核对报告）、新版 `ai-gateway-api/design-docs/api-define/OpenAPI接口定义/` 以及 `00-common.md` 公共参数类型校验定义，与 `ai-gateway-web/src/` 当前源码逐一核对，记录 UI 变更项及实施状态。
 >
 > **最后核对**：2026-07-31（与当前源码对齐，全部变更项均已落地）
+>
+> **文档维护**：2026-10-17 移除 3 处失效链接 `clusters-instance-pool-api-issues.md`（该文件在 `ai-gateway-web` / `ai-gateway-api` 全仓及本工作区均不存在，从未提交），按纯文件名引用保留。
 
 ---
 
@@ -490,7 +492,7 @@
 - 复查页移除对应展示行。
 - 提交 `llm_config` 前过滤已删除字段；编辑回显时 `applyLlmConfigData` 同步删除。
 
-**参考**：`clusters.md` 表：LLM配置；[clusters-instance-pool-api-issues.md](./clusters-instance-pool-api-issues.md) 问题三
+**参考**：`clusters.md` 表：LLM配置；`clusters-instance-pool-api-issues.md` 问题三
 
 ---
 
@@ -509,7 +511,7 @@
 - `src/modules/Clusters/components/GatewayConfig.vue`（`getInstanceEndpointHosts`）
 - `src/modules/Clusters/components/Review.vue`
 
-**参考**：`clusters.md` Instance 结构；[clusters-instance-pool-api-issues.md](./clusters-instance-pool-api-issues.md) 问题二
+**参考**：`clusters.md` Instance 结构；`clusters-instance-pool-api-issues.md` 问题二
 
 ---
 
@@ -556,7 +558,7 @@
 - `src/modules/Clusters/components/InstancePool.vue`
 - `src/modules/Clusters/components/index.vue`
 
-**参考**：`clusters.md`；[clusters-instance-pool-api-issues.md](./clusters-instance-pool-api-issues.md) 问题一
+**参考**：`clusters.md`；`clusters-instance-pool-api-issues.md` 问题一
 
 ---
 

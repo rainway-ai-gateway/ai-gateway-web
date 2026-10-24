@@ -27,6 +27,7 @@
                 <input
                   type="text"
                   class="ivu-input ivu-input-large"
+                  id="login-username"
                   placeholder="请输入用户名"
                   value="admin"
                 />
@@ -63,13 +64,23 @@
               </button>
             </div>
           </div>
+          <div class="ivu-form-item">
+            <div class="ivu-form-item-content">
+              <p class="login-role-tip">
+                原型提示：用户名填写 <b>viewer</b> 以「系统管理员（只读）」登录，其余用户名以「系统管理员」登录。
+              </p>
+            </div>
+          </div>
         </form>
       </div>
       <footer class="version">当前版本号 V0.0.4</footer>
     </div>
     <script>
       document.getElementById('btn-login').addEventListener('click', function () {
-        Prototype.setUser({ name: 'admin' });
+        var input = document.getElementById('login-username');
+        var name = ((input && input.value) || 'admin').trim() || 'admin';
+        var role = name.toLowerCase() === 'viewer' ? 'system_admin_readonly' : 'system_admin';
+        Prototype.setUser({ name: name, role: role });
         window.location.href = 'pages/home.html';
       });
     </script>

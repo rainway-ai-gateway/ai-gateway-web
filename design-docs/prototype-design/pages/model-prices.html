@@ -18,6 +18,7 @@
     <script src="../assets/js/model-price-upsert.js?v=2026090802"></script>
     <script>
       var root = Layout.render({ pageId: 'ModelPrice.list', breadcrumb: '模型定价', basePath: '../' });
+      var isReadonly = Prototype.isReadonly();
 
       var state = {
         page: 1,
@@ -92,6 +93,9 @@
           {
             key: 'operation', title: '操作', width: 240,
             render: function (row) {
+              if (isReadonly) {
+                return '<button type="button" class="ivu-btn ivu-btn-primary ivu-btn-small" data-action="view" data-id="' + row.id + '" style="margin-right:8px;">详情</button>';
+              }
               return '<button type="button" class="ivu-btn ivu-btn-primary ivu-btn-small" data-action="view" data-id="' + row.id + '" style="margin-right:8px;">详情</button>' +
                 '<button type="button" class="ivu-btn ivu-btn-success ivu-btn-small" data-action="edit" data-id="' + row.id + '" style="margin-right:8px;">编辑</button>' +
                 '<button type="button" class="ivu-btn ivu-btn-error ivu-btn-small" data-action="delete" data-id="' + row.id + '">删除</button>';
@@ -112,8 +116,8 @@
         root.innerHTML =
           '<div class="model-prices-page">' +
             '<div class="action-bar" style="margin-bottom:16px;">' +
-              '<button type="button" class="ivu-btn ivu-btn-primary ivu-btn-small" id="btn-create">+ 新增定价</button>' +
-              '<button type="button" class="ivu-btn ivu-btn-success ivu-btn-small" id="btn-import" style="margin-left:8px;">YAML 导入</button>' +
+              (isReadonly ? '' : '<button type="button" class="ivu-btn ivu-btn-primary ivu-btn-small" id="btn-create">+ 新增定价</button>') +
+              (isReadonly ? '' : '<button type="button" class="ivu-btn ivu-btn-success ivu-btn-small" id="btn-import" style="margin-left:8px;">YAML 导入</button>') +
             '</div>' +
             tableHtml +
           '</div>';
@@ -132,7 +136,8 @@
       }
 
       function bindTableEvents() {
-        document.getElementById('btn-create').onclick = function () {
+        var createBtn = document.getElementById('btn-create');
+        if (createBtn) createBtn.onclick = function () {
           state.isView = false;
           state.currentData = null;
           ModelPriceUpsert.drawer(null, false, function () {
@@ -140,7 +145,8 @@
           });
         };
 
-        document.getElementById('btn-import').onclick = function () {
+        var importBtn = document.getElementById('btn-import');
+        if (importBtn) importBtn.onclick = function () {
           openImportModal();
         };
 
