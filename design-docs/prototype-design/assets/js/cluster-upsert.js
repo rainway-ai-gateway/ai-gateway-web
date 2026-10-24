@@ -32,10 +32,10 @@ window.ClusterUpsert = (function () {
     return /^[A-Za-z0-9][A-Za-z0-9_.-]*[A-Za-z0-9]$|^[A-Za-z0-9]$/.test(name);
   }
 
-  // 描述长度校验
+  // 描述长度校验（0-256 UTF-8 字节，与后端一致）
   function validateDescription(desc) {
     if (!desc) return true;
-    if (desc.length > 256) return false;
+    if (Prototype.utf8Bytes(desc) > 256) return false;
     // 不能包含控制字符
     if (/[\x00-\x1F\x7F]/.test(desc)) return false;
     return true;

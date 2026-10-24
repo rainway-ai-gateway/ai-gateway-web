@@ -518,6 +518,7 @@
               </FormItem>
             </Col>
           </Row>
+          <p class="form-tip">{{ $t('entity.batchLimitsTip') }}</p>
         </div>
       </div>
     </Card>
@@ -540,7 +541,7 @@
 <script>
 import { cloneDeep } from 'lodash';
 import { getModelGroupsFromServices } from '@/utils/model';
-import { EntityNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX } from '@/utils/const';
+import { EntityNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
@@ -599,14 +600,14 @@ export default {
             callback();
         };
 
-        // Validate description (optional; 0-255 chars; no control chars)
+        // Validate description (optional; 0-255 UTF-8 bytes; no control chars)
         const validateDescription = (rule, value, callback) => {
             const val = value === null || value === undefined ? '' : String(value);
             if (val === '') {
                 callback();
                 return;
             }
-            if (val.length > 255) {
+            if (utf8ByteLength(val) > 255) {
                 callback(new Error(this.$t('entity.descriptionLengthError')));
                 return;
             }

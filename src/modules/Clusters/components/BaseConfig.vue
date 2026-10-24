@@ -142,7 +142,7 @@
   </Form>
 </template>
 <script>
-import { ClustersNameRegCheck, NumRegCheck } from '@/utils/const';
+import { ClustersNameRegCheck, NumRegCheck, utf8ByteLength } from '@/utils/const';
 import { cloneDeep } from 'lodash';
 export default {
     name: 'BaseConfig',
@@ -200,7 +200,7 @@ export default {
                 callback();
                 return;
             }
-            if (value.length > 256) {
+            if (utf8ByteLength(value) > 256) {
                 callback(new Error(this.$t('cluster.descriptionLengthError')));
                 return;
             }

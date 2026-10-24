@@ -444,6 +444,16 @@
         }
 
         function commitAll() {
+          // 生效条件集合内唯一：重复集合后端整单 422（duplicate ai cache rule cond），提交前拦截
+          var seenCond = {};
+          for (var i = 0; i < state.rows.length; i++) {
+            var c = state.rows[i].cond;
+            if (seenCond[c]) {
+              Prototype.toast('生效条件已存在，集合内必须唯一', 'error');
+              return;
+            }
+            seenCond[c] = true;
+          }
           MockData.aiCacheRules = MockData.aiCacheRules || {};
           MockData.aiCacheRules.rules = cloneRows(state.rows);
           MockData.aiCacheSemanticSettings = cloneRows(state.semantic);
@@ -592,6 +602,12 @@
             return r.name === name;
           });
           if (duplicated) { Prototype.toast('规则名称已存在，请使用其他名称', 'error'); return; }
+          // 生效条件集合内唯一（逐字节比较），与后端 422 duplicate ai cache rule cond 对齐
+          var condDuplicated = state.rows.some(function (r, idx) {
+            if (excludeIndex != null && idx === excludeIndex) return false;
+            return r.cond === cond;
+          });
+          if (condDuplicated) { Prototype.toast('生效条件已存在，集合内必须唯一', 'error'); return; }
 
           var data = {
             name: name,

@@ -132,7 +132,7 @@
 | 字段 | 类型 | 说明 | 可能取值 | 合法性条件 |
 |------|------|------|----------|----------|
 | `name` | string | 集群名 | 全局唯一 | 必填；类型为 [ClusterName](./00-common.md#15-集群名称clustername) |
-| `description` | string | 集群描述信息 | - | 非必填；若传入，长度 0-256 字符；不能包含控制字符 |
+| `description` | string | 集群描述信息 | - | 非必填；若传入，长度 0-256 字节（按 UTF-8 字节计）；不能包含控制字符 |
 | `basic` | object | 基本参数 | 见下方 表：连接设置、表：重试设置、表：超时设置 | 非必填；未传时使用 AI 网关场景默认值 |
 | `sticky_sessions` | object | 会话保持 | 见下方 表：会话保持 | 非必填；未传时使用默认值 |
 | `passive_health_check` | object | 被动健康检查 | 见下方 表：被动健康检查 | 非必填；未传时使用默认值 |
@@ -298,7 +298,7 @@
 **约束**
 
 - `name` 必填，类型为 [ClusterName](./00-common.md#15-集群名称clustername)，全局唯一。
-- `description` 可选；若传入，长度 0-256 字符，不能包含控制字符。
+- `description` 可选；若传入，长度 0-256 字节（按 UTF-8 字节计），不能包含控制字符。
 - `llm_config` 必填；`provider` 必填且必须引用 `/providers` 中已存在的 provider。
 - `llm_config.models` 至少包含 1 个非空模型名且不能重复；每个模型名必须存在于所属 provider 的 `models` 中。
 - `llm_config.model_mappings` 中 `source_model` 不能重复。
@@ -362,7 +362,7 @@
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | -  | - | - | - | - |
 | name| string |  集群名 | Y | 集群名必须全局唯一 | 必填；类型为 [ClusterName](./00-common.md#15-集群名称clustername) |
-| description| string |  集群描述信息| N |  | 非必填；若传入，长度 0-256 字符；不能包含控制字符 |
+| description| string |  集群描述信息| N |  | 非必填；若传入，长度 0-256 字节（按 UTF-8 字节计）；不能包含控制字符 |
 | basic| object |  基本参数| N | AI网关场景默认推荐值：protocol=https；connection.max_idle_conn_per_rs=0、cancel_on_client_close=false；retries.max_retry_in_cluster=2；buffers.req_write_buffer_size=512；timeouts.timeout_conn_serv=50000、timeout_response_header=50000、timeout_readbody_client=30000、timeout_read_client_again=30000、timeout_write_client=60000 | 非必填；未传时使用 AI 网关场景默认值；子字段合法性见 1 中各表 |
 | sticky_sessions| object |  会话保持| N | AI网关场景默认推荐值：enabled=false；若开启，hash_strategy=CLIENT_ID_ONLY、hash_header为空 | 非必填；未传时使用默认值；子字段合法性见 1 中各表 |
 | passive_health_check| object |  被动健康检查| N | AI网关场景默认推荐值：failnum=3、interval=1000ms、host为空（使用provider首个实例addr）、uri="/"、statuscode=0 | 非必填；未传时使用默认值；子字段合法性见 1 中各表 |

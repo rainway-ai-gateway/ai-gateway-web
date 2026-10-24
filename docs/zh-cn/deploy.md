@@ -42,4 +42,4 @@ static/
 - `titleEn`：英文界面标题，留空时使用 `title`
 - `favicon`：图标路径，相对路径基于 `branding/` 目录，也可填 `/xxx.ico` 或 `http(s)` 地址
 
-修改后刷新页面生效；若浏览器仍显示旧图标，请强制刷新或清理缓存。更多说明见 [branding/README.md](../../branding/README.md)。
+修改后刷新页面生效；若浏览器仍显示旧图标，请强制刷新或清理缓存。更多说明见仓库内 `branding/README.md`（不在本手册站点内）。

@@ -90,19 +90,17 @@
       border
     ></Table>
 
-    <div class="batch-pager">
-      <Button size="small" :disabled="!hasPrev" @click="onPrev">
-        {{ $t('batchTasks.prevPage') }}
-      </Button>
-      <Button
-        size="small"
-        :disabled="!hasNext"
-        style="margin-left: 8px;"
-        @click="onNext"
-      >
-        {{ $t('batchTasks.nextPage') }}
-      </Button>
-    </div>
+    <cursor-pager
+      class="batch-pager"
+      :has-prev="hasPrev"
+      :has-next="hasNext"
+      :page-index="pageIndex"
+      :page-count="tableData.length"
+      :loading="loading"
+      @first="onFirst"
+      @prev="onPrev"
+      @next="onNext"
+    />
 
     <Drawer
       v-model="drawerVisible"
@@ -117,8 +115,10 @@
 
 <script>
 import BatchView from './components/BatchView.vue';
+import CursorPager from '@/components/table/cursorPager.vue';
 
-const PAGE_LIMIT = 20;
+// 每页条数：与接口默认一致（接口上限 200），减少游标翻页次数
+const PAGE_LIMIT = 50;
 
 const TERMINAL_STATUSES = ['completed', 'expired', 'failed', 'cancelled'];
 
@@ -184,7 +184,8 @@ export default {
     name: 'BatchTasks',
 
     components: {
-        BatchView
+        BatchView,
+        CursorPager
     },
 
     data() {
@@ -194,6 +195,10 @@ export default {
             // 主键游标分页：cursorStack 保存已访问游标，首页游标为空串（不传 cursor）
             cursorStack: [''],
             nextCursor: '',
+            // 已应用的过滤条件快照：翻页只按快照请求，避免「改了筛选未查询就翻页」导致跨页条件不一致
+            appliedFilter: null,
+            // 请求序号：丢弃过期响应，避免快速连点上一页/下一页时数据被旧响应覆盖
+            requestSeq: 0,
             drawerVisible: false,
             detail: null,
             detailLoading: false,
@@ -217,6 +222,11 @@ export default {
             return !!this.nextCursor;
         },
 
+        // 游标栈深度即当前页号（首页为 1）
+        pageIndex() {
+            return this.cursorStack.length;
+        },
+
         columns() {
             return [
                 {
@@ -233,7 +243,7 @@ export default {
                             'Tag',
                             {
                                 props: {
-                                    type: this.statusTagType(params.row.status)
+                                    color: this.statusTagColor(params.row.status)
                                 }
                             },
                             this.statusLabel(params.row.status)
@@ -266,7 +276,7 @@ export default {
                             'Tag',
                             {
                                 props: {
-                                    type: this.settleTagType(
+                                    color: this.settleTagColor(
                                         params.row.settle_status
                                     )
                                 }
@@ -335,6 +345,7 @@ export default {
     },
 
     mounted() {
+        this.appliedFilter = { ...this.filter };
         this.fetchData();
     },
 
@@ -350,7 +361,8 @@ export default {
             return key ? this.$t(`batchTasks.${key}`) : status || '-';
         },
 
-        statusTagType(status) {
+        // iView Tag 的颜色走 color 属性（type 仅接受 border/dot），避免 Invalid prop 警告
+        statusTagColor(status) {
             return STATUS_TAG_TYPES[status] || 'default';
         },
 
@@ -359,7 +371,7 @@ export default {
             return key ? this.$t(`batchTasks.${key}`) : status || '-';
         },
 
-        settleTagType(status) {
+        settleTagColor(status) {
             return SETTLE_TAG_TYPES[status] || 'default';
         },
 
@@ -445,8 +457,10 @@ export default {
 
         fetchData() {
             this.loading = true;
+            const seq = ++this.requestSeq;
             const params = { limit: PAGE_LIMIT };
-            const f = this.filter;
+            // 翻页沿用「已应用」的条件快照；仅 onQuery/onReset 会更新快照
+            const f = this.appliedFilter || this.filter;
             if (f.status) params.status = f.status;
             if (f.provider && f.provider.trim()) {
                 params.provider = f.provider.trim();
@@ -468,10 +482,19 @@ export default {
                 openapi: true
             })
                 .then(res => {
+                    // 已有更新请求发出时丢弃本次响应
+                    if (seq !== this.requestSeq) return;
                     if (res.status === 200) {
                         const data = res.data.Data || {};
                         this.tableData = data.list || [];
                         this.nextCursor = data.next_cursor || '';
+                        // 后端在本页恰好取满 limit 时也会返回 next_cursor，再翻会得到空页；
+                        // 末页为空且还有上一页时自动回退，避免用户停在空表
+                        if (!this.tableData.length && this.cursorStack.length > 1) {
+                            this.cursorStack.pop();
+                            this.nextCursor = '';
+                            this.fetchData();
+                        }
                     } else {
                         this.tableData = [];
                         this.nextCursor = '';
@@ -484,33 +507,46 @@ export default {
                     }
                 })
                 .catch(err => {
+                    if (seq !== this.requestSeq) return;
                     console.error('加载批量任务失败:', err);
                     this.$Message.error(this.$t('batchTasks.loadFailed'));
                 })
                 .finally(() => {
-                    this.loading = false;
+                    if (seq === this.requestSeq) this.loading = false;
                 });
         },
 
         onQuery() {
+            // 查询即应用当前条件：快照后翻页不再受后续输入改动影响
+            this.appliedFilter = { ...this.filter };
             this.cursorStack = [''];
+            this.nextCursor = '';
             this.fetchData();
         },
 
         onReset() {
             this.filter = defaultFilter();
+            this.appliedFilter = { ...this.filter };
             this.cursorStack = [''];
+            this.nextCursor = '';
+            this.fetchData();
+        },
+
+        onFirst() {
+            if (this.loading || this.cursorStack.length <= 1) return;
+            this.cursorStack = [''];
+            this.nextCursor = '';
             this.fetchData();
         },
 
         onPrev() {
-            if (this.cursorStack.length <= 1) return;
+            if (this.loading || this.cursorStack.length <= 1) return;
             this.cursorStack.pop();
             this.fetchData();
         },
 
         onNext() {
-            if (!this.nextCursor) return;
+            if (this.loading || !this.nextCursor) return;
             this.cursorStack.push(this.nextCursor);
             this.fetchData();
         },
@@ -619,7 +655,6 @@ export default {
 
     .batch-pager {
         margin-top: 16px;
-        text-align: right;
     }
 }
 </style>

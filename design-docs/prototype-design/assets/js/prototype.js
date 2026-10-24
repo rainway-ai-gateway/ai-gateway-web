@@ -278,6 +278,15 @@ window.Prototype = {
     });
   },
 
+  // UTF-8 字节长度：描述类字段的上限按字节计（与后端一致），不能直接用 String.length
+  utf8Bytes(str) {
+    if (str == null || str === '') return 0;
+    if (typeof TextEncoder !== 'undefined') {
+      return new TextEncoder().encode(String(str)).length;
+    }
+    return unescape(encodeURIComponent(String(str))).length;
+  },
+
   toast(message, type) {
     type = type || 'success';
     var iconMap = {

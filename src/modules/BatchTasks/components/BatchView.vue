@@ -54,7 +54,7 @@
           <ul class="clearFloat">
             <li class="title">{{ $t('batchTasks.status') }}:</li>
             <li class="value">
-              <Tag :type="statusTagType(detail.status)">
+              <Tag :color="statusTagColor(detail.status)">
                 {{ statusLabel(detail.status) }}
               </Tag>
             </li>
@@ -106,7 +106,7 @@
           <ul class="clearFloat">
             <li class="title">{{ $t('batchTasks.settleStatus') }}:</li>
             <li class="value">
-              <Tag :type="settleTagType(detail.settle_status)">
+              <Tag :color="settleTagColor(detail.settle_status)">
                 {{ settleLabel(detail.settle_status) }}
               </Tag>
             </li>
@@ -273,7 +273,8 @@ export default {
             return key ? this.$t(`batchTasks.${key}`) : status || '-';
         },
 
-        statusTagType(status) {
+        // iView Tag 的颜色走 color 属性（type 仅接受 border/dot）
+        statusTagColor(status) {
             return STATUS_TAG_TYPES[status] || 'default';
         },
 
@@ -282,7 +283,7 @@ export default {
             return key ? this.$t(`batchTasks.${key}`) : status || '-';
         },
 
-        settleTagType(status) {
+        settleTagColor(status) {
             return SETTLE_TAG_TYPES[status] || 'default';
         },
 

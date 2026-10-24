@@ -117,8 +117,8 @@
 |------|------|------|----------|
 | `file_id` | string | 文件标识（provider 侧 file id） | 非空；`(file_id, provider)` 唯一定位 |
 | `provider` | string | provider 名称 | 与 `file_id` 联合唯一定位 |
-| `purpose` | string | 文件用途 | `batch_input` / `batch_output` 等 provider 枚举值 |
-| `filename` | string | 文件名 | 一期留空（`batch_files` 元数据不落库文件名，响应中省略），后续接入 |
+| `purpose` | string | 文件用途 | `batch_input` / `batch_output`；由任务方向（输入/输出）映射得出——`batch_files` 行内保留 provider 原值（如 `batch`） |
+| `filename` | string | 文件名 | provider File 对象给出的文件名（数据面同步落库）；缺失时（老键、provider 未给）为空，响应中省略该键 |
 | `bytes` | int64 | 文件大小（字节） | ≥0 |
 | `created_at` | string | 创建时间（RFC3339） | 只读 |
 

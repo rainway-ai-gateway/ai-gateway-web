@@ -295,12 +295,18 @@ window.IvuUI = {
     var totalPages = Math.max(1, Math.ceil(total / pageSize));
     var paginationHtml = '';
     if (options.cursorPaging) {
-      // 主键游标分页：仅「上一页 / 下一页」，无页码与每页条数选择器（对齐真实 UI）
+      // 主键游标分页：「首页 / 上一页 · 第 N 页 · 本页 M 条 / 下一页」，无总条数与跳页（对齐真实 UI）
+      var firstDisabled = options.firstDisabled != null ? options.firstDisabled : false;
       var prevDisabled = options.prevDisabled != null ? options.prevDisabled : false;
       var nextDisabled = options.nextDisabled != null ? options.nextDisabled : false;
+      var pageIndex = options.pageIndex != null ? options.pageIndex : 1;
+      var pageCount = options.pageCount != null ? options.pageCount : 0;
       paginationHtml =
         '<div class="el-pagination is-background page">' +
+          '<button type="button" class="btn-prev proto-page-first"' + (firstDisabled ? ' disabled' : '') + '>首页</button>' +
           '<button type="button" class="btn-prev proto-page-prev"' + (prevDisabled ? ' disabled' : '') + '>上一页</button>' +
+          '<span class="proto-page-info">第 ' + pageIndex + ' 页</span>' +
+          '<span class="proto-page-info">本页 ' + pageCount + ' 条</span>' +
           '<button type="button" class="btn-next proto-page-next"' + (nextDisabled ? ' disabled' : '') + '>下一页</button>' +
         '</div>';
     } else {

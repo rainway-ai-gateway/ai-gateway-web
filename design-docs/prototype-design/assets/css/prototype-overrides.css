@@ -2403,3 +2403,19 @@ body {
   color: #515a6e;
   line-height: 32px;
 }
+
+/* 批量任务列表：主键游标分页条（首页 / 上一页 / 第 N 页 · 本页 M 条 / 下一页），左对齐 */
+#batch-page-table .el-pagination.page {
+  text-align: left;
+}
+#batch-page-table .proto-page-first + .proto-page-prev {
+  margin-left: 8px;
+}
+#batch-page-table .proto-page-info {
+  margin-left: 12px;
+  color: #808695;
+  font-size: 12px;
+}
+#batch-page-table .proto-page-next {
+  margin-left: 16px;
+}

@@ -475,8 +475,6 @@ window.MockData = {
         max_body_bytes: 1048576,
         max_value_bytes: 1048576,
         enable_semantic_cache: true,
-        created_at: 1782345000,
-        updated_at: 1782345000,
       },
       {
         name: 'cache-all-questions',
@@ -486,8 +484,6 @@ window.MockData = {
         max_body_bytes: 2097152,
         max_value_bytes: 1048576,
         enable_semantic_cache: false,
-        created_at: 1782345100,
-        updated_at: 1782345100,
       },
       {
         name: 'cache-bypass-stream',
@@ -497,8 +493,6 @@ window.MockData = {
         max_body_bytes: 1048576,
         max_value_bytes: 1048576,
         enable_semantic_cache: false,
-        created_at: 1782345200,
-        updated_at: 1782345200,
       },
     ],
   },
