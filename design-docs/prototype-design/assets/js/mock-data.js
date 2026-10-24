@@ -196,6 +196,12 @@ window.MockData = {
               max_requests: 1000,
             },
           ],
+          batch_limits: {
+            max_create_rpm: 10,
+            max_active_batches: 5,
+            max_file_bytes: 104857600,
+            max_file_lines: 50000,
+          },
         },
       },
       route_rules: {
@@ -259,6 +265,9 @@ window.MockData = {
           port: 443,
         },
       ],
+      instance_source: 'instance_pool',
+      k8s_pool_name: '',
+      k8s_instance_pool: [],
       model_protocols: ['openai'],
       protocol_paths: { openai: '/v1' },
       time_zone: 'Asia/Shanghai',
@@ -283,6 +292,9 @@ window.MockData = {
       instance_pool: [
         { name: 'api', addr: 'api.openai.com', weight: 100, port: 443 },
       ],
+      instance_source: 'instance_pool',
+      k8s_pool_name: '',
+      k8s_instance_pool: [],
       model_protocols: ['openai'],
       create_time: 1704067200,
       update_time: 1717209600,
@@ -295,6 +307,12 @@ window.MockData = {
       keys: [{ name: 'key-claude', key: 'sk-ant-xxxx' }],
       instance_pool: [
         { name: 'api', addr: 'api.anthropic.com', weight: 100, port: 443 },
+      ],
+      instance_source: 'k8s_pool',
+      k8s_pool_name: 'llm-inference-pool',
+      k8s_instance_pool: [
+        { addr: '10.0.0.11', port: 8000, weight: 100 },
+        { addr: '10.0.0.12', port: 8000, weight: 100 },
       ],
       model_protocols: ['anthropic'],
       create_time: 1714521600,
@@ -334,6 +352,15 @@ window.MockData = {
       provider: 'openai',
       balance_mode: 'WRR',
       epp_config: null,
+      llm_config: {
+        normalize_upstream_error: {
+          enabled: true,
+          stream_enabled: false,
+          unrecognized_action: 'passthrough',
+          max_body_bytes: 65536,
+          redact_secrets: true,
+        },
+      },
     },
     {
       name: 'epp-cluster-a',
@@ -341,18 +368,32 @@ window.MockData = {
       provider: 'deepseek',
       balance_mode: 'EPP',
       epp_config: {
-        scheduling_profile: 'balanced',
-        cache_affinity: 'medium',
+        load_profile: 'balanced',
+        affinity: 'medium',
         prefix_cache_affinity: true,
         session_affinity_enabled: true,
         session_affinity_header: 'x-session-id',
         kv_cache_utilization_max: 0.9,
+        waiting_queue_max: 0,
+        running_requests_max: 0,
+        fallback_on_empty: false,
+        metrics_staleness_threshold_ms: 200,
         flow_control: {
           max_requests: 1000,
           queue_ttl: 30,
           no_endpoint_queue_ttl: 600,
           enable_eviction: false,
         },
+      },
+      epp_runtime: {
+        check: {
+          disabled: false,
+          check_interval: '1s',
+          fail_threshold: 5,
+          cooldown: '30s',
+          success_threshold: 3,
+        },
+        timeout: { connect: '300ms', call: '2s' },
       },
     },
     {
@@ -361,19 +402,24 @@ window.MockData = {
       provider: 'openai',
       balance_mode: 'EPP',
       epp_config: {
-        scheduling_profile: 'latency-first',
-        cache_affinity: 'medium',
+        load_profile: 'queue-first',
+        affinity: 'low',
         prefix_cache_affinity: true,
         session_affinity_enabled: false,
         session_affinity_header: '',
         kv_cache_utilization_max: 0.85,
+        waiting_queue_max: 20,
+        running_requests_max: 50,
+        fallback_on_empty: true,
+        metrics_staleness_threshold_ms: 300,
         flow_control: {
           max_requests: 500,
           queue_ttl: 60,
           no_endpoint_queue_ttl: 600,
-          enable_eviction: true,
+          enable_eviction: false,
         },
       },
+      epp_runtime: null,
     },
   ],
   eppPool: {
@@ -381,17 +427,11 @@ window.MockData = {
     groups: [
       {
         name: 'g1',
-        instances: [
-          { id: 'epp-a', host: '10.0.0.1', port: 9002 },
-          { id: 'epp-b', host: '10.0.0.2', port: 9002 },
-        ],
+        instances: [{ id: 'epp-a', host: '10.0.0.1', port: 9002 }],
       },
       {
         name: 'g2',
-        instances: [
-          { id: 'epp-c', host: '10.0.0.3', port: 9002 },
-          { id: 'epp-d', host: '10.0.0.4', port: 9002 },
-        ],
+        instances: [{ id: 'epp-c', host: '10.0.0.3', port: 9002 }],
       },
       {
         name: 'g3',
@@ -401,20 +441,8 @@ window.MockData = {
   },
   eppAssignments: {
     clusters: [
-      {
-        cluster: 'epp-cluster-a',
-        group: 'g1',
-        primary: { id: 'epp-a', host: '10.0.0.1', port: 9002 },
-        standby: { id: 'epp-b', host: '10.0.0.2', port: 9002 },
-        degraded: false,
-      },
-      {
-        cluster: 'epp-cluster-b',
-        group: 'g2',
-        primary: { id: 'epp-c', host: '10.0.0.3', port: 9002 },
-        standby: { id: 'epp-d', host: '10.0.0.4', port: 9002 },
-        degraded: false,
-      },
+      { cluster: 'epp-cluster-a', group: 'g1' },
+      { cluster: 'epp-cluster-b', group: 'g2' },
     ],
     unassigned_clusters: [],
     idle_groups: ['g3'],
@@ -437,6 +465,112 @@ window.MockData = {
       },
     ],
   },
+  aiCacheRules: {
+    rules: [
+      {
+        name: 'cache-deepseek-chat',
+        cond: 'req_ai_intent_in("task_type", "chat", false)',
+        cache_key_strategy: 'lastQuestion',
+        cache_ttl: 3600,
+        max_body_bytes: 1048576,
+        max_value_bytes: 1048576,
+        enable_semantic_cache: true,
+      },
+      {
+        name: 'cache-all-questions',
+        cond: 'req_header_value_in("x-cache-scope", "full", false)',
+        cache_key_strategy: 'allQuestions',
+        cache_ttl: 0,
+        max_body_bytes: 2097152,
+        max_value_bytes: 1048576,
+        enable_semantic_cache: false,
+      },
+      {
+        name: 'cache-bypass-stream',
+        cond: 'req_query_value_in("stream", "1", false)',
+        cache_key_strategy: 'disabled',
+        cache_ttl: 0,
+        max_body_bytes: 1048576,
+        max_value_bytes: 1048576,
+        enable_semantic_cache: false,
+      },
+    ],
+  },
+  aiCacheSemanticSettings: {
+    top_k: 1,
+    threshold: 0.15,
+    threshold_relation: 'lt',
+  },
+  aiContextRules: {
+    rules: [
+      {
+        cond: 'req_path_in("/v1/chat/completions", false)',
+        mode: 'balanced',
+        max_context_tokens: 64000,
+        reserve_tokens: 8192,
+      },
+      {
+        cond: 'default_t()',
+        mode: 'off',
+      },
+    ],
+  },
+  aiContextSettings: {
+    trigger_ratio: 0.7,
+    keep_latest_images: 2,
+    tool_result_max_chars: 2000,
+    thinking_policy: 'trim-all-but-last',
+    chars_per_token: 4,
+    image_token_estimate: 1200,
+    rewrite: { strength: 'lite', protected_survival_rate: 0.95 },
+  },
+  trafficMirrorRules: {
+    rules: [
+      {
+        name: 'mirror-gpt4o-to-shadow-v2',
+        cond: 'req_ai_model_in("gpt-4o", false)',
+        mirror_cluster: 'cluster-test1',
+        percentage: 100,
+        remove_headers: ['Authorization', 'Cookie', 'X-Api-Key'],
+        set_headers: { 'x-mirror-source': 'prod' },
+        body_rewrites: [{ path: 'model', value: 'gpt-4o-shadow' }],
+        path_rewrite: '',
+        created_at: 1782345000,
+        updated_at: 1782345000,
+      },
+      {
+        name: 'mirror-canary-10pct',
+        cond: 'req_header_value_in("x-canary", "true", false)',
+        mirror_cluster: 'test',
+        percentage: 10,
+        remove_headers: [],
+        set_headers: {},
+        body_rewrites: [],
+        path_rewrite: '/v1/chat/completions',
+        created_at: 1782345100,
+        updated_at: 1782345100,
+      },
+    ],
+  },
+  intentConfig: {
+    min_confidence: 0.6,
+    questions: [
+      {
+        name: 'task_type',
+        type: 'choice',
+        instructions: '判断用户请求的主要任务类型',
+        criteria: ['代码生成', '文本摘要', '问答', '翻译'],
+        min_confidence: 0.7,
+      },
+      {
+        name: 'complexity',
+        type: 'score',
+        instructions: '评估任务的复杂程度',
+        levels: ['简单', '一般', '复杂', '非常复杂'],
+      },
+    ],
+  },
+  k8sPoolNames: ['llm-inference-pool', 'deepseek-prod-pool', 'openai-shared-pool'],
   forwardRules: [
     {
       name: 'vip-user-route',
@@ -466,9 +600,9 @@ window.MockData = {
     },
   ],
   users: [
-    { user_name: 'admin', is_admin: true },
-    { user_name: 'operator', is_admin: true },
-    { user_name: 'viewer', is_admin: false },
+    { user_name: 'admin', role: 'system_admin' },
+    { user_name: 'operator', role: 'system_admin' },
+    { user_name: 'viewer', role: 'system_admin_readonly' },
   ],
   tokens: [
     {
@@ -557,6 +691,7 @@ window.MockData = {
         input_cost_per_token: 0.00000015,
         output_cost_per_token: 0.0000006,
       },
+      batch_discount: 0.5,
       metadata: {
         source: 'https://openai.com/api/pricing/',
         notes: '',
@@ -712,6 +847,31 @@ window.MockData = {
       create_time: 1725148800,
       update_time: 1725148800,
     },
+    {
+      id: 8,
+      provider: 'deepseek',
+      model: 'DeepSeek V3',
+      base_model: 'deepseek-v3',
+      mode: 'batch',
+      capabilities: ['chat'],
+      supported_parameters: ['temperature', 'top_p', 'max_tokens'],
+      limits: {
+        context_window: 64000,
+        max_output_tokens: 8192,
+      },
+      prices: {
+        input_cost_per_token: 1.35e-7,
+        output_cost_per_token: 5.5e-7,
+        cache_read_input_token_cost: 3.5e-8,
+      },
+      metadata: {
+        source: 'https://platform.deepseek.com/pricing',
+        notes:
+          '手工维护的批量价格行（= chat 价 × 0.5），导出时优先于 batch_discount 系数展开',
+      },
+      create_time: 1725148800,
+      update_time: 1725148800,
+    },
   ],
   getModelPriceProviders: function () {
     var names = {};
@@ -742,6 +902,7 @@ window.MockData = {
     'ocr',
     'search',
     'realtime',
+    'batch',
   ],
   modelCapabilities: [
     'chat',
@@ -1064,6 +1225,8 @@ window.MockData = {
     'certificate',
     'quota_plan',
     'model_price',
+    'batch',
+    'batch_file',
     'user',
     'token',
   ],
@@ -1213,6 +1376,20 @@ window.MockData = {
     rate_limit_hits: 320,
     auth_rejects: 45,
     logs_total: 152300,
+    cache: {
+      hit_count: 42000,
+      miss_count: 38000,
+      skip_count: 72300,
+      hit_rate: 0.525,
+      read_tokens: 12000000,
+      write_tokens: 3000000,
+    },
+    mirror: { hit_count: 8600 },
+    intent: {
+      classified_count: 98000,
+      unknown_count: 2000,
+      unknown_rate: 0.02,
+    },
   },
 
   reportTimeseries: {
@@ -1276,6 +1453,21 @@ window.MockData = {
         { time: 1782345240, currency: 'USD', value: 0.0000128 },
       ],
     },
+    cache_tokens: {
+      bucket_sec: 60,
+      series: [
+        { time: 1782345000, kind: 'cache_read', value: 32000 },
+        { time: 1782345000, kind: 'cache_write', value: 8000 },
+        { time: 1782345060, kind: 'cache_read', value: 28000 },
+        { time: 1782345060, kind: 'cache_write', value: 6500 },
+        { time: 1782345120, kind: 'cache_read', value: 41000 },
+        { time: 1782345120, kind: 'cache_write', value: 9200 },
+        { time: 1782345180, kind: 'cache_read', value: 36000 },
+        { time: 1782345180, kind: 'cache_write', value: 7100 },
+        { time: 1782345240, kind: 'cache_read', value: 39000 },
+        { time: 1782345240, kind: 'cache_write', value: 8400 },
+      ],
+    },
   },
 
   reportRankings: {
@@ -1328,6 +1520,27 @@ window.MockData = {
         { name: 'completion', request_count: 4300, error_count: 100, input_tokens: 1340000, output_tokens: 190000 },
       ],
     },
+    ai_intent_answer: {
+      items: [
+        { name: '代码生成', request_count: 68000, error_count: 420, input_tokens: 40000000, output_tokens: 5200000 },
+        { name: '问答', request_count: 45000, error_count: 310, input_tokens: 26000000, output_tokens: 3600000 },
+        { name: '文本摘要', request_count: 22000, error_count: 180, input_tokens: 13000000, output_tokens: 1700000 },
+        { name: 'unknown', request_count: 2000, error_count: 60, input_tokens: 1100000, output_tokens: 120000 },
+      ],
+    },
+    ai_cache_status: {
+      items: [
+        { name: 'hit', request_count: 42000, error_count: 120, input_tokens: 24000000, output_tokens: 3200000 },
+        { name: 'miss', request_count: 38000, error_count: 260, input_tokens: 22000000, output_tokens: 3000000 },
+        { name: 'skip', request_count: 72300, error_count: 820, input_tokens: 42341233, output_tokens: 5893441 },
+      ],
+    },
+    mirror_hit: {
+      items: [
+        { name: '1', request_count: 8600, error_count: 40, input_tokens: 5100000, output_tokens: 680000 },
+        { name: '0', request_count: 143700, error_count: 1160, input_tokens: 83241233, output_tokens: 11413441 },
+      ],
+    },
   },
 
   reportDistribution: {
@@ -1355,6 +1568,27 @@ window.MockData = {
       items: [
         { name: '1', request_count: 120000, ratio: 0.788 },
         { name: '0', request_count: 32300, ratio: 0.212 },
+      ],
+    },
+    ai_intent_answer: {
+      items: [
+        { name: '代码生成', request_count: 68000, ratio: 0.4466 },
+        { name: '问答', request_count: 45000, ratio: 0.2955 },
+        { name: '文本摘要', request_count: 22000, ratio: 0.1445 },
+        { name: 'unknown', request_count: 2000, ratio: 0.0131 },
+      ],
+    },
+    ai_cache_status: {
+      items: [
+        { name: 'hit', request_count: 42000, ratio: 0.2758 },
+        { name: 'miss', request_count: 38000, ratio: 0.2495 },
+        { name: 'skip', request_count: 72300, ratio: 0.4747 },
+      ],
+    },
+    mirror_hit: {
+      items: [
+        { name: '1', request_count: 8600, ratio: 0.0565 },
+        { name: '0', request_count: 143700, ratio: 0.9435 },
       ],
     },
   },
@@ -1415,6 +1649,10 @@ window.MockData = {
         level1Name: null, level1: null,
         client_ip: '192.168.1.100', header_host: 'api.example.org', origin_uri: '/v1/chat',
         req_headers: null, res_headers: null,
+        ai_cache_status: '', mirror_hit: false, mirror_cluster: '',
+        ai_intent_question: '', ai_intent_answer: '', ai_intent_confidence: null,
+        ai_intent_source: '', ai_intent_latency_us: null,
+        ai_intent_cache_hit: null, ai_intent_questions_version: '',
       },
       {
         logid: 12349, log_time: 1782345460, hostid: 'gw-01', product: 'BFE',
@@ -1431,4 +1669,391 @@ window.MockData = {
       },
     ],
   },
+
+  // ========== 批量任务管控（GET /open-api/v1/batches） ==========
+  // reserve_units / settle_units 为 1e-8 定点整数（单位 RMB），不做 ÷1e8 换算
+  batchTasks: {
+    list: [
+      {
+        batch_id: 'batch_abc123',
+        api_key_id: 'ak-2v8x9k3m7p',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-input1',
+        output_file_id: 'file-output1',
+        status: 'completed',
+        request_counts: { total: 100, completed: 98, failed: 2 },
+        est_lines: 100,
+        usage_input_tokens: 50000,
+        usage_output_tokens: 12000,
+        usage_source: 'download',
+        reserve_units: 250000000,
+        settle_units: 180000000,
+        settle_status: 'settled',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-06T10:00:00+08:00',
+        updated_at: '2026-10-06T10:20:00+08:00',
+        terminal_at: '2026-10-06T10:20:00+08:00',
+        batch_files: [
+          { file_id: 'file-input1', provider: 'openai', purpose: 'batch_input', filename: 'input.jsonl', bytes: 1048576, created_at: '2026-10-06T09:55:00+08:00' },
+          { file_id: 'file-output1', provider: 'openai', purpose: 'batch_output', filename: 'output.jsonl', bytes: 2097152, created_at: '2026-10-06T10:20:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_7f8e9d0c1b2a',
+        api_key_id: 'ak-2v8x9k3m7p',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-input2',
+        output_file_id: '',
+        status: 'in_progress',
+        request_counts: { total: 200, completed: 86, failed: 3 },
+        est_lines: 200,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 500000000,
+        settle_units: 0,
+        settle_status: 'reserved',
+        over_reserved: false,
+        sync_source: 'redis',
+        created_at: '2026-10-08T14:30:00+08:00',
+        updated_at: '2026-10-08T14:40:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-input2', provider: 'openai', purpose: 'batch_input', filename: 'bulk_chat_input.jsonl', bytes: 4194304, created_at: '2026-10-08T14:25:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_cancelling001',
+        api_key_id: 'ak-001',
+        product_name: 'AI_product',
+        entity_id: 'entity-2',
+        provider: 'deepseek',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-ds-input1',
+        output_file_id: '',
+        status: 'cancelling',
+        request_counts: { total: 500, completed: 120, failed: 5 },
+        est_lines: 500,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 300000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-08T09:10:00+08:00',
+        updated_at: '2026-10-08T09:22:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-ds-input1', provider: 'deepseek', purpose: 'batch_input', filename: 'ds_input.jsonl', bytes: 8388608, created_at: '2026-10-08T09:05:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_cancelled_old1',
+        api_key_id: 'ak-001',
+        product_name: 'AI_product',
+        entity_id: 'entity-2',
+        provider: 'deepseek',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-ds-input0',
+        output_file_id: '',
+        status: 'cancelled',
+        request_counts: { total: 300, completed: 45, failed: 2 },
+        est_lines: 300,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 150000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-02T11:00:00+08:00',
+        updated_at: '2026-10-02T11:30:00+08:00',
+        terminal_at: '2026-10-02T11:30:00+08:00',
+        batch_files: [
+          { file_id: 'file-ds-input0', provider: 'deepseek', purpose: 'batch_input', filename: 'ds_input_old.jsonl', bytes: 5242880, created_at: '2026-10-02T10:55:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_fail_expired1',
+        api_key_id: 'ak-002',
+        product_name: 'AI_product',
+        entity_id: 'entity-3',
+        provider: 'anthropic',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-ant-input1',
+        output_file_id: '',
+        status: 'failed',
+        request_counts: { total: 50, completed: 0, failed: 50 },
+        est_lines: 50,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 80000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-10-05T16:00:00+08:00',
+        updated_at: '2026-10-05T16:05:00+08:00',
+        terminal_at: '2026-10-05T16:05:00+08:00',
+        batch_files: [
+          { file_id: 'file-ant-input1', provider: 'anthropic', purpose: 'batch_input', filename: 'ant_input.jsonl', bytes: 2097152, created_at: '2026-10-05T15:55:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_queue_final001',
+        api_key_id: 'ak-002',
+        product_name: 'AI_product',
+        entity_id: 'entity-3',
+        provider: 'gemini',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-gem-input1',
+        output_file_id: '',
+        status: 'queued',
+        request_counts: { total: 1000, completed: 0, failed: 0 },
+        est_lines: 1000,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 1200000000,
+        settle_units: 0,
+        settle_status: 'reserved',
+        over_reserved: false,
+        sync_source: 'redis',
+        created_at: '2026-10-09T08:30:00+08:00',
+        updated_at: '2026-10-09T08:30:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-gem-input1', provider: 'gemini', purpose: 'batch_input', filename: 'gem_input.jsonl', bytes: 16777216, created_at: '2026-10-09T08:25:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_expired000001',
+        api_key_id: 'ak-001',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-exp-input1',
+        output_file_id: '',
+        status: 'expired',
+        request_counts: { total: 80, completed: 0, failed: 0 },
+        est_lines: 80,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 60000000,
+        settle_units: 0,
+        settle_status: 'released',
+        over_reserved: false,
+        sync_source: 'log',
+        created_at: '2026-09-28T10:00:00+08:00',
+        updated_at: '2026-10-05T10:00:00+08:00',
+        terminal_at: '2026-10-05T10:00:00+08:00',
+        batch_files: [
+          { file_id: 'file-exp-input1', provider: 'openai', purpose: 'batch_input', filename: 'expired_input.jsonl', bytes: 1048576, created_at: '2026-09-28T09:55:00+08:00' },
+        ],
+      },
+      {
+        batch_id: 'batch_validating0001',
+        api_key_id: 'ak-2v8x9k3m7p',
+        product_name: 'AI_product',
+        entity_id: 'entity-5',
+        provider: 'openai',
+        endpoint: '/v1/batches',
+        input_file_id: 'file-val-input1',
+        output_file_id: '',
+        status: 'validating',
+        request_counts: { total: 0, completed: 0, failed: 0 },
+        est_lines: 60,
+        usage_input_tokens: 0,
+        usage_output_tokens: 0,
+        usage_source: 'download',
+        reserve_units: 0,
+        settle_units: 0,
+        settle_status: 'reserved',
+        over_reserved: false,
+        sync_source: 'redis',
+        created_at: '2026-10-09T10:05:00+08:00',
+        updated_at: '2026-10-09T10:05:00+08:00',
+        terminal_at: '',
+        batch_files: [
+          { file_id: 'file-val-input1', provider: 'openai', purpose: 'batch_input', filename: 'validate_input.jsonl', bytes: 524288, created_at: '2026-10-09T10:00:00+08:00' },
+        ],
+      },
+    ],
+    next_cursor: 0,
+  },
+
+  // ========== 密钥收敛任务（GET /open-api/v1/security/reencrypt-sweeps） ==========
+  // running 时 summary 为空对象、duration_ms=0、finished_at 为空；完成时才按表分组落库；
+  // dry-run 成功任务 error="dry_run"（语义标记，非失败）；failed 含 executor lost。
+  reencryptSweeps: {
+    list: [
+      {
+        task_id: 'rsp-01J9RXQ8Z3K7M2P1A0',
+        status: 'running',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-10-11T01:20:00Z',
+        finished_at: '',
+        duration_ms: 0,
+        summary: {},
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J9AB7Y6Q4N8T2V5C',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-10-10T09:30:00Z',
+        finished_at: '2026-10-10T09:30:08Z',
+        duration_ms: 8300,
+        summary: {
+          providers: { scanned: 120, rewritten: 118, skipped: 2 },
+          api_keys: { scanned: 2400, rewritten: 2390, skipped: 10 }
+        },
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J98H11W2D6R9B4E7',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'providers',
+        active_key_id: 2,
+        created_by: 'operator-chen',
+        started_at: '2026-10-08T14:05:00Z',
+        finished_at: '2026-10-08T14:05:02Z',
+        duration_ms: 2100,
+        summary: {
+          providers: { scanned: 120, rewritten: 120, skipped: 0 }
+        },
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J96ZK39X1C5G8Q2M',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: true,
+        scope: 'api_keys',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-10-07T03:12:00Z',
+        finished_at: '2026-10-07T03:12:05Z',
+        duration_ms: 4800,
+        summary: {
+          api_keys: { scanned: 2400, rewritten: 2361, skipped: 39 }
+        },
+        error: 'dry_run'
+      },
+      {
+        task_id: 'rsp-01J95P07T8V3N6L1D4',
+        status: 'failed',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'operator-li',
+        started_at: '2026-10-06T22:40:00Z',
+        finished_at: '2026-10-06T22:47:00Z',
+        duration_ms: 420000,
+        summary: {},
+        error: 'executor lost'
+      },
+      {
+        task_id: 'rsp-01J92F55B9K4M7Q0W3',
+        status: 'succeeded',
+        mode: 'decrypt',
+        dry_run: false,
+        scope: 'all',
+        active_key_id: 0,
+        created_by: 'admin',
+        started_at: '2026-10-03T06:00:00Z',
+        finished_at: '2026-10-03T06:00:09Z',
+        duration_ms: 9100,
+        summary: {
+          providers: { scanned: 120, rewritten: 120, skipped: 0 },
+          api_keys: { scanned: 2400, rewritten: 2400, skipped: 0 }
+        },
+        error: ''
+      },
+      {
+        task_id: 'rsp-01J91C22A7M5P8R1U6',
+        status: 'succeeded',
+        mode: 'reencrypt',
+        dry_run: true,
+        scope: 'all',
+        active_key_id: 2,
+        created_by: 'operator-chen',
+        started_at: '2026-10-02T11:15:00Z',
+        finished_at: '2026-10-02T11:15:05Z',
+        duration_ms: 5200,
+        summary: {
+          providers: { scanned: 120, rewritten: 118, skipped: 2 },
+          api_keys: { scanned: 2400, rewritten: 2361, skipped: 39 }
+        },
+        error: 'dry_run'
+      },
+      {
+        task_id: 'rsp-01J8Y90D4F2H7K0N3S',
+        status: 'failed',
+        mode: 'reencrypt',
+        dry_run: false,
+        scope: 'providers',
+        active_key_id: 2,
+        created_by: 'admin',
+        started_at: '2026-09-30T08:00:00Z',
+        finished_at: '2026-09-30T08:00:03Z',
+        duration_ms: 3200,
+        summary: {},
+        error: 'db connection reset'
+      }
+    ]
+  }
 };
+
+// 补充历史任务填充行，用于演示列表 offset 分页（page/page_size，默认 1/20）
+(function () {
+  var list = window.MockData.reencryptSweeps.list;
+  var base = Date.parse('2026-09-18T02:00:00Z');
+  for (var i = 1; i <= 16; i++) {
+    var started = new Date(base + i * 20 * 3600 * 1000);
+    var dry = i % 4 === 0;
+    var failed = i % 7 === 0;
+    var duration = 5000 + i * 137;
+    list.push({
+      task_id: 'rsp-01J8H' + (1000 + i),
+      status: failed ? 'failed' : 'succeeded',
+      mode: 'reencrypt',
+      dry_run: dry,
+      scope: 'all',
+      active_key_id: 2,
+      created_by: i % 2 === 0 ? 'operator-chen' : 'admin',
+      started_at: started.toISOString(),
+      finished_at: failed ? '' : new Date(started.getTime() + duration).toISOString(),
+      duration_ms: failed ? 0 : duration,
+      summary: failed ? {} : {
+        providers: { scanned: 120, rewritten: 118, skipped: 2 },
+        api_keys: { scanned: 2400, rewritten: 2390, skipped: 10 }
+      },
+      error: failed ? 'executor lost' : (dry ? 'dry_run' : '')
+    });
+  }
+})();

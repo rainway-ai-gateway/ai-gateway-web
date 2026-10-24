@@ -17,9 +17,10 @@
     <script>
       document.addEventListener('DOMContentLoaded', function () {
         var root = Layout.render({ pageId: 'AICluster.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
         root.innerHTML =
           '<div class="clusters">' +
-            IvuUI.btn('添加集群', 'primary', 'small', '', 'id="btn-add-cluster"') +
+            (isReadonly ? '' : IvuUI.btn('添加集群', 'primary', 'small', '', 'id="btn-add-cluster"')) +
             '<div id="cluster-table"></div>' +
           '</div>' +
           drawerUpsert() +
@@ -45,6 +46,7 @@
               provider: item.provider || '',
               balance_mode: item.balance_mode || 'WRR',
               epp_config: item.epp_config ? JSON.parse(JSON.stringify(item.epp_config)) : null,
+              epp_runtime: item.epp_runtime ? JSON.parse(JSON.stringify(item.epp_runtime)) : null,
             };
           });
         }
@@ -96,6 +98,9 @@
                 title: '操作',
                 key: 'action',
                 render: function (row) {
+                  if (isReadonly) {
+                    return IvuUI.btn('详情', 'success', 'small', '', 'style="margin-right:5px;" data-action="detail" data-name="' + escapeAttr(row.name) + '"');
+                  }
                   return IvuUI.btn('详情', 'success', 'small', '', 'style="margin-right:5px;" data-action="detail" data-name="' + escapeAttr(row.name) + '"') +
                     IvuUI.btn('编辑', 'primary', 'small', '', 'style="margin-right:5px;" data-action="edit" data-name="' + escapeAttr(row.name) + '"') +
                     IvuUI.btn('删除', 'error', 'small', '', 'data-action="delete" data-name="' + escapeAttr(row.name) + '"');
@@ -303,12 +308,13 @@
               var provider = (data.llmConfigData && data.llmConfigData.provider) || '';
               var balanceMode = data.balance_mode || 'WRR';
               var eppConfig = data.epp_config ? JSON.parse(JSON.stringify(data.epp_config)) : null;
+              var eppRuntime = data.epp_runtime ? JSON.parse(JSON.stringify(data.epp_runtime)) : null;
               if (!name) {
                 Prototype.toast('请输入集群名称', 'error');
                 return;
               }
               if (isAdd) {
-                state.allRows.push({ name: name, description: desc, provider: provider, balance_mode: balanceMode, epp_config: eppConfig });
+                state.allRows.push({ name: name, description: desc, provider: provider, balance_mode: balanceMode, epp_config: eppConfig, epp_runtime: eppRuntime });
               } else {
                 var target = state.allRows.find(function (item) { return item.name === row.name; });
                 if (target) {
@@ -317,6 +323,7 @@
                   target.provider = provider;
                   target.balance_mode = balanceMode;
                   target.epp_config = eppConfig;
+                  target.epp_runtime = eppRuntime;
                 }
               }
               Prototype.closeDrawer('drawer-cluster-upsert');
@@ -337,7 +344,8 @@
           Prototype.openDrawer('drawer-cluster-detail');
         }
 
-        document.getElementById('btn-add-cluster').addEventListener('click', function () {
+        var el = document.getElementById('btn-add-cluster');
+        if (el) el.addEventListener('click', function () {
           openUpsert(true, { name: '', description: '' });
         });
 

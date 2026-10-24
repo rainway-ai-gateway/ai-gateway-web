@@ -31,12 +31,13 @@
 <template>
     <div>
         <Button
+            v-has
             class="add-button"
             type="primary"
             size="small"
             @click="onAdd"
         >{{ $t('com.createX', {obj: $t('cert.name')}) }}</Button>
-        <div class="cert-isdefult">
+        <div v-has class="cert-isdefult">
             <span>{{ $t('cert.globalDefaultCert') }}：</span>
             <Select
                 v-model="showCertIsDefult"
@@ -157,7 +158,8 @@ export default {
                                         type: 'error',
                                         size: 'small',
                                         disabled: true
-                                    }
+                                    },
+                                    directives: [{ name: 'has' }]
                                 }, that.$t('com.del'))
                             ]);
                         }
@@ -167,6 +169,7 @@ export default {
                                     type: 'error',
                                     size: 'small'
                                 },
+                                directives: [{ name: 'has' }],
                                 style: {
                                     marginRight: '20px'
                                 },

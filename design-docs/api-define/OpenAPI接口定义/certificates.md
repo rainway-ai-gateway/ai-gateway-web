@@ -18,7 +18,7 @@
 | 字段 | 类型 | 说明 | 可能取值 | 合法性条件 |
 |------|------|------|----------|----------|
 | `cert_name` | string | 证书名 | 必须唯一 | 必填；类型为 [CertName](./00-common.md#19-证书名称certname)；全局唯一 |
-| `description` | string | 证书描述 | - | 必填；长度 2-256 字符；不能包含控制字符 |
+| `description` | string | 证书描述 | - | 必填；长度 2-256 字节（按 UTF-8 字节计）；不能包含控制字符 |
 | `is_default` | bool | 是否是默认证书 | 全局必须有且只有一个默认证书 | 必填；全局必须有且只有一个默认证书 |
 | `cert_file_content` | string | 主证书文件内容 | 创建/更新时必填；返回时不包含 | 必填；必须为合法 PEM 格式 X.509 证书；须与 `key_file_content` 匹配；服务端据此解析 `expired_date` |
 | `key_file_content` | string | 主证书密钥文件内容 | 创建/更新时必填；返回时不包含 | 必填；必须为合法 PEM 格式私钥；须与 `cert_file_content` 匹配 |
@@ -51,7 +51,7 @@
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
 | cert_name | string | 证书名 | Y | 必须唯一 | 必填；类型为 [CertName](./00-common.md#19-证书名称certname)；全局唯一 |
-| description | string | 证书描述 | Y | - | 必填；长度 2-256 字符；不能包含控制字符 |
+| description | string | 证书描述 | Y | - | 必填；长度 2-256 字节（按 UTF-8 字节计）；不能包含控制字符 |
 | is_default | bool | 是否是默认证书 | Y | 全局必须有且只有一个默认证书 | 必填；全局必须有且只有一个默认证书；若当前无默认证书，则必须设置为 `true` |
 | cert_file_content | string | 主证书文件内容 | Y | - | 必填；必须为合法 PEM 格式 X.509 证书；须与 `key_file_content` 匹配；服务端据此解析 `expired_date` |
 | key_file_content | string | 主证书密钥文件内容 | Y | - | 必填；必须为合法 PEM 格式私钥；须与 `cert_file_content` 匹配 |

@@ -141,6 +141,15 @@
           <span v-else class="empty-text">-</span>
         </span>
       </div>
+      <div class="info-row">
+        <span class="info-label">{{ $t('modelPrices.batchDiscount') }}</span>
+        <span class="info-value">
+          <span v-if="isBatchMode">{{
+            $t('modelPrices.batchDiscountBatchModeTip')
+          }}</span>
+          <span v-else>{{ batchDiscountDisplay }}</span>
+        </span>
+      </div>
     </Card>
 
     <Card :title="$t('modelPrices.metadata')" class="info-card">
@@ -201,6 +210,16 @@ export default {
         },
         modeLabel() {
             return this.currentData.mode;
+        },
+        isBatchMode() {
+            return this.currentData.mode === 'batch';
+        },
+        batchDiscountDisplay() {
+            const value = this.currentData.batch_discount;
+            if (value === null || value === undefined || value === '') {
+                return '-';
+            }
+            return this.formatPrice(value);
         }
     },
 

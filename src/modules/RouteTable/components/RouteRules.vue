@@ -27,21 +27,24 @@
         </Button>
         <Button
           v-if="mode === 'view'"
+          v-has
           size="small"
           type="success"
           @click="enterEditMode"
         >
           {{ $t('route.enterEditMode') }}
         </Button>
-        <template v-else>
-          <Button size="small" @click="exitEditMode">
+        <template v-if="mode !== 'view'">
+          <Button v-has size="small" @click="exitEditMode">
             {{ $t('route.exitEditMode') }}
           </Button>
           <Button
+            v-has
             size="small"
             type="primary"
             style="margin-left: 8px;"
             :loading="submitting"
+            :disabled="!isDirty"
             @click="submitRules"
           >
             {{ $t('com.submitAndEffect') }}
@@ -66,6 +69,7 @@
     <div class="action-bar">
       <Button
         v-show="mode === 'edit'"
+        v-has
         size="small"
         type="primary"
         @click="onAddRule"
@@ -79,7 +83,13 @@
       :columns="ruleColumns"
       :tableData="rules"
       :loading="loading"
+      :draggable="mode === 'edit'"
+      @dragDrop="onRuleDragDrop"
     />
+
+    <div v-if="mode === 'edit'" class="drag-tip">
+      {{ $t('route.dragToChangeOrder') }}
+    </div>
 
     <Drawer
       v-model="viewRuleVisible"
@@ -122,7 +132,8 @@ import { cloneDeep } from 'lodash';
 const TYPE_LABELS = {
   global: 'Global',
   entity: 'Entity',
-  apikey: 'API-Key'
+  apikey: 'API-Key',
+  api_key: 'API-Key'
 };
 
 export default {
@@ -254,9 +265,33 @@ export default {
           }
         },
         {
+          title: that.$t('route.fallbackClusterAndModel'),
+          key: 'fallbacks',
+          sortable: 'custom',
+          searchable: true,
+          render(h, params) {
+            const fallbacks = params.row.fallbacks || [];
+            if (!fallbacks.length) {
+              return <span>-</span>;
+            }
+            return h('div', fallbacks.map(f => {
+              const text = `${f.cluster_name}/${f.model || ''}`;
+              return h('Tooltip', {
+                props: { content: text, transfer: true, maxWidth: 600 },
+                style: 'display: block; width: 100%; margin-bottom: 4px;'
+              }, [
+                h('Tag', {
+                  key: `${f.cluster_name}-${f.model}`,
+                  style: 'max-width: calc(100% - 5px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;'
+                }, text)
+              ]);
+            }));
+          }
+        },
+        {
           title: that.$t('com.operation'),
           key: 'operation',
-          width: 150,
+          width: 220,
           render(h, params) {
             const row = params.row;
             if (that.mode === 'view') {
@@ -267,12 +302,20 @@ export default {
             }
             return h('div', [
               h('Button', {
+                props: { size: 'small', type: 'success' },
+                directives: [{ name: 'has' }],
+                style: { marginRight: '8px' },
+                on: { click: () => that.onCopyRule(row.index) }
+              }, that.$t('com.copy')),
+              h('Button', {
                 props: { size: 'small', type: 'primary' },
+                directives: [{ name: 'has' }],
                 style: { marginRight: '8px' },
                 on: { click: () => that.onEditRule(row, row.index) }
               }, that.$t('com.edit')),
               h('Button', {
                 props: { size: 'small', type: 'error' },
+                directives: [{ name: 'has' }],
                 on: { click: () => that.onDeleteRule(row.index) }
               }, that.$t('com.del'))
             ]);
@@ -442,6 +485,36 @@ export default {
       this.refreshRuleIndex();
     },
 
+    onRuleDragDrop(startIndex, endIndex) {
+      if (startIndex === endIndex) {
+        return;
+      }
+      const rules = cloneDeep(this.rules);
+      const [moved] = rules.splice(startIndex, 1);
+      rules.splice(endIndex, 0, moved);
+      this.rules = rules;
+      this.refreshRuleIndex();
+    },
+
+    onCopyRule(index) {
+      const source = this.rules[index];
+      const clone = cloneDeep(source);
+      delete clone.index;
+      delete clone._index;
+      delete clone._rowKey;
+      const name = source.name || '';
+      let seq = 1;
+      let newName;
+      do {
+        const suffix = seq === 1 ? '-copy' : `-copy${seq}`;
+        newName = `${name.substring(0, 64 - suffix.length)}${suffix}`;
+        seq += 1;
+      } while (this.rules.some(rule => rule.name === newName));
+      clone.name = newName;
+      this.rules.splice(index + 1, 0, clone);
+      this.refreshRuleIndex();
+    },
+
     onRuleFormSubmit(rule) {
       if (this.mode === 'view') {
         this.ruleDrawerVisible = false;
@@ -584,6 +657,12 @@ export default {
     justify-content: flex-start;
     align-items: center;
     margin-bottom: 16px;
+  }
+
+  .drag-tip {
+    margin-top: 8px;
+    color: #808695;
+    font-size: 12px;
   }
 
   .submit-bar {

@@ -52,6 +52,25 @@ export function ClustersNameRegCheck(value) {
   return reg.test(trimmed);
 }
 
+/**
+* 检查 K8s 池名称是否符合规范
+* @param {string} value - 需要检查的 K8s 池名称
+* @returns {boolean} - 返回检查结果，true表示符合规范，false表示不符合规范
+*/
+export function K8sPoolNameRegCheck(value) {
+  // K8sPoolName: 1-64 chars; letters, digits, _, -, .; cannot start/end with ., -, _; no whitespace
+  if (!value || typeof value !== 'string') {
+    return false;
+  }
+  if (/\s/.test(value)) {
+    return false;
+  }
+  if (value.length < 1 || value.length > 64) {
+    return false;
+  }
+  return /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9])?$/.test(value);
+}
+
 export function ProviderNameRegCheck(value) {
   // ProviderName: 1-64 chars; letters, digits, _, -, .; cannot start/end with ., -, _; no whitespace
   if (!value || typeof value !== 'string') {
@@ -226,11 +245,12 @@ export function TokenNameRegCheck(value) {
 }
 
 export function PasswordRegCheck(value, userName) {
-  // Password: 8-128 chars; no whitespace; cannot equal userName or its reverse
+  // Password: 8-72 bytes (UTF-8, bcrypt upper bound); no whitespace; cannot equal userName or its reverse
   if (!value || typeof value !== 'string') {
     return false;
   }
-  if (value.length < 8 || value.length > 128) {
+  const byteLength = new TextEncoder().encode(value).length;
+  if (byteLength < 8 || byteLength > 72) {
     return false;
   }
   if (/\s/.test(value)) {
@@ -300,12 +320,24 @@ export function CertNameRegCheck(value) {
 }
 
 /**
- * 检查证书描述是否不符合 API 规范
+ * 计算字符串的 UTF-8 字节长度
+ * 描述类字段的上限按字节计（后端按字节校验），不能直接用 String.length
+ * @param {string} value - 待计算的值
+ * @returns {number} - UTF-8 字节数
+ */
+export function utf8ByteLength(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  return new TextEncoder().encode(String(value)).length;
+}
+
+/**
+ * 检查证书描述是否不符合 API 规范（2-256 UTF-8 字节，不能包含控制字符）
  * @param {string} value - 需要检查的描述
  * @returns {boolean} - 不合法返回 true，合法返回 false
  */
 export function CertDescriptionRegCheck(value) {
-  if (!value || value.length < 2 || value.length > 256) {
+  const bytes = utf8ByteLength(value);
+  if (!value || bytes < 2 || bytes > 256) {
     return true;
   }
   return /[\x00-\x1f\x7f]/.test(value);

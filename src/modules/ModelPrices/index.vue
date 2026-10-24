@@ -15,7 +15,7 @@
 */
 <template>
   <div class="model-prices">
-    <div class="action-bar">
+    <div v-has class="action-bar">
       <Button type="primary" size="small" @click="onCreate">
         + {{ $t('modelPrices.create') }}
       </Button>
@@ -86,6 +86,7 @@
 
 <script>
 import pageTable from '@/components/table/pageTable';
+import store from '@/utils/store';
 import ModelPriceUpsert from './components/ModelPriceUpsert.vue';
 import ModelPriceView from './components/ModelPriceView.vue';
 import ModelPriceImport from './components/ModelPriceImport.vue';
@@ -94,7 +95,7 @@ import { cloneDeep } from 'lodash';
 const MODE_OPTIONS = [
     'chat', 'completion', 'responses', 'image_generation', 'image_edit',
     'embedding', 'rerank', 'audio_speech', 'audio_transcription',
-    'video_generation', 'ocr', 'search', 'realtime'
+    'video_generation', 'ocr', 'search', 'realtime', 'batch'
 ];
 
 export default {
@@ -167,22 +168,28 @@ export default {
                     width: 240,
                     render: (h, params) => {
                         const row = params.row;
-                        return h('div', [
+                        const buttons = [
                             h('Button', {
                                 props: { size: 'small', type: 'primary' },
                                 style: { marginRight: '8px' },
                                 on: { click: () => this.onView(row) }
-                            }, this.$t('com.see') || '详情'),
-                            h('Button', {
-                                props: { size: 'small', type: 'success' },
-                                style: { marginRight: '8px' },
-                                on: { click: () => this.onEdit(row) }
-                            }, this.$t('com.edit') || '编辑'),
-                            h('Button', {
-                                props: { size: 'small', type: 'error' },
-                                on: { click: () => this.onDelete(row) }
-                            }, this.$t('com.del') || '删除')
-                        ]);
+                            }, this.$t('com.see') || '详情')
+                        ];
+                        // 只读管理员隐藏写操作按钮（与 v-has 同规则）
+                        if (!store.isReadonly()) {
+                            buttons.push(
+                                h('Button', {
+                                    props: { size: 'small', type: 'success' },
+                                    style: { marginRight: '8px' },
+                                    on: { click: () => this.onEdit(row) }
+                                }, this.$t('com.edit') || '编辑'),
+                                h('Button', {
+                                    props: { size: 'small', type: 'error' },
+                                    on: { click: () => this.onDelete(row) }
+                                }, this.$t('com.del') || '删除')
+                            );
+                        }
+                        return h('div', buttons);
                     }
                 }
             ];
@@ -221,6 +228,13 @@ export default {
         },
 
         fetchData() {
+            const byModel = (this.searchParams.model || '').toString().trim();
+            // 契约：查询携带 model 时后端按 (provider, model, mode) 单记录语义处理，
+            // 三参缺一即参数错误；单填模型名时前端提示，不发请求
+            if (byModel && (!this.searchParams.provider || !this.searchParams.mode)) {
+                this.$Message.warning(this.$t('modelPrices.modelSearchNeedsProviderMode'));
+                return Promise.resolve();
+            }
             this.loading = true;
             return this.$request({
                 url: 'model-prices',
@@ -233,9 +247,16 @@ export default {
                 openapi: true
             }).then(res => {
                 if (res.status === 200) {
-                    const data = res.data.Data || {};
-                    this.tableData = data.list || [];
-                    this.total = (data.pagination && data.pagination.total) || 0;
+                    if (byModel) {
+                        // 单记录语义：Data 为记录本身，包装为单行列表展示
+                        const rec = res.data.Data;
+                        this.tableData = rec && rec.id ? [rec] : [];
+                        this.total = this.tableData.length;
+                    } else {
+                        const data = res.data.Data || {};
+                        this.tableData = data.list || [];
+                        this.total = (data.pagination && data.pagination.total) || 0;
+                    }
                     this.handleEmptyProviderHint();
                 } else {
                     this.$Message.error(this.$t('modelPrices.loadFailed'));

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../assets/static/css/app.css" />
+    <link rel="stylesheet" href="../assets/static/css/ai-rule.css" />
+    <link rel="stylesheet" href="../assets/font/iconfont.css" />
+    <link rel="stylesheet" href="../assets/css/prototype-overrides.css" />
+    <style>
+      #ai-context-table .ivu-table-sort { display: inline-block; height: 12px; margin-left: 4px; vertical-align: middle; width: 14px; }
+      #ai-context-table .ivu-table-sort i { color: #c5c8ce; display: block; font-size: 14px; height: 6px; line-height: 6px; overflow: hidden; }
+      .ai-context-view-list { color:#515a6e; font-size:14px; line-height:1.8; }
+      .ai-context-view-list .ai-context-view-item { padding:4px 0; border-bottom:1px dashed #e8eaec; }
+      .ai-context-view-list .ai-context-view-item:last-child { border-bottom:none; }
+      .ai-context-hint { color:#808695; font-size:12px; line-height:1.6; margin-top:4px; }
+      .route-editor-header { position:relative; margin-bottom:16px; }
+      .route-owner-label { color:#515a6e; font-size:14px; margin-bottom:12px; }
+      .route-header-actions { display:flex; align-items:center; gap:8px; }
+      .route-header-submit { position:absolute; top:0; right:0; display:flex; align-items:center; gap:8px; }
+    </style>
+    <script src="../assets/js/mock-data.js"></script>
+    <script src="../assets/js/ivu-ui.js"></script>
+    <script src="../assets/js/layout.js"></script>
+    <script src="../assets/js/prototype.js"></script>
+  </head>
+  <body>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var root = Layout.render({ pageId: 'AIContextRule.list', basePath: '../' });
+        root.innerHTML = '<div id="ai-context-page"></div>';
+
+        var isReadonly = Prototype.isReadonly();
+
+        var MODE_LABELS = {
+          off: '不处理（off）',
+          conservative: '仅无损裁剪（conservative）',
+          balanced: '裁剪 + lite 改写（balanced）',
+          aggressive: '裁剪 + full 改写（aggressive）'
+        };
+
+        var THINKING_LABELS = {
+          'trim-all-but-last': '仅保留最后一条 assistant（trim-all-but-last）',
+          keep: '保留全部（keep）'
+        };
+
+        var REWRITE_LABELS = {
+          lite: '保守规则包（lite）',
+          full: '激进规则包（full）'
+        };
+
+        var DEFAULT_SETTINGS = {
+          trigger_ratio: 0.7,
+          keep_latest_images: 2,
+          tool_result_max_chars: 2000,
+          thinking_policy: 'trim-all-but-last',
+          chars_per_token: 4,
+          image_token_estimate: 1200,
+          rewrite: { strength: 'lite', protected_survival_rate: 0.95 }
+        };
+
+        var state = {
+          rows: cloneRows((MockData.aiContextRules && MockData.aiContextRules.rules) || []),
+          filteredRows: [],
+          search: { cond: '', mode: '' },
+          pageSize: 20,
+          currentPage: 1,
+          sortKey: '',
+          sortOrder: '',
+          mode: 'view',
+          originalRows: null,
+          drawerMode: 'add',
+          editIndex: -1,
+          activeTab: 'rules',
+          settings: cloneRows(MockData.aiContextSettings || DEFAULT_SETTINGS),
+          originalSettings: null
+        };
+
+        function cloneRows(value) {
+          return JSON.parse(JSON.stringify(value || {}));
+        }
+
+        function formatTokens(value) {
+          if (value == null || value === 0) return '模型默认（0）';
+          return String(value) + ' tokens';
+        }
+
+        // ======= Filter & Sort =======
+        function filterRows() {
+          state.filteredRows = state.rows.filter(function (row) {
+            var cond = String(state.search.cond || '').trim();
+            var mode = String(state.search.mode || '').trim();
+            if (cond && String(row.cond == null ? '' : row.cond).toUpperCase().indexOf(cond.toUpperCase()) === -1) return false;
+            if (mode && String(row.mode || '') !== mode) return false;
+            return true;
+          });
+        }
+
+        function sortRows(rows) {
+          if (!state.sortKey || !state.sortOrder) return rows;
+          var arr = rows.slice();
+          var order = state.sortOrder;
+          var key = state.sortKey;
+          arr.sort(function (a, b) {
+            var va = getSortValue(a, key);
+            var vb = getSortValue(b, key);
+            if (typeof va === 'number' && typeof vb === 'number') {
+              return order === 'asc' ? va - vb : vb - va;
+            }
+            var sa = String(va);
+            var sb = String(vb);
+            return order === 'asc' ? sa.localeCompare(sb) : sb.localeCompare(sa);
+          });
+          return arr;
+        }
+
+        function getSortValue(row, key) {
+          if (key === 'max_context_tokens' || key === 'reserve_tokens') {
+            return row[key] == null ? 0 : row[key];
+          }
+          return row[key] == null ? '' : row[key];
+        }
+
+        function getPageRows() {
+          var sorted = sortRows(state.filteredRows);
+          var start = (state.currentPage - 1) * state.pageSize;
+          return sorted.slice(start, start + state.pageSize);
+        }
+
+        function findRowIndex(row) {
+          if (!row) return -1;
+          return state.rows.findIndex(function (item) {
+            return item === row || item.cond === row.cond;
+          });
+        }
+
+        // ======= Header =======
+        function renderHeader(tab) {
+          var editing = state.mode === 'edit';
+          var prefix = tab === 'rules' ? 'rules' : 'settings';
+          var addHtml = !isReadonly && editing && tab === 'rules'
+            ? IvuUI.btn('添加规则', 'primary', 'small', '', 'id="btn-context-' + prefix + '-add"')
+            : '';
+          var editingLabels = tab === 'rules'
+            ? { enter: '进入编辑模式', exit: '退出编辑模式', submit: '提交并生效' }
+            : { enter: '编辑', exit: '取消', submit: '保存' };
+          var submitHtml = isReadonly
+            ? ''
+            : (editing
+              ? IvuUI.btn(editingLabels.exit, 'default', 'small', '', 'id="btn-context-' + prefix + '-exit"') +
+                IvuUI.btn(editingLabels.submit, 'success', 'small', '', 'id="btn-context-' + prefix + '-submit"')
+              : IvuUI.btn(editingLabels.enter, 'primary', 'small', '', 'id="btn-context-' + prefix + '-enter"'));
+          var subtitle = tab === 'rules'
+            ? 'AI 上下文压缩规则（集合级，按数组顺序匹配，首条命中生效）'
+            : '上下文压缩全局调优参数（单例，全局生效）';
+          return '<div class="route-editor-header">' +
+            '<div class="route-owner-label">' + subtitle + '</div>' +
+            '<div class="route-header-actions">' + addHtml + '</div>' +
+            '<div class="route-header-submit">' + submitHtml + '</div>' +
+            '</div>';
+        }
+
+        // ======= Page (with tabs) =======
+        function renderPage() {
+          filterRows();
+          var totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
+          if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+          document.getElementById('ai-context-page').innerHTML =
+            IvuUI.tabs(
+              [
+                { name: 'rules', label: '压缩规则' },
+                { name: 'settings', label: '全局设置' }
+              ],
+              IvuUI.tabPane('rules', '<div id="rules-pane"></div>', state.activeTab === 'rules') +
+                IvuUI.tabPane('settings', '<div id="settings-pane"></div>', state.activeTab === 'settings')
+            ) + drawerAIContext();
+
+          renderRulesPane();
+          renderSettingsPane();
+
+          Prototype.initTabs(document.getElementById('ai-context-page'));
+          document.getElementById('ai-context-page').querySelectorAll('.ivu-tabs-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+              state.activeTab = tab.getAttribute('data-tab');
+            });
+          });
+        }
+
+        function renderRulesPane() {
+          var pane = document.getElementById('rules-pane');
+          if (!pane) return;
+          pane.innerHTML = renderHeader('rules') + '<div id="ai-context-table"></div>';
+
+          document.getElementById('ai-context-table').innerHTML = IvuUI.pageTable({
+            tableId: 'ai-context-page-table',
+            columns: [
+              { title: '生效条件', key: 'cond', minWidth: 280, sortable: true, searchable: true, searchPlaceholder: '请输入条件表达式查询' },
+              {
+                title: '压缩档位', key: 'mode', minWidth: 200, sortable: true, searchable: true,
+                searchType: 'select', searchPlaceholder: '请选择压缩档位',
+                searchFilters: [
+                  { label: 'off', value: 'off' },
+                  { label: 'conservative', value: 'conservative' },
+                  { label: 'balanced', value: 'balanced' },
+                  { label: 'aggressive', value: 'aggressive' }
+                ],
+                render: function (row) {
+                  return IvuUI.tag(MODE_LABELS[row.mode] || row.mode || '-', row.mode === 'off' ? 'default' : 'primary');
+                }
+              },
+              { title: '预算上限', key: 'max_context_tokens', minWidth: 150, sortable: true, render: function (row) { return formatTokens(row.max_context_tokens); } },
+              { title: '预留输出', key: 'reserve_tokens', minWidth: 150, sortable: true, render: function (row) { return formatTokens(row.reserve_tokens); } },
+              {
+                title: '操作', key: 'action', width: 220,
+                render: function (row, rowIndex) {
+                  var pageStart = (state.currentPage - 1) * state.pageSize;
+                  var globalIndex = pageStart + rowIndex;
+                  if (isReadonly) {
+                    return IvuUI.btn('查看', 'primary', 'small', '', 'data-context-view="' + globalIndex + '"');
+                  }
+                  if (state.mode === 'edit') {
+                    return IvuUI.btn('编辑', 'primary', 'small', '', 'data-context-edit="' + globalIndex + '"') + ' ' +
+                      IvuUI.btn('删除', 'error', 'small', '', 'data-context-delete="' + globalIndex + '"');
+                  }
+                  return IvuUI.btn('查看', 'primary', 'small', '', 'data-context-view="' + globalIndex + '"');
+                }
+              }
+            ],
+            rows: getPageRows(),
+            total: state.filteredRows.length,
+            pageSize: state.pageSize,
+            currentPage: state.currentPage,
+            searchValues: state.search
+          });
+
+          bindTableEvents();
+          highlightSortIcons();
+        }
+
+        function renderSettingsPane() {
+          var pane = document.getElementById('settings-pane');
+          if (!pane) return;
+          pane.innerHTML = renderHeader('settings') + renderSettingsCard();
+          bindSettingsActions(pane);
+        }
+
+        function renderSettingsCard() {
+          var editing = state.mode === 'edit';
+          var s = state.settings || DEFAULT_SETTINGS;
+          var rw = s.rewrite || {};
+          var body;
+          if (editing) {
+            var thinkingOpts = Object.keys(THINKING_LABELS).map(function (key) {
+              return '<option value="' + key + '"' + (s.thinking_policy === key ? ' selected' : '') + '>' + THINKING_LABELS[key] + '</option>';
+            }).join('');
+            var rewriteOpts = Object.keys(REWRITE_LABELS).map(function (key) {
+              return '<option value="' + key + '"' + (rw.strength === key ? ' selected' : '') + '>' + REWRITE_LABELS[key] + '</option>';
+            }).join('');
+            body = IvuUI.formTop(
+              IvuUI.formTopItem('触发阈值（trigger_ratio，(0,1]，默认 0.7）：估算 prompt 超过 budget × 该比例才启动压缩',
+                IvuUI.inputNumber(s.trigger_ratio != null ? s.trigger_ratio : 0.7, 'id="ctx-trigger-ratio" min="0" max="1" step="0.01"'), true) +
+              IvuUI.formTopItem('保留最近图片数（keep_latest_images，≥0，默认 2；0 = 完全不裁图）',
+                IvuUI.inputNumber(s.keep_latest_images != null ? s.keep_latest_images : 2, 'id="ctx-keep-images" min="0" step="1"'), true) +
+              IvuUI.formTopItem('工具结果最大字符数（tool_result_max_chars，≥0，默认 2000；0 = 不截断）',
+                IvuUI.inputNumber(s.tool_result_max_chars != null ? s.tool_result_max_chars : 2000, 'id="ctx-tool-result-max-chars" min="0" step="1"'), true) +
+              IvuUI.formTopItem('thinking 块策略（thinking_policy）',
+                '<div class="ivu-select ivu-select-single" style="width:100%;"><div class="ivu-select-selection">' +
+                  '<select id="ctx-thinking-policy" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    thinkingOpts +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div></div>', true) +
+              IvuUI.formTopItem('文本估算系数（chars_per_token，≥1，默认 4；中文密集可调 3）',
+                IvuUI.inputNumber(s.chars_per_token != null ? s.chars_per_token : 4, 'id="ctx-chars-per-token" min="1" step="1"'), true) +
+              IvuUI.formTopItem('图片估值 token（image_token_estimate，≥0，默认 1200）',
+                IvuUI.inputNumber(s.image_token_estimate != null ? s.image_token_estimate : 1200, 'id="ctx-image-token-estimate" min="0" step="1"'), true) +
+              IvuUI.formTopItem('改写强度（rewrite.strength）',
+                '<div class="ivu-select ivu-select-single" style="width:100%;"><div class="ivu-select-selection">' +
+                  '<select id="ctx-rewrite-strength" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    rewriteOpts +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div></div>', true) +
+              IvuUI.formTopItem('保护 token 存活率（rewrite.protected_survival_rate，(0,1]，默认 0.95）：改写后低于该值则整体回退为无损裁剪产物',
+                IvuUI.inputNumber(rw.protected_survival_rate != null ? rw.protected_survival_rate : 0.95, 'id="ctx-protected-survival-rate" min="0" max="1" step="0.01"'), true)
+            );
+          } else {
+            body = '<ul class="ai-context-view-list">' +
+              '<li class="ai-context-view-item">触发阈值（trigger_ratio）：' + IvuUI.escapeHtml(s.trigger_ratio) + '</li>' +
+              '<li class="ai-context-view-item">保留最近图片数（keep_latest_images）：' + IvuUI.escapeHtml(s.keep_latest_images) + (s.keep_latest_images === 0 ? '（完全不裁图）' : '') + '</li>' +
+              '<li class="ai-context-view-item">工具结果最大字符数（tool_result_max_chars）：' + IvuUI.escapeHtml(s.tool_result_max_chars) + (s.tool_result_max_chars === 0 ? '（不截断）' : '') + '</li>' +
+              '<li class="ai-context-view-item">thinking 块策略（thinking_policy）：' + (THINKING_LABELS[s.thinking_policy] || IvuUI.escapeHtml(s.thinking_policy)) + '</li>' +
+              '<li class="ai-context-view-item">文本估算系数（chars_per_token）：' + IvuUI.escapeHtml(s.chars_per_token) + '</li>' +
+              '<li class="ai-context-view-item">图片估值 token（image_token_estimate）：' + IvuUI.escapeHtml(s.image_token_estimate) + '</li>' +
+              '<li class="ai-context-view-item">改写强度（rewrite.strength）：' + (REWRITE_LABELS[rw.strength] || IvuUI.escapeHtml(rw.strength)) + '</li>' +
+              '<li class="ai-context-view-item">保护 token 存活率（rewrite.protected_survival_rate）：' + IvuUI.escapeHtml(rw.protected_survival_rate) + '</li>' +
+              '</ul>';
+          }
+          return '<div class="llm-card" style="margin-top:16px;"><div class="llm-card-title">全局调优设置</div><div class="llm-card-body">' + body + '</div></div>';
+        }
+
+        function bindSettingsActions(pane) {
+          var enterBtn = pane.querySelector('#btn-context-settings-enter');
+          if (enterBtn) enterBtn.onclick = enterEditMode;
+          var exitBtn = pane.querySelector('#btn-context-settings-exit');
+          if (exitBtn) exitBtn.onclick = exitEditMode;
+          var submitBtn = pane.querySelector('#btn-context-settings-submit');
+          if (submitBtn) submitBtn.onclick = submitSettings;
+        }
+
+        function highlightSortIcons() {
+          var tableRoot = document.getElementById('ai-context-page-table');
+          if (!tableRoot) return;
+          var sortKeys = ['cond', 'mode', 'max_context_tokens', 'reserve_tokens', null];
+          tableRoot.querySelectorAll('th').forEach(function (th, idx) {
+            var sortIcons = th.querySelectorAll('.ivu-table-sort i');
+            if (sortIcons.length < 2) return;
+            sortIcons[0].style.color = '#c5c8ce';
+            sortIcons[1].style.color = '#c5c8ce';
+            if (state.sortKey === sortKeys[idx]) {
+              if (state.sortOrder === 'asc') sortIcons[0].style.color = '#2d8cf0';
+              else if (state.sortOrder === 'desc') sortIcons[1].style.color = '#2d8cf0';
+            }
+          });
+        }
+
+        function bindTableEvents() {
+          var tableRoot = document.getElementById('ai-context-page-table');
+          if (!tableRoot) return;
+          var pane = document.getElementById('rules-pane');
+
+          Prototype.bindPageTableSearch(tableRoot, function (key, value) {
+            state.search[key] = value;
+            state.currentPage = 1;
+            renderPage();
+          });
+
+          var sortKeys = ['cond', 'mode', 'max_context_tokens', 'reserve_tokens', null];
+          tableRoot.querySelectorAll('th').forEach(function (th, idx) {
+            if (sortKeys[idx] != null) {
+              th.style.cursor = 'pointer';
+              th.onclick = function () {
+                var key = sortKeys[idx];
+                if (state.sortKey === key) {
+                  if (state.sortOrder === 'asc') state.sortOrder = 'desc';
+                  else if (state.sortOrder === 'desc') { state.sortKey = ''; state.sortOrder = ''; }
+                  else state.sortOrder = 'asc';
+                } else {
+                  state.sortKey = key;
+                  state.sortOrder = 'asc';
+                }
+                state.currentPage = 1;
+                renderPage();
+              };
+            }
+          });
+
+          tableRoot.querySelectorAll('[data-page]').forEach(function (item) {
+            item.onclick = function () {
+              state.currentPage = parseInt(item.getAttribute('data-page'), 10);
+              renderPage();
+            };
+          });
+
+          var sizeSelect = tableRoot.querySelector('.proto-page-size');
+          if (sizeSelect) {
+            sizeSelect.onchange = function () {
+              state.pageSize = parseInt(sizeSelect.value, 10);
+              state.currentPage = 1;
+              renderPage();
+            };
+          }
+
+          var prevBtn = tableRoot.querySelector('.proto-page-prev');
+          if (prevBtn) {
+            prevBtn.onclick = function () {
+              if (state.currentPage > 1) { state.currentPage -= 1; renderPage(); }
+            };
+          }
+
+          var nextBtn = tableRoot.querySelector('.proto-page-next');
+          if (nextBtn) {
+            nextBtn.onclick = function () {
+              var totalPages = Math.max(1, Math.ceil(state.filteredRows.length / state.pageSize));
+              if (state.currentPage < totalPages) { state.currentPage += 1; renderPage(); }
+            };
+          }
+
+          tableRoot.querySelectorAll('[data-context-view]').forEach(function (btn) {
+            btn.onclick = function () { openDrawer('view', parseInt(btn.getAttribute('data-context-view'), 10)); };
+          });
+
+          tableRoot.querySelectorAll('[data-context-edit]').forEach(function (btn) {
+            btn.onclick = function () { openDrawer('edit', parseInt(btn.getAttribute('data-context-edit'), 10)); };
+          });
+
+          tableRoot.querySelectorAll('[data-context-delete]').forEach(function (btn) {
+            btn.onclick = function () {
+              var index = parseInt(btn.getAttribute('data-context-delete'), 10);
+              var row = state.filteredRows[index];
+              if (!row) return;
+              Prototype.confirm({
+                title: '提示',
+                content: '确认删除该压缩规则？删除后需提交并生效。',
+                onOk: function () {
+                  var rowIndex = findRowIndex(row);
+                  if (rowIndex >= 0) state.rows.splice(rowIndex, 1);
+                  renderPage();
+                  Prototype.toast('删除成功!');
+                },
+                onCancel: function () { Prototype.toast('取消删除', 'info'); }
+              });
+            };
+          });
+
+          var addBtn = pane.querySelector('#btn-context-rules-add');
+          if (addBtn) addBtn.onclick = function () { openDrawer('add'); };
+
+          var submitBtn = pane.querySelector('#btn-context-rules-submit');
+          if (submitBtn) submitBtn.onclick = submitRules;
+
+          var enterBtn = pane.querySelector('#btn-context-rules-enter');
+          if (enterBtn) enterBtn.onclick = enterEditMode;
+
+          var exitBtn = pane.querySelector('#btn-context-rules-exit');
+          if (exitBtn) exitBtn.onclick = exitEditMode;
+        }
+
+        function hasUnsavedChanges() {
+          return JSON.stringify(state.originalRows) !== JSON.stringify(state.rows) ||
+            JSON.stringify(state.originalSettings) !== JSON.stringify(state.settings);
+        }
+
+        function enterEditMode() {
+          state.originalRows = cloneRows(state.rows);
+          state.originalSettings = cloneRows(state.settings);
+          state.mode = 'edit';
+          renderPage();
+        }
+
+        function exitEditMode() {
+          if (hasUnsavedChanges()) {
+            Prototype.confirm({
+              title: '提示',
+              content: '当前有未提交的改动，取消将丢弃这些改动，确认取消？',
+              onOk: function () {
+                state.rows = cloneRows(state.originalRows || []);
+                state.settings = cloneRows(state.originalSettings || DEFAULT_SETTINGS);
+                state.mode = 'view';
+                state.originalRows = null;
+                state.originalSettings = null;
+                renderPage();
+                Prototype.toast('已放弃未保存的改动', 'info');
+              },
+              onCancel: function () { Prototype.toast('已取消', 'info'); }
+            });
+            return;
+          }
+          state.mode = 'view';
+          state.originalRows = null;
+          state.originalSettings = null;
+          renderPage();
+        }
+
+        function commitAll() {
+          MockData.aiContextRules = MockData.aiContextRules || {};
+          MockData.aiContextRules.rules = cloneRows(state.rows);
+          MockData.aiContextSettings = cloneRows(state.settings);
+          state.mode = 'view';
+          state.originalRows = null;
+          state.originalSettings = null;
+          renderPage();
+          Prototype.toast('提交并生效成功！');
+        }
+
+        function submitRules() {
+          commitAll();
+        }
+
+        function submitSettings() {
+          var triggerRatio = parseFloat(document.getElementById('ctx-trigger-ratio').value);
+          var keepImages = parseInt(document.getElementById('ctx-keep-images').value, 10);
+          var toolResultMaxChars = parseInt(document.getElementById('ctx-tool-result-max-chars').value, 10);
+          var thinkingPolicy = document.getElementById('ctx-thinking-policy').value;
+          var charsPerToken = parseInt(document.getElementById('ctx-chars-per-token').value, 10);
+          var imageTokenEstimate = parseInt(document.getElementById('ctx-image-token-estimate').value, 10);
+          var rewriteStrength = document.getElementById('ctx-rewrite-strength').value;
+          var protectedSurvivalRate = parseFloat(document.getElementById('ctx-protected-survival-rate').value);
+
+          if (isNaN(triggerRatio) || triggerRatio <= 0 || triggerRatio > 1) { Prototype.toast('触发阈值须在 (0,1] 之间', 'error'); return; }
+          if (isNaN(keepImages) || keepImages < 0) { Prototype.toast('保留最近图片数不能小于 0', 'error'); return; }
+          if (isNaN(toolResultMaxChars) || toolResultMaxChars < 0) { Prototype.toast('工具结果最大字符数不能小于 0', 'error'); return; }
+          if (['trim-all-but-last', 'keep'].indexOf(thinkingPolicy) === -1) { Prototype.toast('thinking 块策略不合法', 'error'); return; }
+          if (isNaN(charsPerToken) || charsPerToken < 1) { Prototype.toast('文本估算系数不能小于 1', 'error'); return; }
+          if (isNaN(imageTokenEstimate) || imageTokenEstimate < 0) { Prototype.toast('图片估值 token 不能小于 0', 'error'); return; }
+          if (['lite', 'full'].indexOf(rewriteStrength) === -1) { Prototype.toast('改写强度不合法', 'error'); return; }
+          if (isNaN(protectedSurvivalRate) || protectedSurvivalRate <= 0 || protectedSurvivalRate > 1) { Prototype.toast('保护 token 存活率须在 (0,1] 之间', 'error'); return; }
+
+          state.settings = {
+            trigger_ratio: triggerRatio,
+            keep_latest_images: keepImages,
+            tool_result_max_chars: toolResultMaxChars,
+            thinking_policy: thinkingPolicy,
+            chars_per_token: charsPerToken,
+            image_token_estimate: imageTokenEstimate,
+            rewrite: { strength: rewriteStrength, protected_survival_rate: protectedSurvivalRate }
+          };
+          commitAll();
+        }
+
+        // ======= Drawer =======
+        function viewDrawerBody(row) {
+          return '<div class="forward-rule-upsert"><form class="ivu-form ivu-form-label-top">' +
+            IvuUI.formTopItem('生效条件', IvuUI.escapeHtml(row.cond || '-')) +
+            IvuUI.formTopItem('压缩档位', MODE_LABELS[row.mode] || IvuUI.escapeHtml(row.mode || '-')) +
+            IvuUI.formTopItem('预算上限', formatTokens(row.max_context_tokens)) +
+            IvuUI.formTopItem('预留输出', formatTokens(row.reserve_tokens)) +
+            '</form></div>';
+        }
+
+        function editDrawerBody() {
+          var modeOpts = Object.keys(MODE_LABELS).map(function (value) {
+            return '<option value="' + value + '">' + MODE_LABELS[value] + '</option>';
+          }).join('');
+          return '<div class="forward-rule-upsert"><form class="ivu-form ivu-form-label-top">' +
+            IvuUI.formTopItem('生效条件（BFE 条件表达式，如 req_path_in(...) / default_t()）',
+              IvuUI.expressionEditor('ai-context-expression'), true) +
+            IvuUI.formTopItem('压缩档位',
+              '<div class="ivu-select ivu-select-single" style="width:100%;">' +
+                '<div class="ivu-select-selection">' +
+                  '<select id="ai-context-mode" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                    modeOpts +
+                  '</select>' +
+                  '<span class="proto-select-arrow" aria-hidden="true">▾</span>' +
+                '</div>' +
+              '</div>', true) +
+            IvuUI.formTopItem('预算上限（max_context_tokens，≥0，0 = 用模型窗口默认）',
+              IvuUI.inputNumber('', 'id="ai-context-max-tokens" min="0" step="1" placeholder="0"'), false) +
+            IvuUI.formTopItem('预留输出（reserve_tokens，≥0，0 = 自动 clamp(窗口×15%, 256, 16000)）',
+              IvuUI.inputNumber('', 'id="ai-context-reserve-tokens" min="0" step="1" placeholder="0"'), false) +
+            '</form></div>';
+        }
+
+        function setDrawerTitle(mode) {
+          var titleEl = document.querySelector('#drawer-ai-context .ivu-drawer-header-inner');
+          if (!titleEl) return;
+          titleEl.textContent = mode === 'view' ? '查看压缩规则' : (mode === 'add' ? '添加压缩规则' : '编辑压缩规则');
+        }
+
+        function fillEditDrawerForm(row) {
+          document.getElementById('ai-context-expression').value = row ? (row.cond || '') : '';
+          document.getElementById('ai-context-mode').value = row ? (row.mode || 'off') : 'off';
+          document.getElementById('ai-context-max-tokens').value = row && row.max_context_tokens != null ? row.max_context_tokens : 0;
+          document.getElementById('ai-context-reserve-tokens').value = row && row.reserve_tokens != null ? row.reserve_tokens : 0;
+        }
+
+        function openDrawer(mode, filteredIndex) {
+          state.drawerMode = mode;
+          var row = null;
+          if ((mode === 'edit' || mode === 'view') && typeof filteredIndex === 'number') {
+            row = state.filteredRows[filteredIndex];
+            state.editIndex = mode === 'edit' ? findRowIndex(row) : -1;
+          } else {
+            state.editIndex = -1;
+          }
+
+          var drawerContent = document.querySelector('#drawer-ai-context .ivu-drawer-content');
+          var bodyEl = drawerContent.querySelector('.ivu-drawer-body');
+          var footerEl = drawerContent.querySelector('.ivu-drawer-footer');
+
+          if (mode === 'view') {
+            bodyEl.innerHTML = viewDrawerBody(row || {});
+            if (footerEl) footerEl.style.display = 'none';
+          } else {
+            bodyEl.innerHTML = editDrawerBody();
+            if (footerEl) footerEl.style.display = '';
+            fillEditDrawerForm(mode === 'edit' ? row : null);
+            IvuUI.initExpressionEditor('#drawer-ai-context .proto-expression-editor');
+            bindDrawerActions();
+          }
+
+          setDrawerTitle(mode);
+          Prototype.openDrawer('drawer-ai-context');
+        }
+
+        function bindDrawerActions() {
+          var saveBtn = document.getElementById('btn-ai-context-save');
+          if (saveBtn) saveBtn.onclick = onDrawerSave;
+          var resetBtn = document.getElementById('btn-ai-context-reset');
+          if (resetBtn) resetBtn.onclick = onDrawerReset;
+        }
+
+        function onDrawerSave() {
+          var cond = document.getElementById('ai-context-expression').value.trim();
+          var mode = document.getElementById('ai-context-mode').value;
+          var maxTokens = parseInt(document.getElementById('ai-context-max-tokens').value, 10);
+          var reserveTokens = parseInt(document.getElementById('ai-context-reserve-tokens').value, 10);
+
+          if (!cond) { Prototype.toast('请输入生效条件表达式', 'error'); return; }
+          if (['off', 'conservative', 'balanced', 'aggressive'].indexOf(mode) === -1) { Prototype.toast('压缩档位不合法', 'error'); return; }
+          if (isNaN(maxTokens) || maxTokens < 0) { Prototype.toast('预算上限不能小于 0', 'error'); return; }
+          if (isNaN(reserveTokens) || reserveTokens < 0) { Prototype.toast('预留输出不能小于 0', 'error'); return; }
+
+          var excludeIndex = (state.drawerMode === 'edit' && state.editIndex >= 0) ? state.editIndex : null;
+          var duplicated = state.rows.some(function (r, idx) {
+            if (excludeIndex != null && idx === excludeIndex) return false;
+            return r.cond === cond;
+          });
+          if (duplicated) { Prototype.toast('生效条件表达式已存在，请调整后再提交', 'error'); return; }
+
+          var data = { cond: cond, mode: mode };
+          if (maxTokens > 0) data.max_context_tokens = maxTokens;
+          if (reserveTokens > 0) data.reserve_tokens = reserveTokens;
+
+          if (state.drawerMode === 'add') {
+            state.rows.unshift(data);
+          } else if (state.editIndex >= 0) {
+            state.rows[state.editIndex] = data;
+          }
+
+          Prototype.closeDrawer('drawer-ai-context');
+          renderPage();
+          Prototype.toast(state.drawerMode === 'add' ? '添加成功！' : '保存成功！');
+        }
+
+        function onDrawerReset() {
+          fillEditDrawerForm(state.drawerMode === 'edit' && state.editIndex >= 0 ? state.rows[state.editIndex] : null);
+        }
+
+        function drawerAIContext() {
+          var footer =
+            '<div class="com-btn-box drawer-footer route-drawer-footer">' +
+              IvuUI.btn('本地保存', 'primary', 'small', '', 'id="btn-ai-context-save"') + ' ' +
+              IvuUI.btn('重置', 'default', 'small', 'reset-btn', 'id="btn-ai-context-reset"') +
+            '</div>';
+          return IvuUI.drawer('drawer-ai-context', '添加压缩规则', '<div class="ivu-drawer-body-placeholder"></div>', footer, '60%');
+        }
+
+        Prototype.bindDrawerClose();
+        renderPage();
+      });
+    </script>
+  </body>
+</html>

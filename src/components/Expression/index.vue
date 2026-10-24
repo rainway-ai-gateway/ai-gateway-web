@@ -15,7 +15,7 @@
 */
 <template>
     <div class="expression">
-        <div v-for="item in expressionConfig" :key="item.name" class="expression-item">
+        <div v-for="item in expressionConfig" :key="item.id || item.name" class="expression-item">
             <div v-if="item.buttons && item.buttons.length > 0" class="expression-item-box">
                 <div class="title">{{ item.name }}:</div>
                 <div class="expression-item-body">
@@ -28,13 +28,13 @@
                         :transfer="true"
                         :disabled="!ele.description && !ele.example"
                     >
-                        <div slot="content" class="expression-content" style="white-space: normal;">
+                        <div slot="content" class="expression-content">
                             <p class="vars-expression-title">
                                 {{ ele.description }}
                             </p>
                             <div
                                 v-html="ele.example"
-                                class="vars-expression-name expression-content-example"
+                                class="vars-expression-name"
                             ></div>
                         </div>
                         <div
@@ -79,6 +79,14 @@ export default {
         readonly: {
             type: Boolean,
             default: false
+        },
+        // Group ids of controller palette to hide, e.g. ['response'] for
+        // request-phase rule forms where response primitives never match.
+        hideGroups: {
+            type: Array,
+            default: function () {
+                return [];
+            }
         }
     },
     computed: {
@@ -95,7 +103,9 @@ export default {
         },
         expressionConfig() {
             if (this.type === 'controller') {
-                return controller(this.conditionVars);
+                return controller(this.conditionVars).filter(
+                    item => !this.hideGroups.includes(item.id)
+                );
             }
             return connController;
         }
@@ -200,33 +210,39 @@ export default {
             }
         }
     }
-    .expression-content-example {
-        word-break: break-all;
-        p {
-            word-break: break-all;
-        }
-    }
 }
 /deep/ .ivu-input {
     background-color: black;
     color: #ffffff;
 }
-.vars-expression-com-style {
+</style>
+<style lang="less">
+/* Tooltip content is moved to document.body by iview's v-transfer-dom, so the
+   scoped styles above (and any .expression-item ancestor requirement) can never
+   match it; these must stay unscoped. theme="light" tooltips are only used by
+   this component, so the inner width override stays local in practice. */
+.ivu-tooltip-light .ivu-tooltip-inner {
+    max-width: 560px;
+    white-space: normal;
+}
+.expression-content {
+    max-width: 536px;
+}
+.vars-expression-title {
     word-break: break-all;
     border: 1px solid #666;
     border-radius: 5px;
     padding: 5px;
+    background: #eeeeee61;
 }
 .vars-expression-name {
-    padding: 5px;
-    padding-top: 15px;
+    padding: 15px 5px 5px;
     p {
-        .vars-expression-com-style();
+        word-break: break-all;
+        border: 1px solid #666;
+        border-radius: 5px;
+        padding: 5px;
         background: #eee;
     }
-}
-.vars-expression-title {
-    .vars-expression-com-style();
-    background: #eeeeee61;
 }
 </style>

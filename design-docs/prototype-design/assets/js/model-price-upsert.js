@@ -3,7 +3,7 @@ window.ModelPriceUpsert = {
   data: null,
   isView: false,
   onSuccess: null,
-  errors: { source: '', limits: '', prices: '' },
+  errors: { source: '', limits: '', prices: '', batch_discount: '' },
 
   drawer: function (data, isView, onSuccess) {
     this.data = data
@@ -22,7 +22,13 @@ window.ModelPriceUpsert = {
         };
     this.isView = isView;
     this.onSuccess = onSuccess || null;
-    this.errors = { source: '', limits: '', prices: '', tier_prices: '' };
+    this.errors = {
+      source: '',
+      limits: '',
+      prices: '',
+      tier_prices: '',
+      batch_discount: '',
+    };
 
     // 转换对象为数组用于表单渲染
     if (!Array.isArray(this.data.limits)) {
@@ -393,6 +399,12 @@ window.ModelPriceUpsert = {
           self.errors.tier_prices +
           '</p>'
         : '';
+    var batchDiscountError =
+      !isView && self.errors.batch_discount
+        ? '<p class="error-text" style="color:#ed4014;margin-top:8px;">' +
+          self.errors.batch_discount +
+          '</p>'
+        : '';
     var pricingHtml = this.renderPricingSection(
       isView,
       d,
@@ -401,6 +413,7 @@ window.ModelPriceUpsert = {
       tierPricesHtml,
       pricesError,
       tierPricesError,
+      batchDiscountError,
     );
 
     return (
@@ -419,17 +432,42 @@ window.ModelPriceUpsert = {
     tierPricesHtml,
     pricesError,
     tierPricesError,
+    batchDiscountError,
   ) {
     if (isView) {
+      var batchDiscountView =
+        d.mode === 'batch'
+          ? '-（mode=batch 的价格行不配置批量折扣系数）'
+          : this.formatPrice(d.batch_discount);
       return (
         '<div class="info-row"><div class="info-label">默认价格</div><div class="info-value">' +
         pricesHtml +
         '</div></div>' +
         '<div class="info-row"><div class="info-label">分时段价格</div><div class="info-value">' +
         tierPricesHtml +
+        '</div></div>' +
+        '<div class="info-row"><div class="info-label">批量折扣系数</div><div class="info-value">' +
+        batchDiscountView +
         '</div></div>'
       );
     }
+    var batchDiscountBlock =
+      d.mode === 'batch'
+        ? ''
+        : '<div class="proto-price-config-block">' +
+          '<div class="proto-price-config-header">' +
+          '<span class="proto-price-config-title">批量折扣系数</span>' +
+          '<span class="proto-price-config-help" title="导出时将本行各 token 价格键 × 系数展开生成 (provider, model, mode=batch) 价格行随 ModelTable 下发；tier 价逐档展开；手工维护的 mode=batch 行优先于系数展开。">?</span>' +
+          '</div>' +
+          '<div class="proto-price-config-body">' +
+          '<div class="ivu-input-number ivu-input-number-default" style="width:200px;">' +
+          '<div class="ivu-input-number-input-wrap">' +
+          '<input type="number" class="ivu-input-number-input" id="field-batch_discount" value="' +
+          IvuUI.escapeHtml(this.formatPriceForInput(d.batch_discount)) +
+          '" placeholder="0.5" min="0" max="1" step="0.1" />' +
+          '</div></div>' +
+          batchDiscountError +
+          '</div></div>';
     return (
       '<div class="proto-price-config-group">' +
       '<div class="proto-price-config-block">' +
@@ -454,7 +492,9 @@ window.ModelPriceUpsert = {
       '</div>' +
       tierPricesHtml +
       tierPricesError +
-      '</div></div></div>'
+      '</div></div>' +
+      batchDiscountBlock +
+      '</div>'
     );
   },
 
@@ -1022,6 +1062,25 @@ window.ModelPriceUpsert = {
       };
     });
 
+    // 模型模式：切换后刷新表单（控制批量折扣系数字段的展示）
+    var modeEl = document.getElementById('field-mode');
+    if (modeEl) {
+      modeEl.onchange = function () {
+        if (self.data.mode !== modeEl.value) {
+          self.data.mode = modeEl.value;
+          self.refreshBody();
+        }
+      };
+    }
+
+    // 批量折扣系数：输入同步到 data，便于校验失败刷新后保留
+    var batchDiscountEl = document.getElementById('field-batch_discount');
+    if (batchDiscountEl) {
+      batchDiscountEl.oninput = function () {
+        self.data.batch_discount = batchDiscountEl.value;
+      };
+    }
+
     // 提交
     var submitBtn = document.getElementById('btn-model-price-submit');
     if (submitBtn) {
@@ -1042,13 +1101,20 @@ window.ModelPriceUpsert = {
   handleSubmit: function () {
     var self = this;
     var d = this.data;
-    this.errors = { source: '', limits: '', prices: '', tier_prices: '' };
+    this.errors = {
+      source: '',
+      limits: '',
+      prices: '',
+      tier_prices: '',
+      batch_discount: '',
+    };
 
     // 收集表单值
     var providerEl = document.getElementById('field-provider');
     var modelEl = document.getElementById('field-model');
     var baseModelEl = document.getElementById('field-base_model');
     var modeEl = document.getElementById('field-mode');
+    var batchDiscountEl = document.getElementById('field-batch_discount');
     var metaSourceEl = document.getElementById('field-meta-source');
     var metaNotesEl = document.getElementById('field-meta-notes');
 
@@ -1056,6 +1122,7 @@ window.ModelPriceUpsert = {
     if (modelEl) d.model = modelEl.value.trim();
     if (baseModelEl) d.base_model = baseModelEl.value.trim();
     if (modeEl) d.mode = modeEl.value;
+    if (batchDiscountEl) d.batch_discount = batchDiscountEl.value.trim();
     if (!d.metadata) d.metadata = {};
     if (metaSourceEl) d.metadata.source = metaSourceEl.value.trim();
     if (metaNotesEl) d.metadata.notes = metaNotesEl.value;
@@ -1088,6 +1155,33 @@ window.ModelPriceUpsert = {
     if (!d.mode) {
       Prototype.toast('请选择模型模式', 'error');
       return;
+    }
+
+    // 批量折扣系数校验：mode=batch 的价格行不配置本字段；
+    // 其余模式非必填，填写时须为 (0,1] 浮点数（0、负数、>1 均非法）
+    if (
+      d.mode !== 'batch' &&
+      d.batch_discount !== '' &&
+      d.batch_discount != null
+    ) {
+      var batchDiscountNum = Number(d.batch_discount);
+      if (
+        isNaN(batchDiscountNum) ||
+        batchDiscountNum <= 0 ||
+        batchDiscountNum > 1
+      ) {
+        this.errors.batch_discount =
+          '批量折扣系数必须为 (0,1] 区间内的浮点数';
+        this.refreshBody();
+        Prototype.toast(
+          '批量折扣系数必须为 (0,1] 区间内的浮点数',
+          'error',
+        );
+        return;
+      }
+      d.batch_discount = batchDiscountNum;
+    } else {
+      d.batch_discount = null;
     }
 
     // 来源 URL 校验
@@ -1157,6 +1251,9 @@ window.ModelPriceUpsert = {
       prices: priceObj,
       metadata: d.metadata || {},
     };
+    if (d.mode !== 'batch' && d.batch_discount != null) {
+      payload.batch_discount = d.batch_discount;
+    }
     var tierPrices = {};
     Object.keys(d.tier_prices_map || {}).forEach(function (tierName) {
       var tierObj = self.listToObject(d.tier_prices_map[tierName]);

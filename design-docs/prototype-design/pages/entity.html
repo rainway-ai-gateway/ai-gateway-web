@@ -19,14 +19,15 @@
     <script>
                 document.addEventListener('DOMContentLoaded', function () {
                   var root = Layout.render({ pageId: 'Entity.list', basePath: '../' });
+                  var isReadonly = Prototype.isReadonly();
                   var orgContent =
                     '<div class="title entity-page">' +
-                      IvuUI.btn('创建Entity', 'primary', 'small', '', 'id="btn-entity-add"') +
+                      (isReadonly ? '' : IvuUI.btn('创建Entity', 'primary', 'small', '', 'id="btn-entity-add"')) +
                     '</div>' +
                     '<div id="entity-table"></div>';
                   var typeContent =
                     '<div class="title entity-page">' +
-                      IvuUI.btn('创建类型', 'primary', 'small', '', 'id="btn-entity-type-add"') +
+                      (isReadonly ? '' : IvuUI.btn('创建类型', 'primary', 'small', '', 'id="btn-entity-type-add"')) +
                     '</div>' +
                     '<div id="entity-type-table"></div>';
 
@@ -46,7 +47,7 @@
                   var entityState = {
                     rows: cloneRows(MockData.entities),
                     filteredRows: [],
-                    search: { id: '', name: '', type: '', parent_id: '', quota_plan: '', rate_limit_policy_enabled: '' },
+                    search: { id: '', name: '', level: '', type: '', parent_id: '', quota_plan: '', rate_limit_policy_enabled: '' },
                     pageSize: 20,
                     currentPage: 1,
                     sortKey: '',
@@ -73,9 +74,17 @@
                     return JSON.parse(JSON.stringify(list || []));
                   }
 
+                  function entityTypeLevel(typeName) {
+                    var matched = (MockData.entityTypes || []).filter(function (item) {
+                      return item && item.type_name === typeName;
+                    })[0];
+                    return matched ? matched.level : null;
+                  }
+
                   function enrichEntityRows(rows) {
                     return rows.map(function (row) {
                       return Object.assign({}, row, {
+                        level: entityTypeLevel(row.type),
                         rate_limit_policy_enabled: !!(row.rate_limit_policy && row.rate_limit_policy.enabled)
                       });
                     });
@@ -88,6 +97,7 @@
                         if (!keyword) return true;
                         if (key === 'id') return String(row.id || '').toUpperCase().indexOf(keyword) !== -1;
                         if (key === 'name') return String(row.name || '').toUpperCase().indexOf(keyword) !== -1;
+                        if (key === 'level') return row.level === null || row.level === undefined ? false : String(row.level) === keyword;
                         if (key === 'description') return String(row.description || '-').toUpperCase().indexOf(keyword) !== -1;
                         if (key === 'type') return String(row.type || '').toUpperCase().indexOf(keyword) !== -1;
                         if (key === 'parent_id') return EntityUpsert.parentName(row, entityState.rows).toUpperCase().indexOf(keyword) !== -1;
@@ -146,6 +156,21 @@
                   { title: 'ID', key: 'id', minWidth: 120, searchable: true, sortable: true },
                   { title: '名称', key: 'name', minWidth: 120, searchable: true, sortable: true },
                   {
+                    title: '级别', key: 'level', minWidth: 100, searchable: true, sortable: true,
+                    searchType: 'select',
+                    searchPlaceholder: '请选择级别',
+                    searchFilters: [
+                      { label: '1', value: '1' },
+                      { label: '2', value: '2' },
+                      { label: '3', value: '3' },
+                      { label: '4', value: '4' },
+                      { label: '5', value: '5' }
+                    ],
+                    render: function (row) {
+                      return row.level === null || row.level === undefined ? '-' : String(row.level);
+                    }
+                  },
+                  {
                     title: '描述', key: 'description', minWidth: 180, searchable: true, sortable: true,
                     searchPlaceholder: '请输入描述查询',
                     render: function (row) { return IvuUI.escapeHtml(row.description || '-'); }
@@ -173,6 +198,9 @@
                     title: '操作', key: 'action', width: 300,
                     render: function (row, rowIndex) {
                       var pageStart = (entityState.currentPage - 1) * entityState.pageSize;
+                      if (isReadonly) {
+                        return IvuUI.btn('管理路由规则', 'success', 'small', '', 'data-entity-manage-rules="' + (pageStart + rowIndex) + '"');
+                      }
                       return IvuUI.btn('管理路由规则', 'success', 'small', '', 'data-entity-manage-rules="' + (pageStart + rowIndex) + '"') + ' ' +
                         IvuUI.btn('编辑', 'primary', 'small', '', 'data-entity-edit="' + (pageStart + rowIndex) + '"') + ' ' +
                         IvuUI.btn('删除', 'error', 'small', '', 'data-entity-delete="' + (pageStart + rowIndex) + '"');
@@ -219,6 +247,7 @@
                           title: '操作', key: 'action', width: 200,
                           render: function (row, rowIndex) {
                             var pageStart = (typeState.currentPage - 1) * typeState.pageSize;
+                            if (isReadonly) return '';
                             return IvuUI.btn('编辑', 'primary', 'small', '', 'data-entity-type-edit="' + (pageStart + rowIndex) + '"') + ' ' +
                               IvuUI.btn('删除', 'error', 'small', '', 'data-entity-type-delete="' + (pageStart + rowIndex) + '"');
                           }
@@ -465,6 +494,9 @@
           };
         }
                     if (entityState.drawerMode !== 'view') EntityUpsert.initUpsertForm();
+                    if (entityState.drawerMode !== 'view' && typeof ApiKeyUpsert.bindBatchLimitInputs === 'function') {
+                      ApiKeyUpsert.bindBatchLimitInputs();
+                    }
                     var resetBtn = document.getElementById('btn-entity-reset-quota');
                     if (resetBtn) resetBtn.onclick = openEntityResetQuotaModal;
                   }
@@ -482,10 +514,12 @@
       }
                   }
 
-                  document.getElementById('btn-entity-add').addEventListener('click', function () {
+                  var addBtn = document.getElementById('btn-entity-add');
+                  if (addBtn) addBtn.addEventListener('click', function () {
                     openEntityDrawer('add');
                   });
-                  document.getElementById('btn-entity-type-add').addEventListener('click', function () {
+                  var typeAddBtn = document.getElementById('btn-entity-type-add');
+                  if (typeAddBtn) typeAddBtn.addEventListener('click', function () {
                     openTypeDrawer('add');
                   });
 

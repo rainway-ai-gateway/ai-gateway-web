@@ -17,6 +17,7 @@
 document.addEventListener('DOMContentLoaded', function () {
   var isEdit = location.search.indexOf('edit=1') >= 0;
   var root = Layout.render({ pageId: 'AICluster.list', breadcrumb: isEdit ? '编辑集群' : '添加集群', basePath: '../' });
+  var isReadonly = Prototype.isReadonly();
   var titles = ['基本配置', '超时/重试', '被动健康检查', '大模型配置', '审核检查'];
   root.innerHTML =
     '<div id="steps-bar"></div>' +
@@ -28,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="com-btn-box">' +
       IvuUI.btn('上一步', 'default', 'default', '', 'id="btn-prev"') + ' ' +
       IvuUI.btn('下一步', 'primary', 'default', '', 'id="btn-next"') + ' ' +
-      IvuUI.btn('提交', 'primary', 'default', 'proto-hidden-inline', 'id="btn-submit"') + ' ' +
+      (isReadonly ? '' : IvuUI.btn('提交', 'primary', 'default', 'proto-hidden-inline', 'id="btn-submit"')) + ' ' +
       IvuUI.btn('取消', 'default', 'default', '', 'onclick="location.href=\'cluster-list.html\'"') +
     '</div>';
 

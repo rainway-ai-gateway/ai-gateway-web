@@ -343,6 +343,36 @@
               </p>
             </div>
           </div>
+
+          <div v-if="formData.mode !== 'batch'" class="price-config-block">
+            <div class="price-config-header">
+              <span class="price-config-title">
+                {{ $t('modelPrices.batchDiscount') }}
+                <Tooltip placement="top" transfer max-width="360">
+                  <div slot="content" class="price-config-tip">
+                    {{ $t('modelPrices.batchDiscountTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="price-config-help-icon"
+                  />
+                </Tooltip>
+              </span>
+            </div>
+            <div class="price-config-body">
+              <InputNumber
+                v-model="formData.batch_discount"
+                :min="0"
+                :max="1"
+                :step="0.1"
+                placeholder="0.5"
+                style="width: 200px;"
+              />
+              <p v-if="batchDiscountError" class="error-text">
+                {{ $t('modelPrices.batchDiscountInvalid') }}
+              </p>
+            </div>
+          </div>
         </div>
       </Card>
 
@@ -379,7 +409,7 @@ import { formatPriceForInput, isPriceOverflow } from '@/utils/price';
 const MODE_OPTIONS = [
     'chat', 'completion', 'responses', 'image_generation', 'image_edit',
     'embedding', 'rerank', 'audio_speech', 'audio_transcription',
-    'video_generation', 'ocr', 'search', 'realtime'
+    'video_generation', 'ocr', 'search', 'realtime', 'batch'
 ];
 
 const CAPABILITY_OPTIONS = [
@@ -448,6 +478,7 @@ export default {
             tierDuplicateError: false,
             tierValueError: false,
             tierOverflowError: false,
+            batchDiscountError: false,
             submitting: false,
             formData: {
                 provider: '',
@@ -458,6 +489,7 @@ export default {
                 supported_parameters: [],
                 limits: {},
                 prices: {},
+                batch_discount: 0.5,
                 metadata: {
                     source: '',
                     notes: ''
@@ -542,6 +574,27 @@ export default {
             },
             immediate: true,
             deep: true
+        },
+        // 校验仅在提交时执行；此处让「已显示」的错误在值修正后即时消失
+        pricesList: {
+            handler() {
+                if (this.pricesDuplicateError || this.pricesValueError || this.pricesOverflowError) {
+                    this.pricesDuplicateError = this.getDuplicateKeys(this.pricesList).length > 0;
+                    this.pricesValueError = this.hasNonNegativeViolation(this.pricesList);
+                    this.pricesOverflowError = this.hasOverflowViolation(this.pricesList);
+                }
+            },
+            deep: true
+        },
+        tierPricesPeakList: {
+            handler() {
+                if (this.tierDuplicateError || this.tierValueError || this.tierOverflowError) {
+                    this.tierDuplicateError = this.getDuplicateKeys(this.tierPricesPeakList).length > 0;
+                    this.tierValueError = this.hasNonNegativeViolation(this.tierPricesPeakList);
+                    this.tierOverflowError = this.hasOverflowViolation(this.tierPricesPeakList);
+                }
+            },
+            deep: true
         }
     },
 
@@ -583,6 +636,7 @@ export default {
                 supported_parameters: [],
                 limits: {},
                 prices: {},
+                batch_discount: 0.5,
                 metadata: {
                     source: '',
                     notes: ''
@@ -591,6 +645,7 @@ export default {
             this.limitsList = [];
             this.pricesList = [];
             this.tierPricesPeakList = [];
+            this.batchDiscountError = false;
             this.pricesError = false;
             this.limitsDuplicateError = false;
             this.pricesDuplicateError = false;
@@ -642,6 +697,23 @@ export default {
             return [...duplicates];
         },
 
+        hasNonNegativeViolation(list) {
+            return (list || []).some(item => {
+                if (!item.key) return false;
+                const value = Number(item.value);
+                return Number.isNaN(value) || value < 0;
+            });
+        },
+
+        hasOverflowViolation(list) {
+            return (list || []).some(item => {
+                if (!item.key) return false;
+                const value = Number(item.value);
+                if (Number.isNaN(value) || value < 0) return false;
+                return isPriceOverflow(value);
+            });
+        },
+
         validateDynamicKeys() {
             const limitsDuplicates = this.getDuplicateKeys(this.limitsList);
             const pricesDuplicates = this.getDuplicateKeys(this.pricesList);
@@ -650,38 +722,35 @@ export default {
             this.pricesDuplicateError = pricesDuplicates.length > 0;
             this.tierDuplicateError = tierDuplicates.length > 0;
 
-            // limits 值须为非负整数；prices 值须为非负数
+            // limits 值须为非负整数；prices / tier 值须为非负数
             this.limitsValueError = this.limitsList.some(item => {
                 if (!item.key) return false;
                 const value = Number(item.value);
                 return Number.isNaN(value) || value < 0 || !Number.isInteger(value);
             });
-            this.pricesValueError = this.pricesList.some(item => {
-                if (!item.key) return false;
-                const value = Number(item.value);
-                return Number.isNaN(value) || value < 0;
-            });
-            this.pricesOverflowError = this.pricesList.some(item => {
-                if (!item.key) return false;
-                const value = Number(item.value);
-                if (Number.isNaN(value) || value < 0) return false;
-                return isPriceOverflow(value);
-            });
-            this.tierValueError = this.tierPricesPeakList.some(item => {
-                if (!item.key) return false;
-                const value = Number(item.value);
-                return Number.isNaN(value) || value < 0;
-            });
-            this.tierOverflowError = this.tierPricesPeakList.some(item => {
-                if (!item.key) return false;
-                const value = Number(item.value);
-                if (Number.isNaN(value) || value < 0) return false;
-                return isPriceOverflow(value);
-            });
+            this.pricesValueError = this.hasNonNegativeViolation(this.pricesList);
+            this.pricesOverflowError = this.hasOverflowViolation(this.pricesList);
+            this.tierValueError = this.hasNonNegativeViolation(this.tierPricesPeakList);
+            this.tierOverflowError = this.hasOverflowViolation(this.tierPricesPeakList);
 
             return !this.limitsDuplicateError && !this.pricesDuplicateError
                 && !this.limitsValueError && !this.pricesValueError && !this.pricesOverflowError
                 && !this.tierDuplicateError && !this.tierValueError && !this.tierOverflowError;
+        },
+
+        // 批量折扣系数校验：mode=batch 的价格行不配置本字段；
+        // 其余模式非必填，填写时须为 (0,1] 区间内的浮点数
+        validateBatchDiscount() {
+            const mode = this.formData.mode;
+            const raw = this.formData.batch_discount;
+            if (mode === 'batch' || raw === '' || raw === null || raw === undefined) {
+                this.batchDiscountError = false;
+                return true;
+            }
+            const num = Number(raw);
+            const valid = !Number.isNaN(num) && num > 0 && num <= 1;
+            this.batchDiscountError = !valid;
+            return valid;
         },
 
         addLimit() {
@@ -718,6 +787,13 @@ export default {
             } else {
                 delete data.tier_prices;
             }
+            // 批量折扣系数：仅 mode != batch 且填写了值时提交，否则置 null
+            const rawDiscount = data.batch_discount;
+            if (data.mode !== 'batch' && rawDiscount !== '' && rawDiscount !== null && rawDiscount !== undefined) {
+                data.batch_discount = Number(rawDiscount);
+            } else {
+                data.batch_discount = null;
+            }
             return data;
         },
 
@@ -726,6 +802,7 @@ export default {
                 item.key === '' || item.value === '' || item.value === null || item.value === undefined
             );
             const dynamicKeysValid = this.validateDynamicKeys();
+            const batchDiscountValid = this.validateBatchDiscount();
 
             this.$refs.formData.validate(valid => {
                 if (!valid) {
@@ -733,6 +810,10 @@ export default {
                     return;
                 }
                 if (!dynamicKeysValid) {
+                    return;
+                }
+                if (!batchDiscountValid) {
+                    this.$Message.error(this.$t('modelPrices.batchDiscountInvalid'));
                     return;
                 }
                 if (this.pricesError) {
@@ -756,7 +837,7 @@ export default {
                     }
                 }
 
-                // 校验 (provider, model, mode) 组合唯一性
+                // 校验 (provider, model, mode) 组合唯一性；404 属于预期（不存在），静默处理不弹错误提示
                 this.submitting = true;
                 this.$request({
                     url: 'model-prices',
@@ -766,11 +847,12 @@ export default {
                         model: payload.model,
                         mode: payload.mode
                     },
-                    openapi: true
+                    openapi: true,
+                    unneedTips: true
                 }).then(res => {
                     const data = res.data && res.data.Data;
                     // 后端返回单条记录时存在 id；返回分页列表时检查 list 长度
-                    const isDuplicate = data && (
+                    const isDuplicate = res.status === 200 && data && (
                         data.id || (Array.isArray(data.list) && data.list.length > 0)
                     );
                     if (isDuplicate) {
@@ -780,13 +862,8 @@ export default {
                         this.doSubmit(payload, isEdit);
                     }
                 }).catch(err => {
-                    // 404 表示不存在，可以提交；其他错误提示但仍让后端处理
-                    if (err && err.response && err.response.status === 404) {
-                        this.doSubmit(payload, isEdit);
-                    } else {
-                        console.error('校验组合唯一性失败:', err);
-                        this.doSubmit(payload, isEdit);
-                    }
+                    console.error('校验组合唯一性失败:', err);
+                    this.doSubmit(payload, isEdit);
                 });
             });
         },

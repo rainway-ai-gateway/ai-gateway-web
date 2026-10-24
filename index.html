@@ -36,6 +36,139 @@
         <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
         <meta name="version" content="_VERSION_" />
         <meta name="viewport" content="width=device-width,minimum-scale=1.0,maximum-scale=1.0" />
+        <script>
+            (function () {
+                var CONFIG_URL = '/branding/branding.json';
+                var DEFAULT_FAVICON = '/branding/favicon.ico';
+                var DEFAULT_TITLES = { zh: '壬远 AI网关', en: 'Rainway AI Gateway' };
+                // 图标不存在时用它占位：显式声明「无图标」，避免浏览器回退请求 /favicon.ico
+                var EMPTY_FAVICON = 'data:,';
+                var FAVICON_STATE_KEY = '__BRANDING_FAVICON_STATE__';
+
+                function getLang() {
+                    try {
+                        return localStorage.getItem('lang') || 'en';
+                    } catch (e) {
+                        return 'en';
+                    }
+                }
+
+                function resolveAsset(path) {
+                    if (!path) {
+                        return DEFAULT_FAVICON;
+                    }
+                    if (/^(https?:)?\/\//.test(path) || path.charAt(0) === '/') {
+                        return path;
+                    }
+                    return '/branding/' + path.replace(/^\.?\//, '');
+                }
+
+                function isExternalUrl(path) {
+                    return /^(https?:)?\/\//.test(path);
+                }
+
+                function withVersion(href) {
+                    return (
+                        href +
+                        (href.indexOf('?') === -1 ? '?v=' : '&v=') +
+                        Date.now()
+                    );
+                }
+
+                function ensureFaviconLink() {
+                    var link = document.getElementById('branding-favicon');
+                    if (!link) {
+                        link = document.createElement('link');
+                        link.id = 'branding-favicon';
+                        link.rel = 'icon';
+                        document.head.appendChild(link);
+                    }
+                    return link;
+                }
+
+                function showFavicon(href) {
+                    ensureFaviconLink().href = withVersion(href);
+                }
+
+                function hideFavicon() {
+                    ensureFaviconLink().href = EMPTY_FAVICON;
+                }
+
+                function probeAsset(href) {
+                    return fetch(href, { method: 'HEAD', cache: 'no-store' })
+                        .then(function (response) {
+                            if (response.status === 405 || response.status === 501) {
+                                return fetch(href, {
+                                    method: 'GET',
+                                    cache: 'no-store'
+                                });
+                            }
+                            return response;
+                        })
+                        .then(function (response) {
+                            return !!(response && response.ok);
+                        })
+                        .catch(function () {
+                            return false;
+                        });
+                }
+
+                function applyFavicon(href) {
+                    var state = window[FAVICON_STATE_KEY];
+                    if (state && state.href === href) {
+                        return;
+                    }
+                    window[FAVICON_STATE_KEY] = { href: href, exists: false };
+
+                    if (isExternalUrl(href) || typeof fetch !== 'function') {
+                        showFavicon(href);
+                        window[FAVICON_STATE_KEY] = { href: href, exists: true };
+                        return;
+                    }
+
+                    probeAsset(withVersion(href)).then(function (exists) {
+                        if (exists) {
+                            showFavicon(href);
+                            window[FAVICON_STATE_KEY] = {
+                                href: href,
+                                exists: true
+                            };
+                        } else {
+                            hideFavicon();
+                        }
+                    });
+                }
+
+                function apply(config) {
+                    config = config || {};
+                    var isEn = getLang() === 'en';
+                    var title = isEn
+                        ? config.titleEn || config.title || DEFAULT_TITLES.en
+                        : config.title || config.titleEn || DEFAULT_TITLES.zh;
+                    document.title = title;
+                    applyFavicon(resolveAsset(config.favicon));
+                }
+
+                if (typeof fetch === 'function') {
+                    window.__BRANDING_CONFIG_PROMISE__ = fetch(
+                        CONFIG_URL + '?_=' + Date.now(),
+                        { cache: 'no-store' }
+                    )
+                        .then(function (response) {
+                            return response.ok ? response.json() : null;
+                        })
+                        .catch(function () {
+                            return null;
+                        })
+                        .then(function (config) {
+                            apply(config);
+                            return config;
+                        });
+                } else {
+                    window.__BRANDING_CONFIG_PROMISE__ = Promise.resolve(null);
+                }
+            })();
+        </script>
     </head>
 
     <body id="product-body">

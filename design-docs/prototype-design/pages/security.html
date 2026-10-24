@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="../assets/static/css/app.css" />
+    <link rel="stylesheet" href="../assets/static/css/ai-rule.css" />
+    <link rel="stylesheet" href="../assets/font/iconfont.css" />
+    <link rel="stylesheet" href="../assets/css/prototype-overrides.css" />
+    <style>
+      .sec-trigger-form .ivu-form-item { margin-bottom:16px; }
+      .sec-form-row { display:flex; gap:24px; flex-wrap:wrap; }
+      .sec-form-row .ivu-form-item { flex:1; min-width:220px; }
+      .sec-hint { color:#808695; font-size:12px; line-height:1.6; margin-top:4px; }
+      .sec-help { position:relative; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; margin-left:4px; border:1px solid #2d8cf0; border-radius:50%; color:#2d8cf0; font-size:11px; font-style:normal; font-weight:400; line-height:1; cursor:help; vertical-align:middle; }
+      .sec-help-tip { position:absolute; left:50%; top:140%; transform:translateX(-50%); z-index:20; width:340px; background:#17233d; color:#fff; font-size:12px; font-style:normal; font-weight:400; line-height:1.7; padding:8px 10px; border-radius:4px; text-align:left; opacity:0; visibility:hidden; transition:opacity .15s; pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+      .sec-help-tip::before { content:""; position:absolute; left:50%; bottom:100%; transform:translateX(-50%); border:6px solid transparent; border-bottom-color:#17233d; }
+      .sec-help:hover .sec-help-tip { opacity:1; visibility:visible; }
+      .sec-switch-row { display:flex; align-items:center; gap:8px; }
+      .sec-switch { position:relative; display:inline-block; width:44px; height:22px; }
+      .sec-switch input { opacity:0; width:0; height:0; }
+      .sec-slider { position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:22px; transition:.2s; }
+      .sec-slider:before { content:""; position:absolute; width:18px; height:18px; left:2px; top:2px; background:#fff; border-radius:50%; transition:.2s; }
+      .sec-switch input:checked + .sec-slider { background:#2d8cf0; }
+      .sec-switch input:checked + .sec-slider:before { transform:translateX(22px); }
+      .sec-filter-bar { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+      .sec-filter-item { display:flex; flex-direction:column; gap:4px; }
+      .sec-filter-item label { color:#515a6e; font-size:12px; }
+      .sec-filter-item input, .sec-filter-item select { height:32px; border:1px solid #dcdee2; border-radius:4px; padding:0 8px; background:#fff; }
+      .sec-filter-item input[type="date"] { width:150px; }
+      .sec-summary-block { border:1px solid #e8eaec; border-radius:4px; padding:12px; margin-top:8px; }
+      .sec-summary-title { font-weight:600; color:#17233d; margin-bottom:8px; }
+      .sec-summary-nums { display:flex; gap:16px; color:#515a6e; font-size:13px; margin-bottom:6px; }
+      .sec-progress { height:8px; background:#f0f2f5; border-radius:4px; overflow:hidden; }
+      .sec-progress-inner { height:100%; background:#2d8cf0; border-radius:4px; transition:width .3s; }
+      .sec-kv { display:flex; gap:8px; color:#515a6e; font-size:13px; margin-bottom:6px; }
+      .sec-kv .sec-kv-label { color:#808695; min-width:110px; }
+      .sec-error { color:#ed4014; background:#fff1f0; border:1px solid #ffa39e; border-radius:4px; padding:8px 12px; margin-top:8px; font-size:13px; }
+      .sec-note { color:#2d8cf0; background:#f0faff; border:1px solid #aed0ee; border-radius:4px; padding:8px 12px; margin-top:8px; font-size:13px; }
+      .sec-conflict { color:#ed4014; background:#fff1f0; border:1px solid #ffa39e; border-radius:4px; padding:8px 12px; margin-top:12px; font-size:13px; display:none; }
+      .sec-polling { color:#2d8cf0; font-size:12px; margin-left:8px; }
+      .sec-empty { color:#808695; font-size:13px; padding:8px 0; }
+      .sec-detail-link { color:#2d8cf0; }
+    </style>
+    <script src="../assets/js/mock-data.js"></script>
+    <script src="../assets/js/ivu-ui.js"></script>
+    <script src="../assets/js/layout.js"></script>
+    <script src="../assets/js/prototype.js"></script>
+  </head>
+  <body>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var root = Layout.render({ pageId: 'ReencryptSweep.list', basePath: '../' });
+        var isReadonly = Prototype.isReadonly();
+        root.innerHTML = '<div id="security-page"></div>';
+
+        var MODE_LABELS = { reencrypt: '重加密', decrypt: '解密' };
+        var SCOPE_LABELS = { all: '全部', providers: '仅 providers 表', api_keys: '仅 api_keys 表' };
+        var STATUS_TAG_TYPES = { running: 'primary', succeeded: 'success', failed: 'error' };
+
+        // 完成时按表分组落库的统计（模拟 GET 完成后的 summary）
+        var COMPLETE_SUMMARY = {
+          providers: { scanned: 120, rewritten: 118, skipped: 2 },
+          api_keys: { scanned: 2400, rewritten: 2390, skipped: 10 }
+        };
+        var DEFAULT_SORT = { key: 'started_at', order: 'desc' };
+
+        var state = {
+          // 列表数据来源：GET /open-api/v1/security/reencrypt-sweeps（含运行中任务）
+          rows: (MockData.reencryptSweeps && MockData.reencryptSweeps.list) || [],
+          // Query 过滤参数（status/mode/scope/dry_run/start_time/end_time）
+          filter: { status: '', mode: '', scope: '', dry_run: '', start_time: '', end_time: '' },
+          // offset 分页（page/page_size，默认 1/20）
+          page: 1,
+          pageSize: 20,
+          filtered: [],
+          // 排序（sort_by 有效字段仅 started_at、task_id，默认 started_at desc）
+          sortKey: DEFAULT_SORT.key,
+          sortOrder: DEFAULT_SORT.order,
+          pollers: {},
+          seq: 100,
+          // 触发表单状态（轮询局部刷新时保留）
+          trigger: { mode: 'reencrypt', scope: 'all', dry_run: false }
+        };
+
+        function nowRfc3339() {
+          return new Date().toISOString();
+        }
+
+        function runningTask() {
+          for (var i = 0; i < state.rows.length; i++) {
+            if (state.rows[i].status === 'running') return state.rows[i];
+          }
+          return null;
+        }
+
+        function statusTag(task) {
+          var label = task.status === 'running' ? '运行中' : (task.status === 'succeeded' ? '成功' : '失败');
+          return IvuUI.tag(label, STATUS_TAG_TYPES[task.status] || 'default');
+        }
+
+        // ======= 任务触发区（POST /open-api/v1/security/reencrypt-sweeps，参数全可选） =======
+        function renderTrigger() {
+          return IvuUI.card('触发收敛任务',
+            '<div class="sec-trigger-form"><form class="ivu-form ivu-form-label-top">' +
+              '<div class="sec-form-row">' +
+                IvuUI.formTopItem('变换方向<i class="sec-help">?<span class="sec-help-tip">reencrypt：明文物或旧 keyID 密文行重写为 active 钥密文<br>decrypt：全部密文行解密为明文，仅用于回滚预案，日常禁止触发</span></i>',
+                  '<div class="ivu-select ivu-select-single" style="width:100%;"><div class="ivu-select-selection">' +
+                    '<select id="sec-mode" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                      '<option value="reencrypt"' + (state.trigger.mode === 'reencrypt' ? ' selected' : '') + '>' + MODE_LABELS.reencrypt + '</option>' +
+                      '<option value="decrypt"' + (state.trigger.mode === 'decrypt' ? ' selected' : '') + '>' + MODE_LABELS.decrypt + '</option>' +
+                    '</select><span class="proto-select-arrow" aria-hidden="true">▾</span></div></div>') +
+                IvuUI.formTopItem('扫描范围',
+                  '<div class="ivu-select ivu-select-single" style="width:100%;"><div class="ivu-select-selection">' +
+                    '<select id="sec-scope" class="proto-ivu-select-native" style="width:100%;height:32px;border:0;background:transparent;padding:0 24px 0 8px;appearance:none;-webkit-appearance:none;">' +
+                      '<option value="all"' + (state.trigger.scope === 'all' ? ' selected' : '') + '>' + SCOPE_LABELS.all + '</option>' +
+                      '<option value="providers"' + (state.trigger.scope === 'providers' ? ' selected' : '') + '>' + SCOPE_LABELS.providers + '</option>' +
+                      '<option value="api_keys"' + (state.trigger.scope === 'api_keys' ? ' selected' : '') + '>' + SCOPE_LABELS.api_keys + '</option>' +
+                    '</select><span class="proto-select-arrow" aria-hidden="true">▾</span></div></div>') +
+              '</div>' +
+              IvuUI.formTopItem('预演模式',
+                '<div class="sec-switch-row">' +
+                  '<label class="sec-switch"><input type="checkbox" id="sec-dry-run"' + (state.trigger.dry_run ? ' checked' : '') + ' /><span class="sec-slider"></span></label>' +
+                  '<span class="sec-hint" style="margin-top:0;">开启后仅统计"将要重写"的行数，不落库</span>' +
+                '</div>') +
+              '<div>' + (isReadonly ? '' : IvuUI.btn('触发任务', 'primary', '', '', 'id="btn-sec-trigger"')) + '</div>' +
+              '<div id="sec-conflict" class="sec-conflict"></div>' +
+            '</form></div>');
+        }
+
+        // ======= 收敛统计块（running 时 summary 为空对象，完成后才落库） =======
+        function summaryBlock(title, data) {
+          if (!data) {
+            return '<div class="sec-summary-block">' +
+              '<div class="sec-summary-title">' + title + '</div>' +
+              '<div class="sec-empty">任务运行中，统计将于完成后写入。</div></div>';
+          }
+          var total = (data.scanned || 0) + (data.skipped || 0);
+          var percent = total > 0 ? Math.min(100, Math.round((data.scanned / total) * 100)) : 0;
+          return '<div class="sec-summary-block">' +
+            '<div class="sec-summary-title">' + title + '</div>' +
+            '<div class="sec-summary-nums">' +
+              '<span>已扫描 scanned：<b>' + (data.scanned || 0) + '</b></span>' +
+              '<span>已重写 rewritten：<b>' + (data.rewritten || 0) + '</b></span>' +
+              '<span>已跳过 skipped：<b>' + (data.skipped || 0) + '</b></span>' +
+            '</div>' +
+            '<div class="sec-progress"><div class="sec-progress-inner" style="width:' + percent + '%;"></div></div>' +
+          '</div>';
+        }
+
+        // dry-run 成功的 error="dry_run" 为语义标记，不作为失败告警展示
+        function errorBlock(task) {
+          if (!task.error) return '';
+          if (task.error === 'dry_run') {
+            return '<div class="sec-note">预演任务（dry_run）：rewritten 为"将要重写"的行数，未落库。</div>';
+          }
+          return '<div class="sec-error">错误：' + IvuUI.escapeHtml(task.error) + '</div>';
+        }
+
+        // 单个任务的完整明细（运行中横幅与历史详情抽屉共用）
+        function detailBody(task) {
+          var tables = [];
+          if (task.scope !== 'api_keys') tables.push({ key: 'providers', label: 'providers 表收敛统计' });
+          if (task.scope !== 'providers') tables.push({ key: 'api_keys', label: 'api_keys 表收敛统计' });
+
+          return '' +
+            '<div class="sec-kv"><span class="sec-kv-label">任务ID</span><span>' + IvuUI.escapeHtml(task.task_id) + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">状态</span><span>' + statusTag(task) +
+              (task.status === 'running' ? '<span class="sec-polling">轮询中…</span>' : '') + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">变换方向</span><span>' +
+              IvuUI.escapeHtml(MODE_LABELS[task.mode] || task.mode) + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">预演模式</span><span>' + (task.dry_run ? '是（仅统计，不落库）' : '否') + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">扫描范围</span><span>' +
+              IvuUI.escapeHtml(SCOPE_LABELS[task.scope] || task.scope) + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">触发者</span><span>' + IvuUI.escapeHtml(task.created_by || '-') + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">活跃密钥ID</span><span>' + (task.active_key_id != null ? task.active_key_id : '-') + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">开始 / 结束时间</span><span>' +
+              IvuUI.escapeHtml(task.started_at || '-') + ' / ' + IvuUI.escapeHtml(task.finished_at || '-') + '</span></div>' +
+            '<div class="sec-kv"><span class="sec-kv-label">耗时</span><span>' + (task.status === 'running' ? '-' : (task.duration_ms || 0) + ' ms') + '</span></div>' +
+            tables.map(function (t) {
+              return summaryBlock(t.label, task.summary && task.summary[t.key]);
+            }).join('') +
+            errorBlock(task);
+        }
+
+        // ======= 运行中任务横幅（唯一 running，GET /{task_id} 轮询） =======
+        function paintRunning() {
+          var el = document.getElementById('sec-running');
+          if (!el) return;
+          var task = runningTask();
+          if (!task) {
+            el.innerHTML = IvuUI.card('当前运行任务',
+              '<div class="sec-empty">当前无运行中任务，可直接触发。</div>');
+            return;
+          }
+          el.innerHTML = IvuUI.card('当前运行任务 ' + IvuUI.escapeHtml(task.task_id) +
+            '<span class="sec-polling">轮询中…</span>', detailBody(task));
+        }
+
+        // ======= 历史任务列表筛选栏（对应 GET 列表 Query 参数） =======
+        function renderFilterBar() {
+          function select(id, options, value) {
+            return '<select id="' + id + '">' + options.map(function (o) {
+              return '<option value="' + IvuUI.escapeHtml(o.value) + '"' +
+                (String(o.value) === String(value) ? ' selected' : '') + '>' +
+                IvuUI.escapeHtml(o.label) + '</option>';
+            }).join('') + '</select>';
+          }
+          return '<div class="sec-filter-bar">' +
+            '<div class="sec-filter-item"><label>任务状态</label>' + select('sec-f-status', [
+              { value: '', label: '全部' }, { value: 'running', label: '运行中' },
+              { value: 'succeeded', label: '成功' }, { value: 'failed', label: '失败' }], state.filter.status) + '</div>' +
+            '<div class="sec-filter-item"><label>变换方向</label>' + select('sec-f-mode', [
+              { value: '', label: '全部' }, { value: 'reencrypt', label: '重加密' },
+              { value: 'decrypt', label: '解密' }], state.filter.mode) + '</div>' +
+            '<div class="sec-filter-item"><label>扫描范围</label>' + select('sec-f-scope', [
+              { value: '', label: '全部' }, { value: 'all', label: '全部' },
+              { value: 'providers', label: '仅 providers 表' }, { value: 'api_keys', label: '仅 api_keys 表' }], state.filter.scope) + '</div>' +
+            '<div class="sec-filter-item"><label>预演模式</label>' + select('sec-f-dryrun', [
+              { value: '', label: '全部' }, { value: 'true', label: '是' },
+              { value: 'false', label: '否' }], state.filter.dry_run) + '</div>' +
+            '<div class="sec-filter-item"><label>开始时间起</label>' +
+              '<input type="date" id="sec-f-start" value="' + IvuUI.escapeHtml(state.filter.start_time) + '" /></div>' +
+            '<div class="sec-filter-item"><label>开始时间止</label>' +
+              '<input type="date" id="sec-f-end" value="' + IvuUI.escapeHtml(state.filter.end_time) + '" /></div>' +
+            '<div class="sec-filter-item">' + IvuUI.btn('查询', 'primary', 'small', '', 'id="btn-sec-search"') + '</div>' +
+            '<div class="sec-filter-item">' + IvuUI.btn('重置', 'default', 'small', '', 'id="btn-sec-reset"') + '</div>' +
+          '</div>';
+        }
+
+        // ======= 客户端过滤（对齐 GET 列表 Query 语义） =======
+        function applyFilter() {
+          var f = state.filter;
+          var rows = state.rows.filter(function (row) {
+            if (f.status && row.status !== f.status) return false;
+            if (f.mode && row.mode !== f.mode) return false;
+            if (f.scope && row.scope !== f.scope) return false;
+            if (f.dry_run !== '' && String(!!row.dry_run) !== f.dry_run) return false;
+            if (f.start_time && new Date(row.started_at).getTime() < new Date(f.start_time + 'T00:00:00').getTime()) return false;
+            if (f.end_time && new Date(row.started_at).getTime() > new Date(f.end_time + 'T23:59:59').getTime()) return false;
+            return true;
+          });
+          state.filtered = Prototype.sortRows(rows, state.sortKey, state.sortOrder);
+        }
+
+        function getPageData() {
+          var start = (state.page - 1) * state.pageSize;
+          return state.filtered.slice(start, start + state.pageSize);
+        }
+
+        // ======= 列表表格（offset 分页 + 列头排序；GET /security/reencrypt-sweeps） =======
+        function paintList() {
+          var container = document.getElementById('sec-list-table');
+          if (!container) return;
+          applyFilter();
+          var data = getPageData();
+          var columns = [
+            { title: '任务ID', key: 'task_id', minWidth: 200, sortable: true, render: function (t) { return IvuUI.escapeHtml(t.task_id); } },
+            { title: '状态', key: 'status', minWidth: 100, render: function (t) { return statusTag(t); } },
+            { title: '变换方向', key: 'mode', minWidth: 100, render: function (t) { return IvuUI.escapeHtml(MODE_LABELS[t.mode] || t.mode); } },
+            { title: '扫描范围', key: 'scope', minWidth: 130, render: function (t) { return IvuUI.escapeHtml(SCOPE_LABELS[t.scope] || t.scope); } },
+            { title: '预演', key: 'dry_run', minWidth: 70, render: function (t) { return t.dry_run ? '是' : '否'; } },
+            { title: '触发者', key: 'created_by', minWidth: 100, render: function (t) { return IvuUI.escapeHtml(t.created_by || '-'); } },
+            { title: '开始时间', key: 'started_at', minWidth: 200, sortable: true, render: function (t) { return IvuUI.escapeHtml(t.started_at || '-'); } },
+            { title: '耗时(ms)', key: 'duration_ms', minWidth: 100, render: function (t) { return t.status === 'running' ? '-' : String(t.duration_ms || 0); } },
+            { title: '操作', key: 'action', width: 90, render: function (t) { return '<a href="javascript:void(0)" class="sec-detail-link" data-sec-detail="' + IvuUI.escapeHtml(t.task_id) + '">详情</a>'; } }
+          ];
+          container.innerHTML = IvuUI.pageTable({
+            tableId: 'sec-page-table',
+            columns: columns,
+            rows: data,
+            pageSize: state.pageSize,
+            currentPage: state.page,
+            total: state.filtered.length
+          });
+          bindListEvents();
+        }
+
+        function bindListEvents() {
+          var table = document.getElementById('sec-page-table');
+          if (!table) return;
+
+          Prototype.bindPageTableSort(table, state, paintList);
+
+          var sizeSel = table.querySelector('.proto-page-size');
+          if (sizeSel) sizeSel.onchange = function () {
+            state.pageSize = parseInt(sizeSel.value, 10); state.page = 1; paintList();
+          };
+
+          var prev = table.querySelector('.proto-page-prev');
+          if (prev) prev.onclick = function () {
+            if (state.page > 1) { state.page -= 1; paintList(); }
+          };
+
+          var next = table.querySelector('.proto-page-next');
+          if (next) next.onclick = function () {
+            var totalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
+            if (state.page < totalPages) { state.page += 1; paintList(); }
+          };
+
+          table.querySelectorAll('[data-page]').forEach(function (li) {
+            li.onclick = function () {
+              state.page = parseInt(li.getAttribute('data-page'), 10); paintList();
+            };
+          });
+
+          table.querySelectorAll('[data-sec-detail]').forEach(function (link) {
+            link.onclick = function () { openDetail(link.getAttribute('data-sec-detail')); };
+          });
+        }
+
+        function openDetail(taskId) {
+          var task = state.rows.filter(function (t) { return t.task_id === taskId; })[0];
+          if (!task) return;
+          document.getElementById('sec-detail-body').innerHTML = detailBody(task);
+          Prototype.openDrawer('sec-detail-drawer');
+        }
+
+        // ======= 筛选栏事件（筛选栏不随 paintList 重绘，输入状态保留） =======
+        function bindFilterEvents() {
+          function readFilter() {
+            state.filter.status = document.getElementById('sec-f-status').value;
+            state.filter.mode = document.getElementById('sec-f-mode').value;
+            state.filter.scope = document.getElementById('sec-f-scope').value;
+            state.filter.dry_run = document.getElementById('sec-f-dryrun').value;
+            state.filter.start_time = document.getElementById('sec-f-start').value;
+            state.filter.end_time = document.getElementById('sec-f-end').value;
+            state.page = 1;
+          }
+          var searchBtn = document.getElementById('btn-sec-search');
+          if (searchBtn) searchBtn.onclick = function () { readFilter(); paintList(); };
+          ['status', 'mode', 'scope', 'dryrun', 'start', 'end'].forEach(function (name) {
+            var el = document.getElementById('sec-f-' + name);
+            if (el) el.onchange = function () { readFilter(); paintList(); };
+          });
+          var resetBtn = document.getElementById('btn-sec-reset');
+          if (resetBtn) resetBtn.onclick = function () {
+            state.filter = { status: '', mode: '', scope: '', dry_run: '', start_time: '', end_time: '' };
+            state.page = 1;
+            state.sortKey = DEFAULT_SORT.key;
+            state.sortOrder = DEFAULT_SORT.order;
+            ['sec-f-status', 'sec-f-mode', 'sec-f-scope', 'sec-f-dryrun', 'sec-f-start', 'sec-f-end'].forEach(function (id) {
+              var el = document.getElementById(id); if (el) el.value = '';
+            });
+            paintList();
+          };
+        }
+
+        // ======= 页面装配：触发区 + 运行中横幅 + 历史列表 + 详情抽屉 =======
+        function renderPage() {
+          document.getElementById('security-page').innerHTML =
+            renderTrigger() +
+            '<div id="sec-running"></div>' +
+            IvuUI.card('历史任务', renderFilterBar() + '<div id="sec-list-table"></div>') +
+            IvuUI.drawer('sec-detail-drawer', '任务详情', '<div id="sec-detail-body"></div>',
+              IvuUI.btn('关闭', 'primary', 'default', '', 'data-close-drawer="sec-detail-drawer"'), '60%');
+
+          var triggerBtn = document.getElementById('btn-sec-trigger');
+          if (triggerBtn) triggerBtn.onclick = onTrigger;
+
+          bindFilterEvents();
+          paintRunning();
+          paintList();
+        }
+
+        // ======= 触发（模拟 POST 200 与 409 互斥） =======
+        function onTrigger() {
+          state.trigger.mode = document.getElementById('sec-mode').value;
+          state.trigger.scope = document.getElementById('sec-scope').value;
+          state.trigger.dry_run = document.getElementById('sec-dry-run').checked;
+          var mode = state.trigger.mode;
+          var scope = state.trigger.scope;
+          var dryRun = state.trigger.dry_run;
+          var conflict = document.getElementById('sec-conflict');
+
+          var holder = runningTask();
+          if (holder) {
+            // 409：集群级单例互斥，归因携带持有者 task_id
+            conflict.style.display = 'block';
+            conflict.textContent = '409 已有任务运行中，task_id: ' + holder.task_id + '，请等待完成；可直接轮询该任务，不排队。';
+            Prototype.toast('已有任务运行中，task_id: ' + holder.task_id + '，请等待完成', 'error');
+            return;
+          }
+          conflict.style.display = 'none';
+
+          state.seq += 1;
+          var task = {
+            task_id: 'rsp-01J' + Date.now().toString(36).toUpperCase() + state.seq,
+            status: 'running',
+            mode: mode,
+            dry_run: dryRun,
+            scope: scope,
+            active_key_id: mode === 'decrypt' ? 0 : 2,
+            created_by: (MockData.user && MockData.user.name) || '',
+            started_at: nowRfc3339(),
+            finished_at: '',
+            duration_ms: 0,
+            // running：summary 为空对象，完成后才按表分组落库
+            summary: {},
+            error: ''
+          };
+          state.rows.unshift(task);
+          state.page = 1;
+          state.sortKey = DEFAULT_SORT.key;
+          state.sortOrder = DEFAULT_SORT.order;
+          paintRunning();
+          paintList();
+          Prototype.toast('任务已触发，task_id: ' + task.task_id + '，轮询进度中');
+          startPolling(task);
+        }
+
+        // ======= 轮询模拟（GET /open-api/v1/security/reencrypt-sweeps/{task_id}） =======
+        // running 时 summary 保持空对象、duration_ms=0；完成后一次性落库统计与耗时
+        function startPolling(task) {
+          var ticks = 0;
+          var total = 5;
+          state.pollers[task.task_id] = setInterval(function () {
+            ticks += 1;
+            if (ticks >= total) {
+              clearInterval(state.pollers[task.task_id]);
+              delete state.pollers[task.task_id];
+              finishTask(task);
+            }
+            paintRunning();
+            paintList();
+          }, 800);
+        }
+
+        function cloneSummary(s) {
+          return { scanned: s.scanned, rewritten: s.rewritten, skipped: s.skipped };
+        }
+
+        function finishTask(task) {
+          task.status = 'succeeded';
+          task.finished_at = nowRfc3339();
+          task.duration_ms = 8200;
+          var summary = {};
+          if (task.scope !== 'api_keys') summary.providers = cloneSummary(COMPLETE_SUMMARY.providers);
+          if (task.scope !== 'providers') summary.api_keys = cloneSummary(COMPLETE_SUMMARY.api_keys);
+          task.summary = summary;
+          // dry-run 成功任务固定 error="dry_run"
+          task.error = task.dry_run ? 'dry_run' : '';
+          Prototype.toast(task.dry_run
+            ? '预演任务 ' + task.task_id + ' 已完成；rewritten 为"将要重写"行数'
+            : '任务 ' + task.task_id + ' 已完成；可重触发验证，空跑 rewritten=0 即收敛确认');
+        }
+
+        renderPage();
+      });
+    </script>
+  </body>
+</html>

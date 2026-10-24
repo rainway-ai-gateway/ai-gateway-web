@@ -31,7 +31,29 @@
       </Card>
 
       <Card :title="$t('instancePool.name')" class="llm-section-card">
+        <FormItem :label="$t('provider.instanceSource')" prop="instance_source">
+          <Select v-model="formData.instance_source">
+            <Option value="instance_pool">{{
+              $t('provider.instanceSourceManual')
+            }}</Option>
+            <Option value="k8s_pool">{{
+              $t('provider.instanceSourceK8s')
+            }}</Option>
+          </Select>
+        </FormItem>
+        <FormItem
+          v-if="formData.instance_source === 'k8s_pool'"
+          :label="$t('provider.k8sPoolName')"
+          prop="k8s_pool_name"
+        >
+          <Input
+            v-model="formData.k8s_pool_name"
+            :maxlength="64"
+            :placeholder="$t('provider.k8sPoolNamePlaceholder')"
+          />
+        </FormItem>
         <InstancePool
+          v-else
           ref="instancePool"
           :instancePoolData="instancePoolData"
           :endpointSchema="formData.model_endpoint.schema"
@@ -283,7 +305,7 @@
 
 <script>
 import { cloneDeep } from 'lodash';
-import { ProviderNameRegCheck, maskSecretKey } from '@/utils/const';
+import { ProviderNameRegCheck, K8sPoolNameRegCheck, maskSecretKey } from '@/utils/const';
 import InstancePool, {
     formatInstancePoolForApi,
     getInstanceEndpointHosts,
@@ -459,17 +481,36 @@ export default {
             callback();
         };
 
+        const validateK8sPoolName = (rule, value, callback) => {
+            if (that.formData.instance_source !== 'k8s_pool') {
+                callback();
+                return;
+            }
+            if (!String(value || '').trim()) {
+                callback(new Error(that.$t('provider.k8sPoolNameRequired')));
+                return;
+            }
+            if (!K8sPoolNameRegCheck(value)) {
+                callback(new Error(that.$t('provider.k8sPoolNameRule')));
+                return;
+            }
+            callback();
+        };
+
         return {
             protocolOptions: PROTOCOL_OPTIONS,
             discoverLoading: false,
             batchModelsVisible: false,
             batchModelsText: '',
             instancePoolData: [],
+            k8sInstancePool: [],
             livePool: [],
             modelsList: [],
             formData: {
                 name: '',
                 description: '',
+                instance_source: 'instance_pool',
+                k8s_pool_name: '',
                 model_protocols: ['openai'],
                 model_endpoint: {
                     schema: 'https',
@@ -482,6 +523,7 @@ export default {
             ruleValidate: {
                 name: [{ required: true, validator: validateName, trigger: 'blur' }],
                 description: [{ validator: validateDescription, trigger: 'blur' }],
+                k8s_pool_name: [{ validator: validateK8sPoolName, trigger: 'blur' }],
                 model_protocols: [{ validator: validateProtocols, trigger: 'change', required: true }],
                 model_endpoint: [{ validator: validateEndpoint, trigger: 'blur' }],
                 keys: [{ validator: validateKeys, trigger: 'change' }],
@@ -549,6 +591,13 @@ export default {
                     return valid[item.protocol];
                 });
             }
+        },
+        'formData.instance_source'(val) {
+            this.$nextTick(() => {
+                if (this.$refs.formData && val === 'k8s_pool') {
+                    this.$refs.formData.validateField('k8s_pool_name');
+                }
+            });
         }
     },
 
@@ -558,6 +607,10 @@ export default {
             this.formData = {
                 name: data.name || '',
                 description: data.description || '',
+                instance_source: data.instance_source === 'k8s_pool'
+                    ? 'k8s_pool'
+                    : 'instance_pool',
+                k8s_pool_name: data.k8s_pool_name || '',
                 model_protocols: (data.model_protocols && data.model_protocols.length)
                     ? data.model_protocols.slice()
                     : ['openai'],
@@ -579,6 +632,7 @@ export default {
             this.instancePoolData = data.instance_pool && data.instance_pool.length
                 ? cloneDeep(data.instance_pool)
                 : [];
+            this.k8sInstancePool = cloneDeep(data.k8s_instance_pool || []);
             this.livePool = this.instancePoolData.slice();
         },
         onPoolChange(pool) {
@@ -874,15 +928,22 @@ export default {
             const schema = this.formData.model_endpoint.schema || 'https';
             const payload = {
                 description: this.formData.description || '',
+                instance_source: this.formData.instance_source,
                 model_protocols: (this.formData.model_protocols || []).slice(),
                 model_endpoint: {
                     schema,
                     uri: this.formData.model_endpoint.uri || '/v1/models'
                 },
                 models,
-                keys,
-                instance_pool: formatInstancePoolForApi(instances, schema)
+                keys
             };
+            if (this.isK8sPool) {
+                // K8s 池模式：仅提交池名称；instance_pool 休眠保留（省略不清空），
+                // k8s_instance_pool 为只读镜像，请求体禁止携带
+                payload.k8s_pool_name = String(this.formData.k8s_pool_name || '').trim();
+            } else {
+                payload.instance_pool = formatInstancePoolForApi(instances, schema);
+            }
             var protocolPaths = {};
             (this.formData.protocol_paths || []).forEach(function(item) {
                 var proto = String(item.protocol || '').trim();
@@ -904,38 +965,45 @@ export default {
                     this.$Message.error(this.$t('com.tipValidateError'));
                     return;
                 }
+                if (this.isK8sPool) {
+                    this.submitPayload(this.buildPayload([]));
+                    return;
+                }
                 const poolRef = this.$refs.instancePool;
                 if (!poolRef || typeof poolRef.validateAndExport !== 'function') {
                     return;
                 }
                 poolRef.validateAndExport()
                     .then(instances => {
-                        const payload = this.buildPayload(instances);
-                        const req = this.isAdd
-                            ? {
-                                url: 'providers',
-                                method: 'post',
-                                data: payload,
-                                openapi: true
-                            }
-                            : {
-                                url: this.$urlFormat('providers/{provider_name}', {
-                                    provider_name: this.formData.name
-                                }),
-                                method: 'patch',
-                                data: payload,
-                                openapi: true
-                            };
-                        return this.$request(req);
-                    })
-                    .then(res => {
-                        if (res && res.status === 200) {
-                            this.$Message.success({ content: this.$t('com.tipSubmitSucc') });
-                            this.$emit('submit');
-                        }
+                        this.submitPayload(this.buildPayload(instances));
                     })
                     .catch(() => {});
             });
+        },
+        submitPayload(payload) {
+            const req = this.isAdd
+                ? {
+                    url: 'providers',
+                    method: 'post',
+                    data: payload,
+                    openapi: true
+                }
+                : {
+                    url: this.$urlFormat('providers/{provider_name}', {
+                        provider_name: this.formData.name
+                    }),
+                    method: 'patch',
+                    data: payload,
+                    openapi: true
+                };
+            return this.$request(req)
+                .then(res => {
+                    if (res && res.status === 200) {
+                        this.$Message.success({ content: this.$t('com.tipSubmitSucc') });
+                        this.$emit('submit');
+                    }
+                })
+                .catch(() => {});
         }
     }
 };

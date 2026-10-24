@@ -49,9 +49,6 @@ var server = express();
 
 server.use(logger('dev'));
 
-server.use(bodyParser.json());
-server.use(bodyParser.urlencoded({ extended: true }));
-
 var compiler = webpack(webpackConfig);
 
 var devMiddleware = require('webpack-dev-middleware')(compiler, {
@@ -92,6 +89,9 @@ if (context.length && options.target) {
 //     changeOrigin: true,
 //     secure: false,
 // }))
+
+// serve branding assets (runtime configurable, never hashed)
+server.use('/branding', express.static(path.resolve('branding')));
 
 // handle fallback for HTML5 history API
 server.use(require('connect-history-api-fallback')());

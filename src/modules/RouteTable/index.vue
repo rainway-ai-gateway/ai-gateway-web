@@ -53,7 +53,8 @@ import RouteRules from './components/RouteRules.vue';
 const TYPE_MAP = {
   global: 'Global',
   entity: 'Entity',
-  apikey: 'API-Key'
+  apikey: 'API-Key',
+  api_key: 'API-Key'
 };
 
 export default {
@@ -71,7 +72,7 @@ export default {
       currentPage: 1,
       pageSize: 20,
       total: 0,
-      searchParams: {},
+      searchParams: { enabled: 'true' },
       detailVisible: false,
       currentType: '',
       currentOwner: '',
@@ -113,6 +114,7 @@ export default {
           key: 'enabled',
           searchable: true,
           searchType: 'select',
+          searchValue: 'true',
           searchFilters: [
             { label: that.$t('com.enable'), value: 'true' },
             { label: that.$t('com.deactivate'), value: 'false' }
@@ -130,7 +132,7 @@ export default {
         {
           title: that.$t('com.operation'),
           key: 'operation',
-          width: 240,
+          width: 280,
           render(h, params) {
             const row = params.row;
             const enabled = row.enabled === true;
@@ -143,11 +145,13 @@ export default {
               }, that.$t('com.see')),
               h('Button', {
                 props: { size: 'small', type: 'success', disabled: enabled || isLoading },
+                directives: [{ name: 'has' }],
                 style: { marginRight: '8px' },
                 on: { click: () => that.onToggleEnabled(row, true) }
               }, that.$t('com.enable')),
               h('Button', {
                 props: { size: 'small', type: 'warning', disabled: !enabled || isLoading },
+                directives: [{ name: 'has' }],
                 on: { click: () => that.onToggleEnabled(row, false) }
               }, that.$t('com.deactivate'))
             ]);
