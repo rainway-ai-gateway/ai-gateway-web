@@ -684,6 +684,15 @@ export default {
             padding: 0 3px;
         }
     }
+
+    /* 可拖拽行显示「小手」，按下时「抓紧」；属性选择器让光标自动跟随 draggable 状态（仅编辑模式） */
+    ::v-deep .ivu-table-tbody tr[draggable='true'] {
+        cursor: grab;
+    }
+
+    ::v-deep .ivu-table-tbody tr[draggable='true']:active {
+        cursor: grabbing;
+    }
 }
 </style>
 <style lang="less">
