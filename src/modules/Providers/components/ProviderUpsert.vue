@@ -55,7 +55,7 @@
         <InstancePool
           v-else
           ref="instancePool"
-          :instancePoolData="instancePoolData"
+          :instancePoolData="manualPoolRestore"
           :endpointSchema="formData.model_endpoint.schema"
           @pool-change="onPoolChange"
         />
@@ -503,6 +503,7 @@ export default {
             batchModelsVisible: false,
             batchModelsText: '',
             instancePoolData: [],
+            manualPoolDraft: null,
             k8sInstancePool: [],
             livePool: [],
             modelsList: [],
@@ -534,6 +535,17 @@ export default {
     },
 
     computed: {
+        isK8sPool() {
+            return this.formData.instance_source === 'k8s_pool';
+        },
+        // 切到 K8s 池时 InstancePool 会被 v-else 卸载，切回时用切走前的快照重建人工实例行
+        // （PR-C-22「切回人工维护实例池原值保留」）；其余情况沿用服务端回填的实例池
+        manualPoolRestore() {
+            if (this.manualPoolDraft && this.formData.instance_source !== 'k8s_pool') {
+                return this.manualPoolDraft;
+            }
+            return this.instancePoolData;
+        },
         endpointHostDisplay() {
             const pool = this.livePool.length ? this.livePool : this.instancePoolData;
             const schema = this.formData.model_endpoint.schema;
@@ -593,6 +605,10 @@ export default {
             }
         },
         'formData.instance_source'(val) {
+            // 切走前存档当前人工实例行，切回时由 manualPoolRestore 消费（PR-C-22）
+            if (val === 'k8s_pool') {
+                this.manualPoolDraft = cloneDeep(this.livePool || []);
+            }
             this.$nextTick(() => {
                 if (this.$refs.formData && val === 'k8s_pool') {
                     this.$refs.formData.validateField('k8s_pool_name');
@@ -634,6 +650,7 @@ export default {
                 : [];
             this.k8sInstancePool = cloneDeep(data.k8s_instance_pool || []);
             this.livePool = this.instancePoolData.slice();
+            this.manualPoolDraft = null;
         },
         onPoolChange(pool) {
             this.livePool = pool || [];
