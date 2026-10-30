@@ -832,6 +832,7 @@ export default {
     modelExists: '已存在同名模型',
   },
   eppPool: {
+    loadFailed: '加载 EPP 实例池失败',
     title: 'EPP 实例池',
     poolName: '池名称',
     groupCount: '实例组数',
