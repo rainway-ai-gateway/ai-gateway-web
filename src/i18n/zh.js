@@ -777,6 +777,8 @@ export default {
     rpmRuleNameRequired: '第{index}条RPM规则请输入规则名称',
     rpmRuleNameDuplicate: 'RPM规则名称 {name} 重复',
     ruleNameLengthError: '规则名称长度不能超过128字符',
+    // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]、长度 1–128
+    ruleNameFormatError: '规则名称字符集为 [a-zA-Z0-9_-]，长度 1–128',
     tpmCombinationDuplicate:
       '存在相同的TPM规则组合（模型、时间窗口、最大Token数、滑动步长）',
     rpmCombinationDuplicate:

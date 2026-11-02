@@ -541,7 +541,7 @@
 <script>
 import { cloneDeep } from 'lodash';
 import { getModelGroupsFromServices } from '@/utils/model';
-import { EntityNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
+import { EntityNameRegCheck, RateLimitRuleNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
@@ -1318,6 +1318,11 @@ export default {
                 callback(new Error(this.$t('entity.ruleNameLengthError')));
                 return;
             }
+            // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]
+            if (!RateLimitRuleNameRegCheck(trimmed)) {
+                callback(new Error(this.$t('entity.ruleNameFormatError')));
+                return;
+            }
             const tpm = this.formData.rate_limit_policy.rules.tpm || [];
             const count = tpm.filter(r => r.name === trimmed).length;
             if (count > 1) {
@@ -1340,6 +1345,11 @@ export default {
             }
             if (trimmed.length < 1 || trimmed.length > 128) {
                 callback(new Error(this.$t('entity.ruleNameLengthError')));
+                return;
+            }
+            // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]
+            if (!RateLimitRuleNameRegCheck(trimmed)) {
+                callback(new Error(this.$t('entity.ruleNameFormatError')));
                 return;
             }
             const rpm = this.formData.rate_limit_policy.rules.rpm || [];
