@@ -1112,6 +1112,11 @@ export default {
     k8sPoolNameRule:
       'K8s 池名称长度 1-64 字符；仅允许字母、数字、下划线_、短横线-、点.；不能以点、短横线、下划线开头或结尾；不能包含空白字符',
     k8sPoolEmpty: '暂无镜像实例（池不存在 ≡ 零实例）',
+    k8sPoolSelectPlaceholder: '请选择 K8s 实例池',
+    k8sPoolNoOptions: '暂无可用的 K8s 实例池',
+    k8sPoolNotExistOption: '池不存在',
+    k8sPoolNotFound: 'K8s 池不存在（≡ 零实例）',
+    k8sPoolInstanceAddress: '实例地址',
     instanceHostPlaceholder: '填写实例后显示',
     tipNameRule:
       '长度1-64字符；仅允许字母、数字、下划线_、短横线-、点.；不能以点、短横线、下划线开头或结尾；不能包含空白字符',
