@@ -51,7 +51,7 @@
         @on-row-click="handleRowClick"
         :loading="loading"
         :class="loading ? 'show-iView-Table-list' : ''"
-        :draggable="draggable"
+        :draggable="canDrag"
         @on-drag-drop="onDragDrop"
       >
       </Table>
@@ -147,6 +147,19 @@ export default {
          * 属性在视图模式没有响应式属主（v-else 分支根本不含它），因此在此精确清理是安全的。
          */
         draggable(isDraggable) {
+            if (isDraggable) {
+                return;
+            }
+            this.$nextTick(() => {
+                const rows = this.$el
+                    ? this.$el.querySelectorAll(
+                          '.show-iView-Table tbody tr[draggable]',
+                      )
+                    : [];
+                rows.forEach(row => row.removeAttribute('draggable'));
+            });
+        },
+        canDrag(isDraggable) {
             if (isDraggable) {
                 return;
             }
@@ -331,8 +344,30 @@ export default {
             page: {
                 currentPage: 1,
                 pageSize: 20
-            }
+            },
+            // 2026-11-02：排序/列筛选激活时禁用拖拽（视图顺序 ≠ 优先级顺序，
+            // 拖拽会改错行——route RT-D-28 #79 实测）。见 computed.canDrag
+            activeSortKey: '',
+            activeSortOrder: ''
         };
+    },
+
+    computed: {
+        /** 已生效的列筛选数量（排除内部 _render_ 键） */
+        activeFilterCount() {
+            return Object.keys(this.searchMessage || {}).filter(
+                (k) => !k.endsWith('_render_'),
+            ).length;
+        },
+        /** 可拖拽 = 父组件允许 + 无排序 + 无列搜索 + 无列过滤 */
+        canDrag() {
+            return (
+                !!this.draggable &&
+                !this.activeSortKey &&
+                this.activeFilterCount === 0 &&
+                Object.keys(this.filterMessage || {}).length === 0
+            );
+        }
     },
 
     methods: {
@@ -502,6 +537,14 @@ export default {
             return content.join(',').replace(/(^\s*)|(\s*$)/g, '');
         },
         sortChange(data) {
+            // 记录排序态：排序激活期间禁用拖拽（#79），清除排序后恢复
+            if (!data || data.order === 'normal') {
+                this.activeSortKey = '';
+                this.activeSortOrder = '';
+            } else {
+                this.activeSortKey = data.key || '';
+                this.activeSortOrder = data.order || '';
+            }
             if (data.order === 'normal') {
                 this.showTableData = cloneDeep(this.cloneShowData);
                 this.showSrcIndex = this.cloneShowSrcIndex.slice();
