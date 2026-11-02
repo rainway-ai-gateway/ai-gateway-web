@@ -23,12 +23,15 @@
   >
     <Card :title="$t('entity.basicInfo')" class="form-card">
       <FormItem :label="$t('entity.name')" prop="name">
-        <Input
-          v-model="formData.name"
-          :disabled="!isAdd"
-          :placeholder="$t('entity.namePlaceholder')"
-          show-word-limit
-        ></Input>
+        <div class="word-limit-field">
+          <Input
+            v-model="formData.name"
+            :disabled="!isAdd"
+            :placeholder="$t('entity.namePlaceholder')"
+          ></Input>
+          <!-- iView 3.5.4 Input 无 show-word-limit（无效属性），自实现计数器（名称上限 64，校验拦截非 maxlength） -->
+          <span class="ivu-input-word-count">{{ (formData.name || '').length }}/64</span>
+        </div>
         <p v-if="isAdd" class="form-tip">{{ $t('entity.nameRule') }}</p>
       </FormItem>
 
@@ -1439,6 +1442,23 @@ export default {
 </script>
 
 <style lang="less" scoped>
+/* iView 3.5.4 Input 无 show-word-limit，自实现字数计数器（名称 1–64，校验拦截） */
+.word-limit-field {
+    position: relative;
+    /deep/ .ivu-input {
+        padding-right: 56px;
+    }
+    .ivu-input-word-count {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #808695;
+        font-size: 12px;
+        line-height: 1;
+        pointer-events: none;
+    }
+}
 .form-card {
     margin-bottom: 16px;
 

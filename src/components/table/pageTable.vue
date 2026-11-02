@@ -775,4 +775,14 @@ export default {
 .show-iView-Table-list {
     min-height: 300px;
 }
+/* 长文本单元格省略号裁剪（render 函数自定义渲染的列用，配合 title 悬浮全文；
+   iView 原生列请用 ellipsis:true + tooltip:true，见 2026-11-02 布局缺陷修复） */
+.cell-ellipsis {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
 </style>

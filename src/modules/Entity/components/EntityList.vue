@@ -99,7 +99,9 @@ export default {
                     key: 'name',
                     minWidth: 120,
                     sortable: 'custom',
-                    searchable: true
+                    searchable: true,
+                    ellipsis: true,
+                    tooltip: true
                 },
                 {
                     title: that.$t('entity.level'),
@@ -126,8 +128,10 @@ export default {
                     minWidth: 180,
                     sortable: 'custom',
                     searchable: true,
+                    ellipsis: true,
                     render(h, params) {
-                        return h('span', params.row.description || '-');
+                        const text = params.row.description || '-';
+                        return h('span', { class: 'cell-ellipsis', attrs: { title: text } }, text);
                     }
                 },
                 {
@@ -135,7 +139,9 @@ export default {
                     key: 'type',
                     minWidth: 100,
                     sortable: 'custom',
-                    searchable: true
+                    searchable: true,
+                    ellipsis: true,
+                    tooltip: true
                 },
                 {
                     title: that.$t('entity.parentEntity'),
@@ -143,9 +149,11 @@ export default {
                     minWidth: 120,
                     sortable: 'custom',
                     searchable: true,
+                    ellipsis: true,
                     render(h, params) {
                         const parent = that.tableData.find(item => item.id === params.row.parent_id);
-                        return h('span', parent ? parent.name : '-');
+                        const text = parent ? parent.name : '-';
+                        return h('span', { class: 'cell-ellipsis', attrs: { title: text } }, text);
                     }
                 },
                 {
