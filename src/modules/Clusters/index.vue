@@ -419,7 +419,8 @@ export default {
             const jobs = [];
             if (needEntity) {
                 jobs.push(
-                    this.$request({ url: 'entities', method: 'get', openapi: true, unneedTips: true })
+                    // issue #303：列表接口无参不再返回全量（默认 1/20），属主映射需显式拉满一页（上限 100）
+                    this.$request({ url: 'entities', method: 'get', params: { page: 1, page_size: 100 }, openapi: true, unneedTips: true })
                         .then(res => {
                             const map = {};
                             if (res.status === 200) {
@@ -438,7 +439,8 @@ export default {
             }
             if (needApiKey) {
                 jobs.push(
-                    this.$request({ url: 'api-keys', method: 'get', openapi: true, unneedTips: true })
+                    // issue #303：列表接口无参不再返回全量（默认 1/20），属主映射需显式拉满一页（上限 100）
+                    this.$request({ url: 'api-keys', method: 'get', params: { page: 1, page_size: 100 }, openapi: true, unneedTips: true })
                         .then(res => {
                             const map = {};
                             if (res.status === 200) {

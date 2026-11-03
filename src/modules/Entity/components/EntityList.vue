@@ -418,9 +418,11 @@ export default {
             this.tableLoading = true;
             Promise.all([
                 this.fetchEntityTypeList(),
+                // issue #303：列表接口无参不再返回全量（默认 1/20），列表主数据需显式拉满一页（上限 100）
                 this.$request({
                     url: 'entities',
                     method: 'get',
+                    params: { page: 1, page_size: 100 },
                     openapi: true
                 })
             ])
@@ -447,9 +449,11 @@ export default {
                 });
         },
         fetchEntityTypeList() {
+            // issue #303：列表接口无参不再返回全量（默认 1/20），类型筛选项需显式拉满一页（上限 100）
             return this.$request({
                 url: 'entity-types',
                 method: 'get',
+                params: { page: 1, page_size: 100 },
                 openapi: true
             })
                 .then(res => {

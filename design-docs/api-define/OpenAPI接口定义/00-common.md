@@ -26,6 +26,7 @@
   - 402：没有调用权限造成的失败
   - 403：管理面 IP 白名单拒绝（网络层访问控制，先于鉴权执行；仅当服务端 `[AccessControl]` 启用时可能返回，见接口层设计文档中间件设计）
   - 404：查询/修改/删除不存在的对象时
+  - 405：请求方法不被目标路由支持（响应头 `Allow` 列出该资源实际支持的方法，逗号分隔；响应体仍为 `{"ErrNum":405,"ErrMsg":"Method Not Allowed"}`）
   - 409：资源依赖冲突时
   - 422：参数不合法造成的失败
   - 500：其他业务逻辑错误，一律返回500
@@ -33,6 +34,25 @@
   - 556：数据重复时
 - **Data**: 返回的数据结构，调用成功时返回json格式数据，失败时返回null
 - **ErrMsg**: 文本消息，成功时为"success"或空串，失败时为错误信息
+
+**响应头**
+
+| 头 | 出现条件 | 说明 |
+|----|----------|------|
+| `Req-ID` | 所有经统一响应层输出的响应（含路由级 404 / 405） | 请求唯一 ID，与访问日志中的请求 ID 一致，用于排障关联（issue #298） |
+| `Allow` | 405（非 CORS 预检） | 该路径实际支持的方法，逗号 + 空格分隔（issue #297） |
+
+## CORS 与预检
+
+服务开启 CORS（`AllowedOrigins: *`）。跨域调用遵循标准 CORS 预检协议：
+
+| 请求形态 | 响应 |
+|----------|------|
+| 预检：`OPTIONS` + `Origin` + `Access-Control-Request-Method` | `204`，并带 `Access-Control-Allow-Origin`（当前配置下为 `*`）、`Access-Control-Allow-Methods`（回显请求方法）、`Access-Control-Allow-Credentials`、（有请求头时）`Access-Control-Allow-Headers`、`Vary` |
+| 普通 `OPTIONS`（无 `Access-Control-Request-Method`） | `405` + `Allow`（与其它方法一样按「方法不支持」处理） |
+| 实际请求（带 `Origin`） | 正常业务响应 + `Access-Control-Allow-Origin`（当前配置下为 `*`） |
+
+预检与路由级 404/405 均由统一中间件链处理（幂等、含 `Req-ID` 注入与访问日志），不会因路径未注册或方法不支持而丢失 CORS 头。
 
 # Method约定
 
@@ -66,10 +86,28 @@
 
 | 参数名 | 类型 | 参数含义 | 必填 | 补充描述 | 合法性条件 |
 | - | - | - | - | - | - |
-| page | int | 页码 | N | 默认1 | 必须 >0，否则使用默认值 1 |
-| page_size | int | 每页条数 | N | 默认20，最大100 | 取值范围 1-100，超出时截断为 100 |
+| page | int | 页码 | N | 默认1 | 见下方「非法值处理」 |
+| page_size | int | 每页条数 | N | 默认20，最大100 | 见下方「非法值处理」 |
 | sort_by | string | 排序字段 | N | - | - |
 | sort_order | string | 排序方向 | N | asc/desc，默认desc | 仅 `asc`/`desc` 有效，其他值被忽略 |
+
+**默认值与截断（通用基线）**
+
+- 未传 `page` / `page_size`：按 `page=1`、`page_size=20` 处理，并**据此分页返回**（不是返回全量）；
+- `page_size > 100`：截断为 100；
+- 响应 `pagination.page` / `pagination.page_size` 为**生效值**（默认值或截断后的值），
+  `pagination.total` 为**满足本次查询过滤条件的总条数**（与分页无关，用于计算总页数）。
+
+**非法值处理（按各接口的 Query 参数表）**
+
+| 类型 | 行为 | 示例接口 |
+|------|------|----------|
+| 严格 | `page <= 0` 或 `page_size < 1` / `> 100` → `422 Param Illegal` | `/api-keys`（`api-keys.md` §2.2） |
+| 截断（clamp） | `page <= 0` 按 1；`page_size < 1` 按 20；`> 100` 按 100 | `/entities`、`/entity-types` |
+
+> **登记例外**：`/providers` 在未传 `page`/`page_size` 时返回**全部匹配记录**，
+> 响应 `pagination.page=1`、`pagination.page_size=total`，且 `page_size` 上限为 1000
+> （见 `providers.md` §2.2）。该例外不再扩大，新增列表接口一律遵循上面的通用基线。
 
 # 公共参数类型
 
@@ -192,7 +230,7 @@
 |------|------|------|------|------------|
 | `unlimited` | bool | N | 是否无限配额 | 默认 `true` |
 | `pass_when_no_enough_quota` | bool | N | 配额不足时是否放行 | 默认 `false` |
-| `quota` | number | N | 配额总量 | 非负数；`unit=total_token` 时必须为整数；`unit=RMB` 时取值范围 0 ~ 90000000.00（9000 万元），内部最多保留 8 位小数，对外统一按 4 位小数展示 |
+| `quota` | number | N | 配额总量 | 非负数；`unit=total_token` 时必须为整数；`unit=RMB` 时取值范围 0 ~ 90000000.00（9000 万元），小数位不超过 8 位，内部最多保留 8 位小数，对外统一按 4 位小数展示；违反上述任一条返回 `422 Param Illegal` |
 | `unit` | string | N | 配额单位 | 默认 `total_token`；可选值：`total_token`、`RMB` |
 | `reset_period` | string | N | 配额重置周期 | 默认 `never`；可选值：`never`、`weekly`、`monthly` |
 | `balance` | object | N | 余额状态（只读），包含 `used` 和 `remaining` | 作为输入时无需传入 |
@@ -203,6 +241,13 @@
 |------|------|------|------------|
 | `used` | number | 已用量 | 非负数；**允许大于 `quota`**（issue #1476 起：BFE 全额扣减、余额可为负，`used = quota − remaining` 如实反映实际消耗，超出部分即超额用量）；内部最多 8 位小数，对外统一按 4 位小数展示 |
 | `remaining` | number | 剩余量 | 非负数（Redis 余额为负即欠费时对外展示为 0）；内部最多 8 位小数，对外统一按 4 位小数展示 |
+
+> **关于 `quota` 小数位的说明**（issue #293）
+>
+> `unit=RMB` 时，小数位按调用方提交的十进制表示统计，不按 float64 二进制近似值判断：
+> `0.14`、`888.88`、`1234.5678`、`1000.12345678`、`0.00000001` 均为合法取值；`100.123456789`、`0.000000001`
+> 返回 `422 Param Illegal`，文案指向「至多 8 位小数」，不会静默四舍五入。调用方应直接提交十进制字面量，
+> 不要提交浮点运算产物（如 `0.1+0.2` 得到 `0.30000000000000004`，会被判定为 17 位小数而拒绝）。
 
 > **关于 RMB 配额 9000 万元上限的说明**
 >

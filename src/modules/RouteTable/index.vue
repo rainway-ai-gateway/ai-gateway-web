@@ -269,9 +269,11 @@ export default {
     },
 
     fetchEntityNames() {
+      // issue #303：列表接口无参不再返回全量（默认 1/20），属主映射需显式拉满一页（上限 100）
       this.$request({
         url: 'entities',
         method: 'get',
+        params: { page: 1, page_size: 100 },
         openapi: true
       })
         .then(res => {
