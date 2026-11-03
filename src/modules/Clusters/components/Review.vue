@@ -201,6 +201,10 @@
           <li class="title">{{ $t('gatewayConfig.matchPrefix') }}:</li>
           <li class="value">{{ displayMatchPrefix }}</li>
         </ul>
+        <ul class="clearFloat">
+          <li class="title">{{ $t('gatewayConfig.priceMissAction') }}:</li>
+          <li class="value">{{ displayPriceMissAction }}</li>
+        </ul>
         <ul class="clearFloat detail-row detail-row-block">
           <li class="title">{{ $t('gatewayConfig.modelRedirect') }}:</li>
           <li class="value">
@@ -739,6 +743,15 @@ export default {
         displayMatchPrefix() {
             const prefix = this.llmConfigData && this.llmConfigData.match_prefix;
             return prefix || '-';
+        },
+        displayPriceMissAction() {
+            const action = this.llmConfigData && this.llmConfigData.price_miss_action;
+            const map = {
+                fallback_chat: this.$t('gatewayConfig.priceMissActionFallbackChatShort'),
+                bill_zero: this.$t('gatewayConfig.priceMissActionBillZeroShort'),
+                reject: this.$t('gatewayConfig.priceMissActionRejectShort')
+            };
+            return map[action] || action || '-';
         },
         displayPassiveHealthData() {
             return formatPassiveHealthCheckForApi(this.passiveHealthData);

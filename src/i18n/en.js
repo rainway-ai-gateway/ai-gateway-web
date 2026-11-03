@@ -1026,6 +1026,17 @@ export default {
     matchPrefixRequiredWhenStrip:
       'Match prefix is required when strip prefix is enabled',
     matchPrefixMustEndWithSlash: 'Match prefix must end with /',
+    priceMissAction: 'Price-Miss Action',
+    priceMissActionTip:
+      'Action when the request (model, API type) has no price entry: fall back to chat pricing (default) / bill as 0 / reject before forwarding (HTTP 503 + PRICE_NOT_CONFIGURED, upstream not called, not billed)',
+    priceMissActionFallbackChat: 'fallback_chat (fall back to chat pricing, default)',
+    priceMissActionBillZero: 'bill_zero (bill as 0)',
+    priceMissActionReject: 'reject (reject before forwarding)',
+    priceMissActionInvalid:
+      'Price-miss action must be fallback_chat / bill_zero / reject',
+    priceMissActionFallbackChatShort: 'Fallback to chat pricing',
+    priceMissActionBillZeroShort: 'Bill as 0',
+    priceMissActionRejectShort: 'Reject before forwarding',
     stripPrefix: 'Strip Prefix',
     stripPrefixTip:
       'When enabled, the prefix will be stripped from the request model before forwarding',
@@ -1566,6 +1577,17 @@ export default {
     intentQuestionsVersion: 'Intent Questions Version',
     colCache: 'Cache',
     colMirror: 'Mirror',
+    colPriceMiss: 'Price Miss',
+    priceMissField: 'Price Miss',
+    priceWarnField: 'Price-Miss Form',
+    priceMissYes: 'Yes',
+    priceMissNo: 'No',
+    priceWarnFallback: 'Fallback to chat pricing',
+    priceWarnNoEntry: 'Bill as 0',
+    priceWarnNoBaseline: 'Bill as 0 (no chat baseline)',
+    priceWarnReject: 'Rejected before forwarding',
+    priceWarnSubitemMissing: 'Fallback entry missing subitem price',
+    priceWarnNoModelTable: 'Price table missing',
   },
   aiCache: {
     pageTitle: 'AI Cache Rules (collection-level, matched by priority order, first match wins)',

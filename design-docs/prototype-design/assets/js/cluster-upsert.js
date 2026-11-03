@@ -131,6 +131,9 @@ window.ClusterUpsert = (function () {
         provider: providerName,
         strip_prefix: false,
         match_prefix: '',
+        // 2026-11-03 issue #1479：缺价处置动作（三态，默认 fallback_chat；控制台显式落值）
+        price_miss_action:
+          (row.llm_config && row.llm_config.price_miss_action) || 'fallback_chat',
         models: provider && provider.models ? provider.models.slice() : [],
         model_mappings: [
           { source_model: 'gpt-4-turbo', target_model: 'gpt-4o' },
@@ -456,6 +459,35 @@ window.ClusterUpsert = (function () {
             true,
           )
         : '');
+
+    // 2026-11-03 issue #1479：缺价处置动作（llm_config.price_miss_action，三态）
+    var PRICE_MISS_ACTION_OPTIONS = [
+      {
+        value: 'fallback_chat',
+        label: 'fallback_chat（回退 chat 价计费，默认）',
+      },
+      { value: 'bill_zero', label: 'bill_zero（按 0 计费）' },
+      { value: 'reject', label: 'reject（转发前拒绝）' },
+    ];
+    var priceMissActionHtml = IvuUI.formTopItem(
+      '缺价处置动作' +
+        helpIcon(
+          '请求的（模型，接口类型）无价格条目时的动作：回退 chat 价计费（默认）/ 按 0 计费 / 转发前拒绝（HTTP 503，不调用上游、不计费）',
+        ),
+      '<select class="proto-field from-item-inp" data-field="llm.price_miss_action" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
+        PRICE_MISS_ACTION_OPTIONS.map(function (item) {
+          return (
+            '<option value="' +
+            item.value +
+            '"' +
+            (llm.price_miss_action === item.value ? ' selected' : '') +
+            '>' +
+            item.label +
+            '</option>'
+          );
+        }).join('') +
+        '</select>',
+    );
 
     var selectedModels = llm.models || [];
     var modelTagsHtml = selectedModels.length
@@ -832,7 +864,8 @@ window.ClusterUpsert = (function () {
             modelSelectHtml,
             true,
           ) +
-          stripPrefixHtml,
+          stripPrefixHtml +
+          priceMissActionHtml,
       ) +
       '</div></div>' +
       '<div class="llm-card"><div class="llm-card-title">模型重定向</div><div class="llm-card-body">' +
@@ -1336,6 +1369,14 @@ window.ClusterUpsert = (function () {
       '</li></ul>' +
       reviewRow('裁剪前缀', llm.strip_prefix ? '开启' : '关闭') +
       (llm.strip_prefix ? reviewRow('匹配前缀', llm.match_prefix || '-') : '') +
+      reviewRow(
+        '缺价处置动作',
+        {
+          fallback_chat: '回退 chat 价计费',
+          bill_zero: '按 0 计费',
+          reject: '转发前拒绝',
+        }[llm.price_miss_action] || llm.price_miss_action || '-',
+      ) +
       '<ul class="clearFloat detail-row detail-row-block"><li class="title">模型重定向:</li><li class="value">' +
       (llm.model_mappings && llm.model_mappings.length
         ? '<table class="mapping-table"><thead><tr><th>原请求的模型名称</th><th>转发的后端模型名称</th></tr></thead><tbody>' +
@@ -1672,6 +1713,13 @@ window.ClusterUpsert = (function () {
       if (llm.match_prefix.slice(-1) !== '/') {
         return '匹配前缀必须以 / 结尾';
       }
+    }
+
+    if (
+      llm.price_miss_action != null &&
+      ['fallback_chat', 'bill_zero', 'reject'].indexOf(llm.price_miss_action) === -1
+    ) {
+      return '缺价处置动作须为 fallback_chat / bill_zero / reject';
     }
 
     if (!llm.models || !llm.models.length) return '请至少选择一个模型';

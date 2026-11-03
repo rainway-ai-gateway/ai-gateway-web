@@ -113,6 +113,32 @@
             :placeholder="$t('gatewayConfig.matchPrefixPlaceholder')"
           />
         </FormItem>
+        <FormItem prop="price_miss_action">
+          <span slot="label" class="provider-label">
+            {{ $t('gatewayConfig.priceMissAction') }}
+            <Tooltip placement="top" transfer max-width="320">
+              <div slot="content" class="provider-tip-content">
+                {{ $t('gatewayConfig.priceMissActionTip') }}
+              </div>
+              <Icon type="ios-help-circle-outline" class="provider-help-icon" />
+            </Tooltip>
+          </span>
+          <Select
+            v-model="formData.price_miss_action"
+            style="width: 100%;"
+            size="small"
+          >
+            <Option value="fallback_chat">
+              {{ $t('gatewayConfig.priceMissActionFallbackChat') }}
+            </Option>
+            <Option value="bill_zero">
+              {{ $t('gatewayConfig.priceMissActionBillZero') }}
+            </Option>
+            <Option value="reject">
+              {{ $t('gatewayConfig.priceMissActionReject') }}
+            </Option>
+          </Select>
+        </FormItem>
       </Card>
 
       <Card :title="$t('gatewayConfig.modelRedirect')" class="llm-section-card">
@@ -1101,6 +1127,17 @@ export default {
             }
             callback();
         };
+        const validatePriceMissAction = (rule, value, callback) => {
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            if (['fallback_chat', 'bill_zero', 'reject'].indexOf(value) === -1) {
+                callback(new Error(that.$t('gatewayConfig.priceMissActionInvalid')));
+                return;
+            }
+            callback();
+        };
         const validateMappings = (rule, value, callback) => {
             const mappings = value || [];
             const sources = {};
@@ -1424,6 +1461,7 @@ export default {
                 provider: '',
                 match_prefix: '',
                 strip_prefix: false,
+                price_miss_action: 'fallback_chat',
                 models: [],
                 model_mappings: [{ source_model: '', target_model: '' }],
                 keys: [{ name: '', weight: 0 }],
@@ -1438,6 +1476,7 @@ export default {
                 provider: [{ validator: validateProvider, trigger: 'change', required: true }],
                 models: [{ validator: validateModels, trigger: 'change', required: true }],
                 match_prefix: [{ validator: validateMatchPrefix, trigger: 'blur' }],
+                price_miss_action: [{ validator: validatePriceMissAction, trigger: 'change' }],
                 model_mappings: [{ validator: validateMappings, trigger: 'change' }],
                 keys: [{ validator: validateKeys, trigger: 'change' }],
                 'key_policy.max_retries': [{ validator: validateKeyPolicyMaxRetries, trigger: 'change' }],
@@ -1660,6 +1699,7 @@ export default {
             this.formData.provider = src.provider || '';
             this.formData.match_prefix = src.match_prefix || '';
             this.formData.strip_prefix = !!src.strip_prefix;
+            this.formData.price_miss_action = src.price_miss_action || 'fallback_chat';
             this.formData.models = (src.models || []).slice();
             this.formData.model_mappings =
                 src.model_mappings && src.model_mappings.length
@@ -2101,6 +2141,8 @@ export default {
                     delete tmpData.match_prefix;
                     delete tmpData.strip_prefix;
                 }
+                // 缺价处置动作：新建显式落值（api 约定省略等价默认，控制台不显式省略）
+                tmpData.price_miss_action = tmpData.price_miss_action || 'fallback_chat';
                 const affinity = tmpData.key_affinity || {};
                 tmpData.key_affinity = {
                     enabled: !!affinity.enabled,

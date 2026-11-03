@@ -264,7 +264,9 @@ function formatLlmConfigForApi(llmConfig) {
             redis_prefix: 'bfe:ai:key_affinity',
             penalty_enable: true
         },
-        strip_prefix: !!src.strip_prefix
+        strip_prefix: !!src.strip_prefix,
+        // 缺价处置动作（issue #1479）：新建显式落值，缺省回落默认
+        price_miss_action: src.price_miss_action || 'fallback_chat'
     };
     if (result.strip_prefix) {
         result.match_prefix = src.match_prefix || '';
