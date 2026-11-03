@@ -235,7 +235,10 @@ export default {
     tipConfirmLogout: '确认注销？',
     tipCodeError: '验证码输入错误',
     tipNotLogin: '当前未登录或者登录已过期请前往登录',
-    tipUrlIllegal: '当前url非法',
+    tipRoleNoAccess:
+      '当前账号没有控制台访问权限：控制台仅支持「系统管理员」角色，请使用管理员账号登录，或联系管理员调整角色',
+    tipRoleVersionMismatch:
+      '控制台前端与后端版本不一致，无法识别当前账号的角色。请强制刷新页面（Ctrl/Cmd+Shift+R）后重试；若仍失败，请联系管理员把前后端升级到同一版本',
     tipSelectProductLine: '请先选择产品线',
     tip404: '啊嘞，找不到路了~',
     loginFailed: '登录失败',
@@ -1014,9 +1017,9 @@ export default {
     waitingQueueMax: '排队长度过滤阈值',
     waitingQueueMaxTip: '后端排队长度超过该值的端点被过滤；0 = 不启用该项过滤',
     waitingQueueMaxInvalid: '排队长度过滤阈值须为 >= 0 的数',
-    runningRequestsMax: '在飞请求数过滤阈值',
-    runningRequestsMaxTip: '后端运行中请求数超过该值的端点被过滤；0 = 不启用该项过滤',
-    runningRequestsMaxInvalid: '在飞请求数过滤阈值须为 >= 0 的数',
+    runningRequestsMax: '执行中请求数过滤阈值',
+    runningRequestsMaxTip: '后端执行中请求数超过该值的端点被过滤；0 = 不启用该项过滤',
+    runningRequestsMaxInvalid: '执行中请求数过滤阈值须为 >= 0 的数',
     fallbackOnEmpty: '无端点时回退派发',
     fallbackOnEmptyTip: '所有端点被过滤时：关闭=不派发；开启=派发"最不差"的端点',
     metricsStalenessThresholdMs: '指标失效剔除阈值（ms）',
@@ -1078,6 +1081,8 @@ export default {
     eppCallTimeout: '调用超时',
     eppCallTimeoutTip: '首条消息收发超时，合法 Go duration 且 > 0，默认 3s',
     eppCallTimeoutInvalid: '调用超时须为合法的 Go duration 且 > 0（如 3s）',
+    eppCallTimeoutVsQueueTtlInvalid:
+      '调用超时需大于队列 TTL（秒）与无端点队列 TTL（秒）的最大值（{max} 秒）',
     eppRuntimeUnset: '未配置（BFE 补默认）',
   },
   provider: {
@@ -1237,13 +1242,17 @@ export default {
     priceItemKey: '价格项',
     priceItemValue: '价格',
     priceItemKeyPlaceholder: '请选择价格项',
-    priceItemValuePlaceholder: '如 1.5e-6 或 0.0000015',
+    priceItemValuePlaceholder: '如 0.05',
+    priceItemValuePlaceholderMillion: '如 2（= ¥2/百万 tokens）',
+    priceUnitPerMillionInput: '元/百万 tokens',
+    priceUnitPerMillionTokens: '百万 tokens',
+    priceUnitOther: '元',
     priceHint:
-      '可输入 1.5e-6 或 0.0000015，失焦后按量级自动格式化（小于 1e-4 或 ≥ 1e6 用科学计数法）。单价格 × 1e8 不得超过 2^53（约 9e15）。',
+      '按 token 计价的价格项（含缓存、超长阈值档位）以「元/百万 tokens」为单位输入（如 2），保存时自动换算为每 token 单价；按次/张/秒/页等计价项按原值（元）输入。失焦后按量级自动格式化（小于 1e-4 或 ≥ 1e6 用科学计数法）。单价格 × 1e8 不得超过 2^53（约 9e15）。',
     priceMergeHint:
       '编辑提交时 prices / tier_prices 为键级合并：表单中的键覆盖原值，未出现的键保留（删除某行不会清除后端已有键）。',
     priceDefaultTip:
-      '科学计数法与十进制等价合法（如 1.5e-6 与 0.0000015）。编辑时未提交的价格键保留原值。',
+      '按 token 计价项以「元/百万 tokens」输入并自动换算存储；其余计价项按原值输入；科学计数法与十进制等价合法（如 1.5e-3 与 0.0015）。编辑时未提交的价格键保留原值。',
     tierPriceObject: '分时段价格',
     tierObject: '时段对象',
     tierPriceTip:

@@ -58,17 +58,17 @@ export function ClustersNameRegCheck(value) {
 * @returns {boolean} - 返回检查结果，true表示符合规范，false表示不符合规范
 */
 export function K8sPoolNameRegCheck(value) {
-  // K8sPoolName: 1-64 chars; letters, digits, _, -, .; cannot start/end with ., -, _; no whitespace
+  // K8sPoolName: 1-128 chars; letters, digits, _, -, .; cannot start/end with ., -, _; no whitespace
   if (!value || typeof value !== 'string') {
     return false;
   }
   if (/\s/.test(value)) {
     return false;
   }
-  if (value.length < 1 || value.length > 64) {
+  if (value.length < 1 || value.length > 128) {
     return false;
   }
-  return /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,62}[a-zA-Z0-9])?$/.test(value);
+  return /^[a-zA-Z0-9]([a-zA-Z0-9._-]{0,126}[a-zA-Z0-9])?$/.test(value);
 }
 
 export function ProviderNameRegCheck(value) {

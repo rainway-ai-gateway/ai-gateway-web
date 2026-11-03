@@ -43,11 +43,7 @@
             width="30"
             :mask-closable="false"
         >
-            <CreateUser
-                v-if="isHiden && handleType === 'create'"
-                :legacyRoleApi="roleApiLegacy"
-                @submit="submitData"
-            />
+            <CreateUser v-if="isHiden && handleType === 'create'" @submit="submitData" />
             <UpdatePassword
                 v-if="isHiden && handleType === 'updatePassword'"
                 :currentData="currentData"
@@ -92,7 +88,6 @@
 import pageTable from '@/components/table/pageTable';
 import CreateUser from './CreateUser.vue';
 import UpdatePassword from './UpdatePassword.vue';
-import { resolveRole, isLegacyRoleApi, ROLE_SYSTEM_ADMIN } from '@/utils/role';
 export default {
     components: {
         pageTable,
@@ -110,8 +105,6 @@ export default {
             handleType: '',
             currentData: {},
             roleDrawerVisible: false,
-            // 列表来自 0.10 后端（只有 is_admin）时改走旧的角色/创建接口
-            roleApiLegacy: false,
             roleForm: {
                 user_name: '',
                 role: 'system_admin'
@@ -135,7 +128,7 @@ export default {
                         { label: this.$t('com.sysAdminReadonly'), value: 'system_admin_readonly' }
                     ],
                     render(h, params) {
-                        return h('span', that.roleLabel(resolveRole(params.row)));
+                        return h('span', that.roleLabel(params.row.role));
                     }
                 },
                 {
@@ -221,7 +214,7 @@ export default {
         onChangeRole(params) {
             this.roleForm = {
                 user_name: params.row.user_name,
-                role: resolveRole(params.row) || ROLE_SYSTEM_ADMIN
+                role: params.row.role || 'system_admin'
             };
             this.roleDrawerVisible = true;
         },
@@ -234,21 +227,12 @@ export default {
                 this.$Message.error({ content: this.$t('user.tipSelectRole') });
                 return;
             }
-            // 0.10 后端只有 is_admin（仅支持 true），无法设置只读角色
-            if (this.roleApiLegacy && this.roleForm.role !== ROLE_SYSTEM_ADMIN) {
-                this.$Message.error({ content: this.$t('user.tipRoleReadonlyUpgrade') });
-                return;
-            }
-            const legacy = this.roleApiLegacy;
             this.$request({
-                url: this.$urlFormat(
-                    legacy ? 'auth/users/{user_name}/is_admin' : 'auth/users/{user_name}/role',
-                    {
-                        user_name: this.roleForm.user_name
-                    }
-                ),
+                url: this.$urlFormat('auth/users/{user_name}/role', {
+                    user_name: this.roleForm.user_name
+                }),
                 method: 'patch',
-                data: legacy ? { is_admin: true } : { role: this.roleForm.role }
+                data: { role: this.roleForm.role }
             }).then(data => {
                 if (data.status === 200) {
                     this.$Message.success({ content: this.$t('com.tipEditSuccX', { obj: this.$t('user.role') }) });
@@ -372,18 +356,10 @@ export default {
             }
         },
         onAddAdminUser(data) {
-            // 0.10 后端不认 role，按旧契约只下发 is_admin（仅系统管理员可选）
-            const payload = this.roleApiLegacy
-                ? {
-                      user_name: data.user_name,
-                      password: data.password,
-                      is_admin: data.role === ROLE_SYSTEM_ADMIN
-                  }
-                : data;
             this.$request({
                 url: 'auth/users',
                 method: 'post',
-                data: payload
+                data: data
             }).then(data => {
                 if (data.status === 200) {
                     this.$Message.success({ content: this.$t('com.tipAddSucc') });
@@ -401,7 +377,6 @@ export default {
                 .then(data => {
                     if (data.status === 200) {
                         this.tableData = data.data.Data;
-                        this.roleApiLegacy = isLegacyRoleApi(this.tableData);
                     }
                 })
                 .finally(() => {

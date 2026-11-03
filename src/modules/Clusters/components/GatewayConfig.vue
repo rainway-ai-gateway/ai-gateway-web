@@ -245,8 +245,8 @@
       </Card>
 
       <Card :title="$t('gatewayConfig.keyPolicy')" class="llm-section-card">
-        <Row :gutter="24">
-          <Col span="24">
+        <div class="llm-form-grid">
+          <div class="llm-form-grid-item">
             <FormItem
               :label="$t('gatewayConfig.keyPolicyStrategy')"
               prop="key_policy.strategy"
@@ -255,8 +255,8 @@
                 <Option value="weighted_random">weighted_random</Option>
               </Select>
             </FormItem>
-          </Col>
-          <Col span="12">
+          </div>
+          <div class="llm-form-grid-item">
             <FormItem
               :label="$t('gatewayConfig.keyPolicyMaxRetries')"
               prop="key_policy.max_retries"
@@ -268,10 +268,8 @@
                 style="width: 100%;"
               />
             </FormItem>
-          </Col>
-        </Row>
-        <Row :gutter="24">
-          <Col span="12">
+          </div>
+          <div class="llm-form-grid-item">
             <FormItem
               :label="$t('gatewayConfig.keyPolicyRetryBackoffInitial')"
               prop="key_policy.retry_backoff_initial"
@@ -283,8 +281,8 @@
                 style="width: 100%;"
               />
             </FormItem>
-          </Col>
-          <Col span="12">
+          </div>
+          <div class="llm-form-grid-item">
             <FormItem
               :label="$t('gatewayConfig.keyPolicyRetryBackoffMax')"
               prop="key_policy.retry_backoff_max"
@@ -296,13 +294,13 @@
                 style="width: 100%;"
               />
             </FormItem>
-          </Col>
-        </Row>
+          </div>
+        </div>
       </Card>
 
       <Card :title="$t('gatewayConfig.keyAffinity')" class="llm-section-card">
-        <Row :gutter="24">
-          <Col span="12">
+        <div class="llm-form-grid">
+          <div class="llm-form-grid-item">
             <FormItem prop="key_affinity.enabled">
               <span slot="label" class="provider-label">
                 {{ $t('gatewayConfig.keyAffinityEnabled') }}
@@ -321,69 +319,63 @@
                 <el-option :value="true" :label="$t('com.enable')" />
               </el-select>
             </FormItem>
-          </Col>
-        </Row>
-        <template v-if="formData.key_affinity.enabled">
-          <Row :gutter="24">
-            <Col span="12">
-              <FormItem
-                :label="$t('gatewayConfig.keyAffinityTtl')"
-                prop="key_affinity.ttl"
+          </div>
+          <div v-if="formData.key_affinity.enabled" class="llm-form-grid-item">
+            <FormItem
+              :label="$t('gatewayConfig.keyAffinityRedisPrefix')"
+              prop="key_affinity.redis_prefix"
+            >
+              <Input
+                v-model="formData.key_affinity.redis_prefix"
+                :placeholder="$t('gatewayConfig.keyAffinityRedisPrefixPlaceholder')"
+              />
+            </FormItem>
+          </div>
+          <div v-if="formData.key_affinity.enabled" class="llm-form-grid-item">
+            <FormItem
+              :label="$t('gatewayConfig.keyAffinityTtl')"
+              prop="key_affinity.ttl"
+            >
+              <InputNumber
+                v-model="formData.key_affinity.ttl"
+                :min="1"
+                :precision="0"
+                style="width: 100%;"
+              />
+            </FormItem>
+          </div>
+          <div v-if="formData.key_affinity.enabled" class="llm-form-grid-item">
+            <FormItem prop="key_affinity.penalty_enable">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.keyAffinityPenalty') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.keyAffinityPenaltyTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <el-select
+                v-model="formData.key_affinity.penalty_enable"
+                size="small"
               >
-                <InputNumber
-                  v-model="formData.key_affinity.ttl"
-                  :min="1"
-                  :precision="0"
-                  style="width: 100%;"
-                />
-              </FormItem>
-            </Col>
-            <Col span="12">
-              <FormItem prop="key_affinity.penalty_enable">
-                <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.keyAffinityPenalty') }}
-                  <Tooltip placement="top" transfer max-width="320">
-                    <div slot="content" class="provider-tip-content">
-                      {{ $t('gatewayConfig.keyAffinityPenaltyTip') }}
-                    </div>
-                    <Icon
-                      type="ios-help-circle-outline"
-                      class="provider-help-icon"
-                    />
-                  </Tooltip>
-                </span>
-                <el-select
-                  v-model="formData.key_affinity.penalty_enable"
-                  size="small"
-                >
-                  <el-option :value="false" :label="$t('com.deactivate')" />
-                  <el-option :value="true" :label="$t('com.enable')" />
-                </el-select>
-              </FormItem>
-            </Col>
-          </Row>
-          <Row :gutter="24">
-            <Col span="12">
-              <FormItem
-                :label="$t('gatewayConfig.keyAffinityRedisPrefix')"
-                prop="key_affinity.redis_prefix"
-              >
-                <Input
-                  v-model="formData.key_affinity.redis_prefix"
-                  :placeholder="$t('gatewayConfig.keyAffinityRedisPrefixPlaceholder')"
-                />
-              </FormItem>
-            </Col>
-          </Row>
-        </template>
+                <el-option :value="false" :label="$t('com.deactivate')" />
+                <el-option :value="true" :label="$t('com.enable')" />
+              </el-select>
+            </FormItem>
+          </div>
+        </div>
       </Card>
 
       <Card
         :title="$t('gatewayConfig.normalizeUpstreamError')"
         class="llm-section-card"
       >
-        <Row :gutter="24">
-          <Col span="12">
+        <div class="llm-form-grid">
+          <div class="llm-form-grid-item">
             <FormItem prop="normalize_upstream_error.enabled">
               <span slot="label" class="provider-label">
                 {{ $t('gatewayConfig.normalizeEnabled') }}
@@ -399,10 +391,8 @@
               </span>
               <i-switch v-model="formData.normalize_upstream_error.enabled" />
             </FormItem>
-          </Col>
-        </Row>
-        <Row :gutter="24">
-          <Col span="12">
+          </div>
+          <div class="llm-form-grid-item">
             <FormItem prop="normalize_upstream_error.stream_enabled">
               <span slot="label" class="provider-label">
                 {{ $t('gatewayConfig.normalizeStreamEnabled') }}
@@ -420,8 +410,8 @@
                 v-model="formData.normalize_upstream_error.stream_enabled"
               />
             </FormItem>
-          </Col>
-          <Col span="12">
+          </div>
+          <div class="llm-form-grid-item">
             <FormItem prop="normalize_upstream_error.redact_secrets">
               <span slot="label" class="provider-label">
                 {{ $t('gatewayConfig.normalizeRedactSecrets') }}
@@ -439,63 +429,65 @@
                 v-model="formData.normalize_upstream_error.redact_secrets"
               />
             </FormItem>
-          </Col>
-        </Row>
-        <template v-if="formData.normalize_upstream_error.enabled">
-          <Row :gutter="24">
-            <Col span="12">
-              <FormItem prop="normalize_upstream_error.unrecognized_action">
-                <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.normalizeUnrecognizedAction') }}
-                  <Tooltip placement="top" transfer max-width="320">
-                    <div slot="content" class="provider-tip-content">
-                      {{ $t('gatewayConfig.normalizeUnrecognizedActionTip') }}
-                    </div>
-                    <Icon
-                      type="ios-help-circle-outline"
-                      class="provider-help-icon"
-                    />
-                  </Tooltip>
-                </span>
-                <Select
-                  v-model="
-                    formData.normalize_upstream_error.unrecognized_action
-                  "
-                >
-                  <Option value="passthrough">{{
-                    $t('gatewayConfig.normalizePassthrough')
-                  }}</Option>
-                  <Option value="rewrite_generic">{{
-                    $t('gatewayConfig.normalizeRewriteGeneric')
-                  }}</Option>
-                </Select>
-              </FormItem>
-            </Col>
-            <Col span="12">
-              <FormItem prop="normalize_upstream_error.max_body_bytes">
-                <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.normalizeMaxBodyBytes') }}
-                  <Tooltip placement="top" transfer max-width="320">
-                    <div slot="content" class="provider-tip-content">
-                      {{ $t('gatewayConfig.normalizeMaxBodyBytesTip') }}
-                    </div>
-                    <Icon
-                      type="ios-help-circle-outline"
-                      class="provider-help-icon"
-                    />
-                  </Tooltip>
-                </span>
-                <InputNumber
-                  v-model="formData.normalize_upstream_error.max_body_bytes"
-                  :min="0"
-                  :max="4194304"
-                  :precision="0"
-                  style="width: 100%;"
-                />
-              </FormItem>
-            </Col>
-          </Row>
-        </template>
+          </div>
+          <div
+            v-if="formData.normalize_upstream_error.enabled"
+            class="llm-form-grid-item"
+          >
+            <FormItem prop="normalize_upstream_error.unrecognized_action">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.normalizeUnrecognizedAction') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.normalizeUnrecognizedActionTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <Select
+                v-model="
+                  formData.normalize_upstream_error.unrecognized_action
+                "
+              >
+                <Option value="passthrough">{{
+                  $t('gatewayConfig.normalizePassthrough')
+                }}</Option>
+                <Option value="rewrite_generic">{{
+                  $t('gatewayConfig.normalizeRewriteGeneric')
+                }}</Option>
+              </Select>
+            </FormItem>
+          </div>
+          <div
+            v-if="formData.normalize_upstream_error.enabled"
+            class="llm-form-grid-item"
+          >
+            <FormItem prop="normalize_upstream_error.max_body_bytes">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.normalizeMaxBodyBytes') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.normalizeMaxBodyBytesTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <InputNumber
+                v-model="formData.normalize_upstream_error.max_body_bytes"
+                :min="0"
+                :max="4194304"
+                :precision="0"
+                style="width: 100%;"
+              />
+            </FormItem>
+          </div>
+        </div>
       </Card>
 
       <Card
@@ -519,8 +511,8 @@
           </Col>
         </Row>
         <template v-if="formData.balance_mode === 'EPP'">
-          <Row :gutter="24">
-            <Col span="12">
+          <div class="llm-form-grid">
+            <div class="llm-form-grid-item">
               <FormItem prop="epp_config.load_profile">
                 <span slot="label" class="provider-label">
                   {{ $t('gatewayConfig.loadProfile') }}
@@ -549,8 +541,8 @@
                   >
                 </Select>
               </FormItem>
-            </Col>
-            <Col span="12">
+            </div>
+            <div class="llm-form-grid-item">
               <FormItem prop="epp_config.affinity">
                 <span slot="label" class="provider-label">
                   {{ $t('gatewayConfig.affinity') }}
@@ -563,11 +555,6 @@
                       class="provider-help-icon"
                     />
                   </Tooltip>
-                  <span
-                    v-if="formData.epp_config.affinity === 'off'"
-                    class="epp-off-hint"
-                    >{{ $t('gatewayConfig.affinityOffHint') }}</span
-                  >
                 </span>
                 <Select v-model="formData.epp_config.affinity">
                   <Option
@@ -588,16 +575,14 @@
                   >
                 </Select>
               </FormItem>
-            </Col>
-          </Row>
-          <Row :gutter="24">
-            <Col span="12">
+            </div>
+            <div
+              v-if="formData.epp_config.affinity !== 'off'"
+              class="llm-form-grid-item"
+            >
               <FormItem prop="epp_config.prefix_cache_affinity">
                 <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.prefixCacheAffinity')
-                  }}<span v-if="formData.epp_config.affinity === 'off'">{{
-                    $t('gatewayConfig.affinityOffSuffix')
-                  }}</span>
+                  {{ $t('gatewayConfig.prefixCacheAffinity') }}
                   <Tooltip placement="top" transfer max-width="320">
                     <div slot="content" class="provider-tip-content">
                       {{ $t('gatewayConfig.prefixCacheAffinityTip') }}
@@ -610,14 +595,14 @@
                 </span>
                 <i-switch v-model="formData.epp_config.prefix_cache_affinity" />
               </FormItem>
-            </Col>
-            <Col span="12">
+            </div>
+            <div
+              v-if="formData.epp_config.affinity !== 'off'"
+              class="llm-form-grid-item"
+            >
               <FormItem prop="epp_config.session_affinity_enabled">
                 <span slot="label" class="provider-label">
-                  {{ $t('gatewayConfig.sessionAffinity')
-                  }}<span v-if="formData.epp_config.affinity === 'off'">{{
-                    $t('gatewayConfig.affinityOffSuffix')
-                  }}</span>
+                  {{ $t('gatewayConfig.sessionAffinity') }}
                   <Tooltip placement="top" transfer max-width="320">
                     <div slot="content" class="provider-tip-content">
                       {{ $t('gatewayConfig.sessionAffinityTip') }}
@@ -632,10 +617,8 @@
                   v-model="formData.epp_config.session_affinity_enabled"
                 />
               </FormItem>
-            </Col>
-          </Row>
-          <Row :gutter="24">
-            <Col span="12">
+            </div>
+            <div class="llm-form-grid-item">
               <FormItem
                 :label="$t('gatewayConfig.kvCacheUtilizationMax')"
                 prop="epp_config.kv_cache_utilization_max"
@@ -648,8 +631,8 @@
                   style="width: 100%;"
                 />
               </FormItem>
-            </Col>
-            <Col span="12" v-if="formData.epp_config.session_affinity_enabled">
+            </div>
+            <div v-if="showSessionAffinityHeader" class="llm-form-grid-item">
               <FormItem
                 :label="$t('gatewayConfig.sessionAffinityHeader')"
                 prop="epp_config.session_affinity_header"
@@ -659,10 +642,8 @@
                   :placeholder="$t('gatewayConfig.sessionAffinityHeaderPlaceholder')"
                 />
               </FormItem>
-            </Col>
-          </Row>
-          <Row :gutter="24">
-            <Col span="12">
+            </div>
+            <div class="llm-form-grid-item">
               <FormItem prop="epp_config.waiting_queue_max">
                 <span slot="label" class="provider-label">
                   {{ $t('gatewayConfig.waitingQueueMax') }}
@@ -683,8 +664,8 @@
                   style="width: 100%;"
                 />
               </FormItem>
-            </Col>
-            <Col span="12">
+            </div>
+            <div class="llm-form-grid-item">
               <FormItem prop="epp_config.running_requests_max">
                 <span slot="label" class="provider-label">
                   {{ $t('gatewayConfig.runningRequestsMax') }}
@@ -705,10 +686,8 @@
                   style="width: 100%;"
                 />
               </FormItem>
-            </Col>
-          </Row>
-          <Row :gutter="24">
-            <Col span="12">
+            </div>
+            <div class="llm-form-grid-item">
               <FormItem prop="epp_config.fallback_on_empty">
                 <span slot="label" class="provider-label">
                   {{ $t('gatewayConfig.fallbackOnEmpty') }}
@@ -724,8 +703,8 @@
                 </span>
                 <i-switch v-model="formData.epp_config.fallback_on_empty" />
               </FormItem>
-            </Col>
-            <Col span="12">
+            </div>
+            <div class="llm-form-grid-item">
               <FormItem prop="epp_config.metrics_staleness_threshold_ms">
                 <span slot="label" class="provider-label">
                   {{ $t('gatewayConfig.metricsStalenessThresholdMs') }}
@@ -746,8 +725,8 @@
                   style="width: 100%;"
                 />
               </FormItem>
-            </Col>
-          </Row>
+            </div>
+          </div>
 
           <Card
             :title="$t('gatewayConfig.flowControl')"
@@ -826,8 +805,8 @@
             class="llm-section-card"
             style="margin-top:12px;"
           >
-            <Row :gutter="24">
-              <Col span="12">
+            <div class="llm-form-grid">
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.check.disabled">
                   <span slot="label" class="provider-label">
                     {{ $t('gatewayConfig.eppCheckDisabled') }}
@@ -843,10 +822,8 @@
                   </span>
                   <i-switch v-model="formData.epp_runtime.check.disabled" />
                 </FormItem>
-              </Col>
-            </Row>
-            <Row :gutter="24">
-              <Col span="12">
+              </div>
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.check.check_interval">
                   <span slot="label">{{ $t('gatewayConfig.eppCheckInterval') }}</span>
                   <DurationInput
@@ -854,8 +831,8 @@
                     default-unit="s"
                   />
                 </FormItem>
-              </Col>
-              <Col span="12">
+              </div>
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.check.fail_threshold">
                   <span slot="label">{{ $t('gatewayConfig.eppFailThreshold') }}</span>
                   <InputNumber
@@ -865,10 +842,8 @@
                     style="width: 100%;"
                   />
                 </FormItem>
-              </Col>
-            </Row>
-            <Row :gutter="24">
-              <Col span="12">
+              </div>
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.check.cooldown">
                   <span slot="label" class="provider-label">
                     {{ $t('gatewayConfig.eppCooldown') }}
@@ -887,8 +862,8 @@
                     default-unit="s"
                   />
                 </FormItem>
-              </Col>
-              <Col span="12">
+              </div>
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.check.success_threshold">
                   <span slot="label">{{ $t('gatewayConfig.eppSuccessThreshold') }}</span>
                   <InputNumber
@@ -898,10 +873,8 @@
                     style="width: 100%;"
                   />
                 </FormItem>
-              </Col>
-            </Row>
-            <Row :gutter="24">
-              <Col span="12">
+              </div>
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.timeout.connect">
                   <span slot="label">{{ $t('gatewayConfig.eppConnectTimeout') }}</span>
                   <DurationInput
@@ -909,8 +882,8 @@
                     default-unit="ms"
                   />
                 </FormItem>
-              </Col>
-              <Col span="12">
+              </div>
+              <div class="llm-form-grid-item">
                 <FormItem prop="epp_runtime.timeout.call">
                   <span slot="label" class="provider-label">
                     {{ $t('gatewayConfig.eppCallTimeout') }}
@@ -929,8 +902,8 @@
                     default-unit="s"
                   />
                 </FormItem>
-              </Col>
-            </Row>
+              </div>
+            </div>
           </Card>
         </template>
       </Card>
@@ -1227,7 +1200,10 @@ export default {
             callback();
         };
         const validateSessionAffinityHeader = (rule, value, callback) => {
-            if (!that.formData.epp_config.session_affinity_enabled) {
+            if (
+                !that.formData.epp_config.session_affinity_enabled ||
+                that.formData.epp_config.affinity === 'off'
+            ) {
                 callback();
                 return;
             }
@@ -1253,6 +1229,7 @@ export default {
 
         const validateQueueTtl = (rule, value, callback) => {
             if (value === undefined || value === null || value === '') {
+                revalidateEppCallTimeout();
                 callback();
                 return;
             }
@@ -1261,6 +1238,7 @@ export default {
                 callback(new Error(that.$t('gatewayConfig.queueTtlInvalid')));
                 return;
             }
+            revalidateEppCallTimeout();
             callback();
         };
 
@@ -1283,6 +1261,7 @@ export default {
 
         const validateNoEndpointQueueTtl = (rule, value, callback) => {
             if (value === undefined || value === null || value === '') {
+                revalidateEppCallTimeout();
                 callback();
                 return;
             }
@@ -1291,6 +1270,7 @@ export default {
                 callback(new Error(that.$t('gatewayConfig.noEndpointQueueTtlInvalid')));
                 return;
             }
+            revalidateEppCallTimeout();
             callback();
         };
 
@@ -1376,6 +1356,47 @@ export default {
                 return;
             }
             callback();
+        };
+
+        const validateEppCallTimeoutVsQueueTtl = (rule, value, callback) => {
+            if (that.formData.balance_mode !== 'EPP') {
+                callback();
+                return;
+            }
+            const fc = (that.formData.epp_config && that.formData.epp_config.flow_control) || {};
+            const rawQ = fc.queue_ttl;
+            const rawNe = fc.no_endpoint_queue_ttl;
+            const q = rawQ === undefined || rawQ === null || rawQ === '' ? 60 : Number(rawQ);
+            const ne = rawNe === undefined || rawNe === null || rawNe === '' ? q : Number(rawNe);
+            if (!Number.isInteger(q) || !Number.isInteger(ne)) {
+                callback();
+                return;
+            }
+            const ttlMax = Math.max(q, ne);
+            if (ttlMax <= 0) {
+                // 0 = 显式禁用驱逐，排队预算不再约束调用超时
+                callback();
+                return;
+            }
+            const callStr =
+                value === undefined || value === null || value === ''
+                    ? defaultEppRuntime().timeout.call
+                    : String(value);
+            if (!(parseDurationMs(callStr) > ttlMax * 1000)) {
+                callback(
+                    new Error(
+                        that.$t('gatewayConfig.eppCallTimeoutVsQueueTtlInvalid', { max: ttlMax })
+                    )
+                );
+                return;
+            }
+            callback();
+        };
+
+        const revalidateEppCallTimeout = () => {
+            if (that.$refs.formData) {
+                that.$refs.formData.validateField('epp_runtime.timeout.call');
+            }
         };
 
         const validateEppRuntimeThreshold = invalidKey => (rule, value, callback) => {
@@ -1488,6 +1509,10 @@ export default {
                     {
                         validator: validateEppRuntimeDuration('gatewayConfig.eppCallTimeoutInvalid'),
                         trigger: 'blur'
+                    },
+                    {
+                        validator: validateEppCallTimeoutVsQueueTtl,
+                        trigger: 'change'
                     }
                 ]
             }
@@ -1497,6 +1522,13 @@ export default {
     computed: {
         providerModels() {
             return (this.selectedProvider && this.selectedProvider.models) || [];
+        },
+        // 会话亲和 Header 展示条件：亲和强度非 off 且会话亲和开启（kv_cache 同行动态列宽依赖）
+        showSessionAffinityHeader() {
+            return (
+                this.formData.epp_config.affinity !== 'off' &&
+                this.formData.epp_config.session_affinity_enabled
+            );
         },
         providerKeys() {
             return (this.selectedProvider && this.selectedProvider.keys) || [];
@@ -1912,7 +1944,10 @@ export default {
                 epp.session_affinity_enabled &&
                 !String(epp.session_affinity_header || '').trim()
             ) {
-                return this.$t('gatewayConfig.sessionAffinityHeaderRequired');
+                // 亲和强度 off 时该字段被隐藏、无法就地补填，给出可操作提示（后端契约仍要求 Header 非空）
+                return epp.affinity === 'off'
+                    ? this.$t('gatewayConfig.sessionAffinityHeaderRequiredWhenOff')
+                    : this.$t('gatewayConfig.sessionAffinityHeaderRequired');
             }
             if (epp.kv_cache_utilization_max != null) {
                 const kv = Number(epp.kv_cache_utilization_max);
@@ -2212,5 +2247,17 @@ table {
 
 .mt20 {
     margin-top: 20px;
+}
+
+// 两列自适应表单网格:条件隐藏的表单项不渲染时,后续项自动顶上来补位,不留空白块
+.llm-form-grid {
+    display: flex;
+    flex-wrap: wrap;
+
+    .llm-form-grid-item {
+        box-sizing: border-box;
+        width: 50%;
+        padding-right: 24px;
+    }
 }
 </style>

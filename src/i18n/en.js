@@ -237,7 +237,10 @@ export default {
     tipConfirmLogout: 'Confirm logout？',
     tipCodeError: 'Wrong verification code',
     tipNotLogin: 'Please login first',
-    tipUrlIllegal: 'URL not exist',
+    tipRoleNoAccess:
+      'This account has no access to the console: only the System Admin role is supported. Sign in with an admin account or ask an administrator to change the role',
+    tipRoleVersionMismatch:
+      'The console frontend and backend are on different versions, so the account role cannot be recognized. Hard-refresh the page (Ctrl/Cmd+Shift+R); if it persists, ask an administrator to upgrade them to the same version',
     tipSelectProductLine: 'Please select a product first',
     tip404: 'Page not found',
     loginFailed: 'Login failed',
@@ -1058,8 +1061,6 @@ export default {
     affinityHigh: 'high (1.0)',
     affinityTip:
       'off: no affinity scorer injected; low/medium/high: weight 0.3/0.6/1.0',
-    affinityOffHint: 'Affinity strength is off, no effect',
-    affinityOffSuffix: ' (no effect when off)',
     affinityInvalid: 'Invalid affinity strength value',
     prefixCacheAffinity: 'Prefix Cache Affinity',
     prefixCacheAffinityTip:
@@ -1071,6 +1072,8 @@ export default {
     sessionAffinityHeaderPlaceholder: 'Required when session affinity is on, e.g. x-session-id',
     sessionAffinityHeaderRequired:
       'Header is required when session affinity is enabled',
+    sessionAffinityHeaderRequiredWhenOff:
+      'Session affinity has no effect while affinity is off; switch affinity back to low/medium/high to fill the Header, or turn session affinity off',
     kvCacheUtilizationMax: 'KV Cache Utilization Max',
     kvCacheUtilizationMaxInvalid:
       'KV cache utilization max must be greater than 0 and less than or equal to 1',
@@ -1155,6 +1158,8 @@ export default {
       'Timeout for sending/receiving the first message, valid Go duration and > 0, default 3s',
     eppCallTimeoutInvalid:
       'Call timeout must be a valid Go duration and > 0 (e.g. 3s)',
+    eppCallTimeoutVsQueueTtlInvalid:
+      'Call timeout must be greater than the maximum of queue TTL and no-endpoint queue TTL ({max}s)',
     eppRuntimeUnset: 'Not configured (BFE applies defaults)',
   },
   provider: {
@@ -1186,12 +1191,16 @@ export default {
     instanceSource: 'Instance Source',
     instanceSourceManual: 'Manual Instance Pool (instance_pool)',
     instanceSourceK8s: 'K8s Instance Pool (k8s_pool)',
-    k8sPoolName: 'K8s Pool Name',
-    k8sPoolNamePlaceholder: 'e.g. llm-inference-pool',
-    k8sPoolNameRequired: 'Please enter the K8s pool name',
+    k8sPoolName: 'K8s Instance Pool',
+    k8sPoolSelectPlaceholder: 'Please select a K8s instance pool',
+    k8sPoolNoOptions: 'No K8s instance pools available',
+    k8sPoolNotExistOption: 'pool does not exist',
+    k8sPoolNotFound: 'K8s pool does not exist (equivalent to zero instances)',
+    k8sPoolInstanceAddress: 'Instance Address',
+    k8sPoolNameRequired: 'Please select a K8s instance pool',
     k8sPoolNameRule:
-      'K8s pool name must be 1-64 chars; only letters, digits, underscore _, hyphen -, dot .; cannot start or end with . - _; no whitespace',
-    k8sPoolEmpty: 'No mirror instances (missing pool is equivalent to zero instances)',
+      'K8s pool name must be 1-128 chars; only letters, digits, underscore _, hyphen -, dot .; cannot start or end with . - _; no whitespace',
+    k8sPoolEmpty: 'The pool currently has no instances (an empty pool is a valid state)',
     instanceHostPlaceholder: 'Shown after instances are filled',
     tipNameRule:
       'Length 1-64 characters; only letters, digits, underscore, hyphen, and dot; cannot start or end with a dot, hyphen, or underscore; cannot contain whitespace',
@@ -1322,13 +1331,17 @@ export default {
     priceItemKey: 'Price Item',
     priceItemValue: 'Price',
     priceItemKeyPlaceholder: 'Select price item',
-    priceItemValuePlaceholder: 'e.g. 1.5e-6 or 0.0000015',
+    priceItemValuePlaceholder: 'e.g. 0.05',
+    priceItemValuePlaceholderMillion: 'e.g. 2 (= ¥2 / 1M tokens)',
+    priceUnitPerMillionInput: '¥ / 1M tokens',
+    priceUnitPerMillionTokens: '1M tokens',
+    priceUnitOther: '¥',
     priceHint:
-      'Enter 1.5e-6 or 0.0000015; on blur the value is formatted by magnitude (scientific if < 1e-4 or ≥ 1e6). A single price × 1e8 must be less than 2^53 (~9e15).',
+      'Token-based price items (including cache and above-Nk tiers) are entered in ¥ per 1M tokens (e.g. 2) and converted to per-token price on save; per-request / per-image / per-second / per-page items are entered as-is (¥). On blur the value is formatted by magnitude (scientific if < 1e-4 or ≥ 1e6). A single price × 1e8 must be less than 2^53 (~9e15).',
     priceMergeHint:
       'On edit, prices / tier_prices are merged by key: submitted keys overwrite existing values; omitted keys are kept (removing a row does not delete an existing backend key).',
     priceDefaultTip:
-      'Scientific notation and decimal form are equivalent (e.g. 1.5e-6 and 0.0000015). Keys not submitted on edit are retained.',
+      'Token-based items are entered in ¥ per 1M tokens and converted on save; other items are entered as-is; scientific notation and decimal form are equivalent (e.g. 1.5e-3 and 0.0015). Keys not submitted on edit are retained.',
     tierPriceObject: 'Tier Price',
     tierObject: 'Period Object',
     tierPriceTip:

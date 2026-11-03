@@ -900,9 +900,6 @@ window.ClusterUpsert = (function () {
     var eppConfigHtml = '';
     if (isEpp) {
       var affinityOff = ec.affinity === 'off';
-      var offNote = affinityOff
-        ? '<span style="color:#ff9900;margin-left:6px;font-size:12px;">亲和强度为 off，不生效</span>'
-        : '';
 
       var loadProfileHtml = IvuUI.formTopItem(
         '实例负载画像' +
@@ -927,8 +924,7 @@ window.ClusterUpsert = (function () {
 
       var affinityHtml = IvuUI.formTopItem(
         '亲和强度' +
-          helpIcon('off: 不注入亲和 scorer; low/medium/high: 权重 0.3/0.6/1.0') +
-          offNote,
+          helpIcon('off: 不注入亲和 scorer; low/medium/high: 权重 0.3/0.6/1.0'),
         '<select class="proto-field from-item-inp" data-field="epp.epp_config.affinity" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
           '<option value="off"' +
           (ec.affinity === 'off' ? ' selected' : '') +
@@ -954,8 +950,7 @@ window.ClusterUpsert = (function () {
 
       var prefixCacheHtml = IvuUI.formTopItem(
         '前缀缓存亲和性' +
-          helpIcon('开启后将相同前缀的请求尽力收敛到同一后端') +
-          (affinityOff ? '（off 时不生效）' : ''),
+          helpIcon('开启后将相同前缀的请求尽力收敛到同一后端'),
         prefixCacheSwitchHtml,
       );
 
@@ -967,14 +962,14 @@ window.ClusterUpsert = (function () {
 
       var sessionAffinityHtml = IvuUI.formTopItem(
         '会话亲和性' +
-          helpIcon('开启后将同一会话的请求尽力粘住同一后端') +
-          (affinityOff ? '（off 时不生效）' : ''),
+          helpIcon('开启后将同一会话的请求尽力粘住同一后端'),
         sessionAffinitySwitchHtml,
         true,
       );
 
-      var sessionAffinityHeaderHtml = ec.session_affinity_enabled
-        ? IvuUI.formTopItem(
+      var sessionAffinityHeaderHtml =
+        ec.session_affinity_enabled && !affinityOff
+          ? IvuUI.formTopItem(
             '会话亲和性 Header',
             '<div class="ivu-input-wrapper ivu-input-type-text"><input type="text" class="ivu-input proto-field" data-field="epp.epp_config.session_affinity_header" value="' +
               IvuUI.escapeHtml(ec.session_affinity_header || '') +
@@ -1086,8 +1081,7 @@ window.ClusterUpsert = (function () {
         IvuUI.formTop(
           loadProfileHtml +
             affinityHtml +
-            prefixCacheHtml +
-            sessionAffinityHtml +
+            (affinityOff ? '' : prefixCacheHtml + sessionAffinityHtml) +
             sessionAffinityHeaderHtml +
             kvCacheHtml +
             waitingQueueHtml +

@@ -212,11 +212,16 @@
                       </el-select>
                     </td>
                     <td>
-                      <Input
-                        v-model="entry.value"
-                        :placeholder="$t('modelPrices.priceItemValuePlaceholder')"
-                        @on-blur="onPriceBlur(entry)"
-                      />
+                      <div class="price-input-cell">
+                        <Input
+                          v-model="entry.value"
+                          :placeholder="priceValuePlaceholder(entry.key)"
+                          @on-blur="onPriceBlur(entry)"
+                        />
+                        <span class="price-unit">{{
+                          priceUnitLabel(entry.key)
+                        }}</span>
+                      </div>
                     </td>
                     <td>
                       <Button
@@ -308,11 +313,16 @@
                       </el-select>
                     </td>
                     <td>
-                      <Input
-                        v-model="entry.value"
-                        :placeholder="$t('modelPrices.priceItemValuePlaceholder')"
-                        @on-blur="onPriceBlur(entry)"
-                      />
+                      <div class="price-input-cell">
+                        <Input
+                          v-model="entry.value"
+                          :placeholder="priceValuePlaceholder(entry.key)"
+                          @on-blur="onPriceBlur(entry)"
+                        />
+                        <span class="price-unit">{{
+                          priceUnitLabel(entry.key)
+                        }}</span>
+                      </div>
                     </td>
                     <td>
                       <Button
@@ -404,7 +414,13 @@
 
 <script>
 import { cloneDeep } from 'lodash';
-import { formatPriceForInput, isPriceOverflow } from '@/utils/price';
+import {
+    formatPriceForInput,
+    formatPriceForMillionInput,
+    isTokenBasedPriceKey,
+    isPriceOverflow,
+    millionToTokenPrice
+} from '@/utils/price';
 
 const MODE_OPTIONS = [
     'chat', 'completion', 'responses', 'image_generation', 'image_edit',
@@ -664,8 +680,29 @@ export default {
         objectToPriceList(obj) {
             return Object.keys(obj || {}).map(key => ({
                 key,
-                value: formatPriceForInput(obj[key])
+                value: isTokenBasedPriceKey(key)
+                    ? formatPriceForMillionInput(obj[key])
+                    : formatPriceForInput(obj[key])
             }));
+        },
+
+        // 按 token 计价的键以「元/百万 tokens」录入，提交前换算为每 token 单价存储
+        toStoragePrice(key, value) {
+            return isTokenBasedPriceKey(key)
+                ? millionToTokenPrice(value)
+                : Number(value);
+        },
+
+        priceValuePlaceholder(key) {
+            return isTokenBasedPriceKey(key)
+                ? this.$t('modelPrices.priceItemValuePlaceholderMillion')
+                : this.$t('modelPrices.priceItemValuePlaceholder');
+        },
+
+        priceUnitLabel(key) {
+            return isTokenBasedPriceKey(key)
+                ? this.$t('modelPrices.priceUnitPerMillionInput')
+                : this.$t('modelPrices.priceUnitOther');
         },
 
         onPriceBlur(entry) {
@@ -676,7 +713,7 @@ export default {
             const result = {};
             (list || []).forEach(item => {
                 if (item.key !== '' && item.value !== '' && item.value !== null && item.value !== undefined) {
-                    result[item.key] = Number(item.value);
+                    result[item.key] = this.toStoragePrice(item.key, item.value);
                 }
             });
             return result;
@@ -710,7 +747,7 @@ export default {
                 if (!item.key) return false;
                 const value = Number(item.value);
                 if (Number.isNaN(value) || value < 0) return false;
-                return isPriceOverflow(value);
+                return isPriceOverflow(this.toStoragePrice(item.key, value));
             });
         },
 
@@ -929,6 +966,19 @@ export default {
 
     .add-row-btn {
         margin-top: 4px;
+    }
+
+    .price-input-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .price-unit {
+        flex-shrink: 0;
+        color: #808695;
+        font-size: 12px;
+        white-space: nowrap;
     }
 
     .price-section-card {
