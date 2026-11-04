@@ -24,8 +24,7 @@
             '<div id="cluster-table"></div>' +
           '</div>' +
           drawerUpsert() +
-          drawerDetail() +
-          drawerRefCheck();
+          drawerDetail();
 
         var upsertController = null;
         var state = {
@@ -179,16 +178,18 @@
         }
 
         function handleDelete(name) {
-          var refs = findClusterReferences(name);
-          if (refs.length > 0) {
-            showRefCheckModal(name, refs);
-          } else {
-            Prototype.confirmDelete('是否删除' + name + '？', function () {
+          // Frontend does no reference pre-check; the backend rejects the delete
+          // (mocked here) and the returned error message is shown as-is
+          Prototype.confirmDelete('是否删除' + name + '？', function () {
+            var refs = findClusterReferences(name);
+            if (refs.length > 0) {
+              Prototype.toast('删除失败：集群 ' + name + ' 被规则 ' + refs[0].ruleName + ' 引用', 'error');
+            } else {
               state.allRows = state.allRows.filter(function (item) { return item.name !== name; });
               renderTable();
               Prototype.toast('删除成功');
-            });
-          }
+            }
+          });
         }
 
         function findClusterReferences(clusterName) {
@@ -248,38 +249,6 @@
           });
 
           return results;
-        }
-
-        function showRefCheckModal(clusterName, refs) {
-          var body = document.getElementById('ref-check-body');
-          if (!body) return;
-
-          var rows = refs.map(function (ref) {
-            return '<tr>' +
-              '<td><div class="ivu-table-cell">' + IvuUI.escapeHtml(ref.table) + '</div></td>' +
-              '<td><div class="ivu-table-cell">' + IvuUI.escapeHtml(ref.ruleName) + '</div></td>' +
-              '<td><div class="ivu-table-cell">' + IvuUI.escapeHtml(ref.ruleType) + '</div></td>' +
-            '</tr>';
-          }).join('');
-
-          body.innerHTML =
-            '<div style="margin-bottom:12px;color:#ed4014;">删除失败：集群 <b>' + IvuUI.escapeHtml(clusterName) + '</b> 被以下规则引用，请先解除引用后再删除。</div>' +
-            '<div class="ivu-table-wrapper">' +
-              '<div class="ivu-table ivu-table-default ivu-table-border" style="width:100%;">' +
-                '<div class="ivu-table-body">' +
-                  '<table cellspacing="0" cellpadding="0" border="0" style="width:100%;table-layout:fixed;">' +
-                    '<thead><tr>' +
-                      '<th><div class="ivu-table-cell"><span>路由表</span></div></th>' +
-                      '<th><div class="ivu-table-cell"><span>规则名称</span></div></th>' +
-                      '<th><div class="ivu-table-cell"><span>规则类型</span></div></th>' +
-                    '</tr></thead>' +
-                    '<tbody class="ivu-table-tbody">' + rows + '</tbody>' +
-                  '</table>' +
-                '</div>' +
-              '</div>' +
-            '</div>';
-
-          Prototype.openDrawer('drawer-ref-check');
         }
 
         function openUpsert(isAdd, row) {
@@ -366,11 +335,6 @@
           IvuUI.btn('关闭', 'primary', 'default', '', 'data-close-drawer="drawer-cluster-detail"'), '80%');
       }
 
-      function drawerRefCheck() {
-        return IvuUI.drawer('drawer-ref-check', '引用检查',
-          '<div id="ref-check-body"></div>',
-          IvuUI.btn('关闭', 'primary', 'default', '', 'data-close-drawer="drawer-ref-check"'), '60%');
-      }
     </script>
   </body>
 </html>
