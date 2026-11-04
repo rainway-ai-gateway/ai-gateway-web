@@ -205,6 +205,10 @@
           <li class="title">{{ $t('gatewayConfig.priceMissAction') }}:</li>
           <li class="value">{{ displayPriceMissAction }}</li>
         </ul>
+        <ul class="clearFloat">
+          <li class="title">{{ $t('gatewayConfig.ensureReasoningContent') }}:</li>
+          <li class="value">{{ displayEnsureReasoningContent }}</li>
+        </ul>
         <ul class="clearFloat detail-row detail-row-block">
           <li class="title">{{ $t('gatewayConfig.modelRedirect') }}:</li>
           <li class="value">
@@ -752,6 +756,13 @@ export default {
                 reject: this.$t('gatewayConfig.priceMissActionRejectShort')
             };
             return map[action] || action || '-';
+        },
+        displayEnsureReasoningContent() {
+            const list =
+                this.llmConfigData && Array.isArray(this.llmConfigData.ensure_reasoning_content)
+                    ? this.llmConfigData.ensure_reasoning_content
+                    : [];
+            return list.length ? list.join(', ') : '-';
         },
         displayPassiveHealthData() {
             return formatPassiveHealthCheckForApi(this.passiveHealthData);

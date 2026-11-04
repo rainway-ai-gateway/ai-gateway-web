@@ -265,8 +265,10 @@ function formatLlmConfigForApi(llmConfig) {
             penalty_enable: true
         },
         strip_prefix: !!src.strip_prefix,
-        // 缺价处置动作（issue #1479）：新建显式落值，缺省回落默认
-        price_miss_action: src.price_miss_action || 'fallback_chat'
+        price_miss_action: src.price_miss_action || 'fallback_chat',
+        ensure_reasoning_content: Array.isArray(src.ensure_reasoning_content)
+            ? src.ensure_reasoning_content
+            : []
     };
     if (result.strip_prefix) {
         result.match_prefix = src.match_prefix || '';

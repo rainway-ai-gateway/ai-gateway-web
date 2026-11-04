@@ -982,6 +982,12 @@ export default {
     priceMissActionFallbackChatShort: '回退 chat 价计费',
     priceMissActionBillZeroShort: '按 0 计费',
     priceMissActionRejectShort: '转发前拒绝',
+    ensureReasoningContent: '推理内容补齐协议',
+    ensureReasoningContentTip:
+      '为选中协议自动补齐缺失的 reasoning_content：部分思考模式上游要求最后一条 user 消息后的 assistant 消息回传 reasoning_content，而它自身有不产出 reasoning 的回合；开启后网关在转发请求体里为该窗口内的 assistant 补空串（openai）或空 thinking 块（anthropic），只增不改、异常原样透传。空选 = 关闭；元素须在所属服务商的协议范围内',
+    ensureReasoningContentInvalid: '推理内容补齐协议仅支持 openai / anthropic，且不重复',
+    ensureReasoningContentNotInProvider:
+      '推理内容补齐协议 {proto} 不在所属服务商协议（{protocols}）内',
     stripPrefix: '裁剪前缀',
     stripPrefixTip: '开启后转发给下游前会从请求 model 字段中去掉该前缀',
     ownedProvider: '所属服务商',

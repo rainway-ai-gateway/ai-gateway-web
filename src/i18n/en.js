@@ -1037,6 +1037,13 @@ export default {
     priceMissActionFallbackChatShort: 'Fallback to chat pricing',
     priceMissActionBillZeroShort: 'Bill as 0',
     priceMissActionRejectShort: 'Reject before forwarding',
+    ensureReasoningContent: 'Reasoning Content Backfill Protocols',
+    ensureReasoningContentTip:
+      'Backfill missing reasoning_content for selected protocols: some reasoning-mode upstreams require the assistant message after the last user message to carry reasoning_content, while having rounds that produce none; when enabled, the gateway backfills an empty string (openai) or empty thinking block (anthropic) for assistant messages in that window — additive only, exceptions pass through. Empty = off; each item must be within the owned provider protocols',
+    ensureReasoningContentInvalid:
+      'Reasoning-content-backfill protocols only support openai / anthropic, without duplicates',
+    ensureReasoningContentNotInProvider:
+      'Protocol {proto} is not in the owned provider protocols ({protocols})',
     stripPrefix: 'Strip Prefix',
     stripPrefixTip:
       'When enabled, the prefix will be stripped from the request model before forwarding',

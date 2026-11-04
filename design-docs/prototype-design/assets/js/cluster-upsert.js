@@ -134,6 +134,8 @@ window.ClusterUpsert = (function () {
         // 2026-11-03 issue #1479：缺价处置动作（三态，默认 fallback_chat；控制台显式落值）
         price_miss_action:
           (row.llm_config && row.llm_config.price_miss_action) || 'fallback_chat',
+        ensure_reasoning_content:
+          (row.llm_config && row.llm_config.ensure_reasoning_content) || [],
         models: provider && provider.models ? provider.models.slice() : [],
         model_mappings: [
           { source_model: 'gpt-4-turbo', target_model: 'gpt-4o' },
@@ -487,6 +489,29 @@ window.ClusterUpsert = (function () {
           );
         }).join('') +
         '</select>',
+    );
+
+    var ENSURE_RC_PROTOCOLS = ['openai', 'anthropic'];
+    var ensureRcChecked = llm.ensure_reasoning_content || [];
+    var ensureRcCheckboxHtml = ENSURE_RC_PROTOCOLS.map(function (p) {
+      var checked = ensureRcChecked.indexOf(p) !== -1 ? ' checked' : '';
+      return (
+        '<label style="margin-right:16px;cursor:pointer;">' +
+        '<input type="checkbox" class="proto-ensure-rc" data-value="' +
+        p +
+        '"' +
+        checked +
+        ' /> ' +
+        p +
+        '</label>'
+      );
+    }).join('');
+    var ensureReasoningHtml = IvuUI.formTopItem(
+      '推理内容补齐协议' +
+        helpIcon(
+          '需要补齐 reasoning_content 的协议列表：部分思考模式上游要求最后一条 user 消息后的 assistant 消息回传 reasoning_content；开启后网关为该窗口内 assistant 补空串（openai）或空 thinking 块（anthropic）。空选 = 关闭',
+        ),
+      '<div id="proto-ensure-rc-wrap">' + ensureRcCheckboxHtml + '</div>',
     );
 
     var selectedModels = llm.models || [];
@@ -865,7 +890,8 @@ window.ClusterUpsert = (function () {
             true,
           ) +
           stripPrefixHtml +
-          priceMissActionHtml,
+          priceMissActionHtml +
+          ensureReasoningHtml,
       ) +
       '</div></div>' +
       '<div class="llm-card"><div class="llm-card-title">模型重定向</div><div class="llm-card-body">' +
@@ -1377,6 +1403,10 @@ window.ClusterUpsert = (function () {
           reject: '转发前拒绝',
         }[llm.price_miss_action] || llm.price_miss_action || '-',
       ) +
+      reviewRow(
+        '推理内容补齐协议',
+        (llm.ensure_reasoning_content || []).join(', ') || '-',
+      ) +
       '<ul class="clearFloat detail-row detail-row-block"><li class="title">模型重定向:</li><li class="value">' +
       (llm.model_mappings && llm.model_mappings.length
         ? '<table class="mapping-table"><thead><tr><th>原请求的模型名称</th><th>转发的后端模型名称</th></tr></thead><tbody>' +
@@ -1720,6 +1750,35 @@ window.ClusterUpsert = (function () {
       ['fallback_chat', 'bill_zero', 'reject'].indexOf(llm.price_miss_action) === -1
     ) {
       return '缺价处置动作须为 fallback_chat / bill_zero / reject';
+    }
+
+    var erc = llm.ensure_reasoning_content || [];
+    var ercSeen = {};
+    var providerProtocols =
+      provider && Array.isArray(provider.model_protocols) && provider.model_protocols.length
+        ? provider.model_protocols
+        : ['openai'];
+    for (var ei = 0; ei < erc.length; ei++) {
+      var proto = erc[ei];
+      if (!proto || !String(proto).trim()) {
+        return '推理内容补齐协议存在空元素';
+      }
+      if (['openai', 'anthropic'].indexOf(proto) === -1) {
+        return '推理内容补齐协议仅支持 openai / anthropic，不支持 ' + proto;
+      }
+      if (ercSeen[proto]) {
+        return '推理内容补齐协议重复：' + proto;
+      }
+      ercSeen[proto] = true;
+      if (providerProtocols.indexOf(proto) === -1) {
+        return (
+          '推理内容补齐协议 ' +
+          proto +
+          ' 不在所属服务商协议（' +
+          providerProtocols.join(', ') +
+          '）内'
+        );
+      }
     }
 
     if (!llm.models || !llm.models.length) return '请至少选择一个模型';
@@ -2312,6 +2371,17 @@ window.ClusterUpsert = (function () {
         select.addEventListener('change', function () {
           syncFromDom(bodyEl, state.data);
           render();
+        });
+      });
+
+      bodyEl.querySelectorAll('.proto-ensure-rc').forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+          var value = checkbox.getAttribute('data-value');
+          var list = (state.data.llmConfigData.ensure_reasoning_content || []).slice();
+          var idx = list.indexOf(value);
+          if (checkbox.checked && idx === -1) list.push(value);
+          if (!checkbox.checked && idx !== -1) list.splice(idx, 1);
+          state.data.llmConfigData.ensure_reasoning_content = list;
         });
       });
 

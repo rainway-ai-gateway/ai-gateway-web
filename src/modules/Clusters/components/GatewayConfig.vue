@@ -139,6 +139,26 @@
             </Option>
           </Select>
         </FormItem>
+        <FormItem prop="ensure_reasoning_content">
+          <span slot="label" class="provider-label">
+            {{ $t('gatewayConfig.ensureReasoningContent') }}
+            <Tooltip placement="top" transfer max-width="320">
+              <div slot="content" class="provider-tip-content">
+                {{ $t('gatewayConfig.ensureReasoningContentTip') }}
+              </div>
+              <Icon type="ios-help-circle-outline" class="provider-help-icon" />
+            </Tooltip>
+          </span>
+          <Select
+            v-model="formData.ensure_reasoning_content"
+            style="width: 100%;"
+            size="small"
+            multiple
+          >
+            <Option value="openai">openai</Option>
+            <Option value="anthropic">anthropic</Option>
+          </Select>
+        </FormItem>
       </Card>
 
       <Card :title="$t('gatewayConfig.modelRedirect')" class="llm-section-card">
@@ -1138,6 +1158,45 @@ export default {
             }
             callback();
         };
+        const validateEnsureReasoningContent = (rule, value, callback) => {
+            const list = Array.isArray(value) ? value : [];
+            const seen = {};
+            for (let i = 0; i < list.length; i++) {
+                const proto = list[i];
+                if (!proto || !String(proto).trim()) {
+                    callback(new Error(that.$t('gatewayConfig.ensureReasoningContentInvalid')));
+                    return;
+                }
+                if (['openai', 'anthropic'].indexOf(proto) === -1) {
+                    callback(new Error(that.$t('gatewayConfig.ensureReasoningContentInvalid')));
+                    return;
+                }
+                if (seen[proto]) {
+                    callback(new Error(that.$t('gatewayConfig.ensureReasoningContentInvalid')));
+                    return;
+                }
+                seen[proto] = true;
+                const provider = that.selectedProvider;
+                const protocols =
+                    provider &&
+                    Array.isArray(provider.model_protocols) &&
+                    provider.model_protocols.length
+                        ? provider.model_protocols
+                        : ['openai'];
+                if (protocols.indexOf(proto) === -1) {
+                    callback(
+                        new Error(
+                            that.$t('gatewayConfig.ensureReasoningContentNotInProvider', {
+                                proto,
+                                protocols: protocols.join(', ')
+                            })
+                        )
+                    );
+                    return;
+                }
+            }
+            callback();
+        };
         const validateMappings = (rule, value, callback) => {
             const mappings = value || [];
             const sources = {};
@@ -1462,6 +1521,7 @@ export default {
                 match_prefix: '',
                 strip_prefix: false,
                 price_miss_action: 'fallback_chat',
+                ensure_reasoning_content: [],
                 models: [],
                 model_mappings: [{ source_model: '', target_model: '' }],
                 keys: [{ name: '', weight: 0 }],
@@ -1477,6 +1537,9 @@ export default {
                 models: [{ validator: validateModels, trigger: 'change', required: true }],
                 match_prefix: [{ validator: validateMatchPrefix, trigger: 'blur' }],
                 price_miss_action: [{ validator: validatePriceMissAction, trigger: 'change' }],
+                ensure_reasoning_content: [
+                    { validator: validateEnsureReasoningContent, trigger: 'change' }
+                ],
                 model_mappings: [{ validator: validateMappings, trigger: 'change' }],
                 keys: [{ validator: validateKeys, trigger: 'change' }],
                 'key_policy.max_retries': [{ validator: validateKeyPolicyMaxRetries, trigger: 'change' }],
@@ -1700,6 +1763,9 @@ export default {
             this.formData.match_prefix = src.match_prefix || '';
             this.formData.strip_prefix = !!src.strip_prefix;
             this.formData.price_miss_action = src.price_miss_action || 'fallback_chat';
+            this.formData.ensure_reasoning_content = Array.isArray(src.ensure_reasoning_content)
+                ? src.ensure_reasoning_content.slice()
+                : [];
             this.formData.models = (src.models || []).slice();
             this.formData.model_mappings =
                 src.model_mappings && src.model_mappings.length
@@ -2143,6 +2209,9 @@ export default {
                 }
                 // 缺价处置动作：新建显式落值（api 约定省略等价默认，控制台不显式省略）
                 tmpData.price_miss_action = tmpData.price_miss_action || 'fallback_chat';
+                tmpData.ensure_reasoning_content = Array.isArray(tmpData.ensure_reasoning_content)
+                    ? tmpData.ensure_reasoning_content
+                    : [];
                 const affinity = tmpData.key_affinity || {};
                 tmpData.key_affinity = {
                     enabled: !!affinity.enabled,
