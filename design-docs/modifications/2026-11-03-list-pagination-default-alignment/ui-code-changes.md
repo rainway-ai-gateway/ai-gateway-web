@@ -1,57 +1,55 @@
-# UI 代码变更：列表接口无参默认分页对齐（api issue #303 消费侧）
+# UI 代码变更：列表接口分页对齐——/api-keys 真分页 + 下拉/映射按需全量（最终态）
 
-> **日期**: 2026-11-03 ｜ **前置**: [2026-11-03 缺价处置动作与报表缺价](../2026-11-03-price-miss-action-report-price-miss-and-quota-cap/ui-code-changes.md) ｜ **上游依据**: `ai-gateway-api` 拉取至 `1347d73`，含 `84bee7e fix(pagination): 列表接口无参时回填默认分页 1/20（issue #303）`、`8ad4d62 fix(rules): 规则集合整体替换并发冲突返回 409（#295）`、`c14bac7/db153ef fix(http): CORS 预检与 405 Allow（#298/#297）`；api-define 已按 e2e 工作流阶段 1.6 整体同步（`00-common.md` 拆出「默认值与截断（通用基线）」并登记 `/providers` 全量例外、分页非法值分严格/截断两类；`api-keys/entities/entity-types` pagination 说明同步）
-> **对照接口**: `00-common.md`（通用分页基线）、`api-keys.md` §2.2（严格 422）、`entities.md` / `entity-types.md`（clamp）、`ai-cache-rules.md` / `ai-context-rules.md` / `traffic-mirror-rules.md`（集合整体替换 409）｜ **对照原型**: 无原型变更（纯请求参数补齐，无交互变化）
-> **状态**: 原型 ⬜（无需改动）· UI 代码 ✅（lint 通过，已构建并同步 `ai-gateway-runtime/static/`；api 已重新编译部署并 curl 验证）· 02 文档 ⬜（影响评估见 §5，均为无处置）· 手册 ⬜ ｜ **菜单/路由变更**: 无
+> **日期**: 2026-11-03（2026-11-04 按 api #306 终局回退 entities/entity-types 相关改动）｜ **前置**: [2026-11-03 缺价处置动作](../2026-11-03-price-miss-action-report-price-miss-and-quota-cap/ui-code-changes.md) ｜ **上游依据**: `ai-gateway-api` 最终对齐版本 `71e2513`，关键提交：`84bee7e #303`（api-keys/entities/entity-types 无参回填 1/20）、**`03fdba4 #306`（/entities 与 /entity-types 无参恢复返回完整列表——登记例外）**、`8ad4d62 #295`（规则集合替换并发 409）；api-define 已按 e2e 工作流阶段 1.6 整体同步
+> **对照接口**: `00-common.md`（通用分页基线 + 登记例外清单：providers、entities、entity-types 无参全量）、`api-keys.md` §2.2（严格 422，**无参仍 1/20 分页**）、`route-tables.md`（分页接口，handler 尚无 #303 式改造，无参全量为隐式契约）｜ **对照原型**: 无原型变更
+> **状态**: 原型 ⬜（无需改动）· UI 代码 ✅（lint 通过，构建部署）· 02 文档 ⬜（无受影响用例）· 手册 ⬜ ｜ **菜单/路由变更**: 无
 
-## 1. 变更总览
+## 1. 变更总览（最终态）
 
-| 页面 / 模块 | 变更要点（一句话） | 状态 | 验证 |
-| ----------- | -------- | ---- | ---- |
-| Entity 列表 / Entity 类型列表（`EntityList.vue` / `EntityTypeList.vue`） | 列表主数据与类型筛选/下拉的 `GET entities` / `GET entity-types` 补 `page=1&page_size=100`（此前无参返回全量，#303 后仅 1/20） | ✅ UI | ✅ curl：无参→`page=1,page_size=20,total=5`；带参→生效值 |
-| Entity 创建/编辑（`EntityUpsert.vue`） | 类型下拉 `GET entity-types` 补分页参数 | ✅ UI | 同上 |
-| API Key 列表（`ApiKeyList.vue`） | 列表主数据 `GET api-keys` 补分页参数（该接口为严格 422 语义，100 为合法上限） | ✅ UI | ✅ curl：`/api-keys` 无参→`page=1,page_size=20,total=16` |
-| 集群删除引用检测（`Clusters/index.vue`） | 属主标签映射的 `GET entities` / `GET api-keys` 补分页参数 | ✅ UI | 同上 |
-| 路由表属主映射（`RouteTable/index.vue`） | `fetchEntityNames` 的 `GET entities` 补分页参数 | ✅ UI | 同上 |
-| `/providers` 列表（`Providers/index.vue` 等） | **不改**：`providers.md` 登记例外「未传分页参数时返回全部记录、page_size=total、上限 1000」，#303 明确未动该 handler | ✅ 无需改动 | curl `/providers` 行为不变 |
+| 页面 / 模块 | 最终处理 | 理由 |
+| ----------- | -------- | ---- |
+| API Key 列表（`ApiKeyList.vue`） | **服务端真分页**（pageTable server-pagination） | `/api-keys` 无参仍只给 20 条（#303 未恢复），必须分页 |
+| 集群删除引用检测（`Clusters/index.vue`） | **整段移除**（2026-11-04 用户决策）：删除集群不再做前端引用预检/失败后的 route-tables 全表扫描与引用弹窗，删除失败直接 toast 后端返回的错误消息 | 后端删除路径自带引用校验（`RouteRuleManager.ClusterDeleteChecker` / `RouteRulesManager.ClusterDeleteChecker`，冲突返回 409 + 规则名），如 `Rule %s Refer To This Cluster`；前端扫描属重复实现且依赖无参全量（实测 `/route-tables` 无参只回 20 条） |
+| Entity 列表 / Entity 类型列表 / EntityUpsert / RouteTable | **全部回退**为 #303 之前的原始无参调用（2026-11-04 用户决策） | `/entities`、`/entity-types` 无参已恢复全量，无需循环拉全 |
+| `/providers` 相关调用 | **不改** | 登记例外，无参全量 |
 
-## 2. 接口变更（diff）
+> **过程记录**：#303 后首版曾对 entities/entity-types 的 5 处调用改 `fetchAllList` 循环拉全 + 三个列表页真分页；api #306 恢复这两个接口的无参全量后按契约对齐原则回退（恢复至 `10b1acb`）；引用检测经「修复→回退」后按用户决策整段移除（后端自带 409 校验）；APIKey Upsert 关联 Entity 下拉随之回退无参直取。终局仅保留 `ApiKeyList` 真分页一处实质改动。
 
-api 侧行为变更（#303）：`/api-keys`、`/entities`、`/entity-types` 完全不传 `page`/`page_size` 时，由「返回全量 + `pagination.page=0/page_size=0`」改为「按 `page=1`、`page_size=20` 分页返回，响应回填生效值」；`pagination.total` 统一为**满足本次过滤条件的总条数**（api-keys 修掉了此前 total 只按 ProductName 统计的问题）；非法值语义按接口分两类（api-keys 严格 422；entities/entity-types clamp）。`/providers` 为例外保持全量。另规则集合整体替换（ai-cache / ai-context / traffic-mirror）并发冲突返回 409（`Conflict: collection is being replaced concurrently, retry later`）。
+## 2. 接口行为基线（最终以 #303 + #306 为准）
 
-## 3. UI 代码变更（`src/`，已实施）
+| 接口 | 无参行为 | 显式分页 |
+|------|---------|---------|
+| `/entities`、`/entity-types` | **返回全量**，`page=1, page_size=total`（#306 恢复，登记例外） | 分页 + clamp（page_size>100→100） |
+| `/api-keys` | `page=1, page_size=20` 首页（#303，未恢复） | 严格语义，page_size>100 → 422 |
+| `/providers` | 全量（登记例外，未变） | page_size 上限 1000 |
+| `/route-tables` | **默认 1/20 首页**（handler 无条件回填并下推分页，`endpoints.go:52-64`；curl 实测：22 张表无参只回 20） | 分页 + clamp（page_size>100→100） |
 
-统一改法：上述 7 处「下拉/映射/无分页列表」调用补 `params: { page: 1, page_size: 100 }`（接口上限 100；api-keys 为严格语义，100 合法），并加注释标注 issue #303 背景。这些页面本就是无分页 UI（全量小表），拉满一页是最小修复；若未来数据量超 100，应改真分页（超出本变更范围）。
+## 3. UI 代码变更（`src/`，最终态）
 
-| 文件 | 调用点 |
-| ---- | ---- |
-| `src/modules/Entity/components/EntityList.vue` | `fetchEntityTypeList`（筛选下拉）+ 列表主数据 `GET entities` |
-| `src/modules/Entity/components/EntityTypeList.vue` | `fetchData` 主数据 `GET entity-types` |
-| `src/modules/Entity/components/EntityUpsert.vue` | `fetchEntityTypeList`（表单下拉） |
-| `src/modules/APIKey/components/ApiKeyList.vue` | `fetchData` 主数据 `GET api-keys` |
-| `src/modules/Clusters/index.vue` | 删除集群引用检测的 `GET entities` / `GET api-keys`（属主标签映射） |
-| `src/modules/RouteTable/index.vue` | `fetchEntityNames`（属主映射） |
+- **真分页（1 处）**：`ApiKeyList.vue` 的 `pageTable` 开启 `server-pagination`（`:total` / `:current-page` / `:page-size` / `@on-page-change`，范式同 OperationLogs），`fetchData` 按服务端分页拉取，`total` 取 `pagination.total`。列搜索/排序为 pageTable 客户端口径，仅作用于当前页（使用率低，暂不改造）。
+- **（已删）fetchAllList**：曾新增 `src/utils/paged-list.js` 循环拉全工具（api-keys 映射、route-tables 扫描、APIKey Upsert 关联 Entity 下拉三处消费）；2026-11-04 终局——引用检测整段移除（见变更总览）、`/entities` 已被 #306 恢复无参全量（APIKey Upsert 关联 Entity 下拉回退无参直取），**工具与全部消费一并清除，未进入最终代码**。
+- **回退（5 处，恢复至 `10b1acb` 原始代码）**：`EntityUpsert.fetchEntityTypeList`、`EntityList`（列表主数据 + 类型筛选下拉 + entity-list prop + 父级列名）、`EntityTypeList.fetchData`、`RouteTable.fetchEntityNames`、`Clusters` 的 entities 属主映射。
 
 ## 4. 不改动的部分及理由
 
-- **`/providers` 相关调用**：登记例外，无参仍全量，行为不变。
-- **规则集合 409**：UI 统一 `$request` 错误处理会把后端 `ErrMsg` toast 出来（消息本身含 retry later 指引），无专门交互；并发替换属极小概率，不新增重试逻辑。
-- **CORS / 405 / Req-ID**：HTTP 层增强，UI 同源调用无感知。
-- **其余列表接口**（clusters、route-tables、batches、model-prices、operation-logs 等）：#303 仅改三个 handler，这些接口无参行为不变（已核对代码变更范围）。
+- **`/providers` 相关调用**：登记例外，无参仍全量。
+- **RouteTable 主列表 / model-prices / operation-logs / security**：本就带参分页，无影响（model-prices provider 下拉 `page_size=1000` 合法，该接口上限 1000）。
+- **规则集合 409**（#295）：统一 `$request` 错误处理 toast 后端消息（含 retry later 指引），不新增重试逻辑。
+- **CORS / 405 / Req-ID**（#297/#298）：HTTP 层增强，UI 同源无感知。
+- **其余无参调用**（clusters、batches、certificates、各规则集合、epp-pool、k8s_pools 等）：接口无分页结构，返回全量是契约内行为。
 
-## 5. 既有用例影响（impact-scan：`分页 page_size 无参 entities entity-types api-keys`）
+## 5. 既有用例影响
 
 | 对象 | 影响 | 处置 |
 | ---- | ---- | ---- |
-| `tests/` 下 api-utils / pages 封装 | 测试不直连 `entities`/`entity-types`/`api-keys` 列表端点（grep 无命中）；UI 自动化经浏览器走修复后的带参请求 | **无处置** |
-| 既有 UI 自动化用例的数据可见性 | 相关页面现最多展示 100 条/页；现有用例造数规模远小于 100，行可见性断言不受影响 | **无处置**（用例数据量超 100 时需改真分页，登记为后续事项） |
-| 报表/集群等其它模块 | 接口无参行为未变 | **无处置** |
+| `tests/` 下 api-utils / pages 封装 | 测试不直连这些列表端点（grep 无命中） | 无处置 |
+| 既有 UI 自动化用例 | 回退后各页面行为与 #303 之前一致；ApiKeyList 改分页但现有用例造数规模 <20 | 无处置 |
+| 报表/集群等其它模块 | 接口行为未变或已适配 | 无处置 |
 
 ## 6. 验收清单
 
-- [x] `GET /entities` 无参 → `page=1, page_size=20, total=满足过滤总条数`；`page_size=100` → 生效值（curl 实测）。
-- [x] `GET /api-keys` 无参 → `page=1, page_size=20`（curl 实测）；`page_size=101` → 422（api 侧集成测试覆盖）。
-- [x] `/providers` 无参 → 全量 + `page_size=total`（行为不变，未改 UI）。
-- [x] UI 7 处调用补参后 lint 通过、构建部署完成。
-- [x] api 重新编译部署（`1347d73` + 本地 bfe pin），8183 验证。
-- [ ] 02 文档：无受影响用例（§5），无需新增；如后续相关页面改真分页再补用例。
+- [x] api 行为 curl 实测（部署版本 `71e2513`）：`/entities`、`/entity-types` 无参全量；`/api-keys` 无参 1/20。
+- [x] ApiKeyList 真分页 lint 通过、构建部署；`paged-list.js` 已随全部消费清除。
+- [x] 回退的 5 处与 `10b1acb` 逐字节一致（`git checkout 10b1acb --`）。
+- [ ] 浏览器复验（提交前）：API Key 列表分页、删除集群引用弹窗（route-tables 扫描路径）。
+- [ ] 02 文档：无受影响用例；如后续补 ApiKeyList 分页交互用例再登记。

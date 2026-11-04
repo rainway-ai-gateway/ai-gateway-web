@@ -29,6 +29,11 @@
       :tableData="tableData"
       :columns="columns"
       :loading="tableLoading"
+      :total="total"
+      :server-pagination="true"
+      :current-page="page"
+      :page-size="pageSize"
+      @on-page-change="onPageChange"
       @on-row-click="onView"
     />
 
@@ -155,6 +160,9 @@ export default {
             modelsModal: false,
             currentModels: [],
             tableData: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
             columns: [
                 {
                     title: that.$t('apiKey.keyId'),
@@ -540,17 +548,17 @@ export default {
         },
         fetchData() {
             this.tableLoading = true;
-            // issue #303：列表接口无参不再返回全量（默认 1/20），列表主数据需显式拉满一页（上限 100）
             this.$request({
                 url: this.$urlFormat('api-keys'),
                 method: 'get',
-                params: { page: 1, page_size: 100 },
+                params: { page: this.page, page_size: this.pageSize },
                 openapi: true
             })
                 .then(res => {
                     if (res.status === 200) {
                         const data = res.data.Data || {};
                         const list = Array.isArray(data.list) ? data.list : [];
+                        this.total = (data.pagination && data.pagination.total) || list.length;
                         this.tableData = list.map(item => {
                             const quotaPlan = item.quota_plan || {};
                             const entity = item.entity || {};
@@ -568,6 +576,11 @@ export default {
                 .finally(() => {
                     this.tableLoading = false;
                 });
+        },
+        onPageChange(pageInfo) {
+            this.page = pageInfo.page;
+            this.pageSize = pageInfo.pageSize;
+            this.fetchData();
         },
         showModelsModal(models) {
             this.currentModels = models || [];

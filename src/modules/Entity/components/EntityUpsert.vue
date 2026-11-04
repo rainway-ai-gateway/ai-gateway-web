@@ -978,11 +978,9 @@ export default {
         },
 
         fetchEntityTypeList() {
-            // issue #303：列表接口无参不再返回全量（默认 1/20），类型下拉需显式拉满一页（上限 100）
             this.$request({
                 url: 'entity-types',
                 method: 'get',
-                params: { page: 1, page_size: 100 },
                 openapi: true
             }).then(data => {
                 if (data.status === 200) {
