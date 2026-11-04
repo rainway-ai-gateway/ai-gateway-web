@@ -413,6 +413,58 @@
               </el-select>
             </FormItem>
           </div>
+          <div
+            v-if="formData.key_affinity.enabled && formData.key_affinity.penalty_enable"
+            class="llm-form-grid-item"
+          >
+            <FormItem prop="key_affinity.penalty_ttl_429">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.keyAffinityPenaltyTtl429') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.keyAffinityPenaltyTtl429Tip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <InputNumber
+                v-model="formData.key_affinity.penalty_ttl_429"
+                :min="10"
+                :max="600"
+                :precision="0"
+                style="width: 100%;"
+              />
+            </FormItem>
+          </div>
+          <div
+            v-if="formData.key_affinity.enabled && formData.key_affinity.penalty_enable"
+            class="llm-form-grid-item"
+          >
+            <FormItem prop="key_affinity.penalty_ttl_auth">
+              <span slot="label" class="provider-label">
+                {{ $t('gatewayConfig.keyAffinityPenaltyTtlAuth') }}
+                <Tooltip placement="top" transfer max-width="320">
+                  <div slot="content" class="provider-tip-content">
+                    {{ $t('gatewayConfig.keyAffinityPenaltyTtlAuthTip') }}
+                  </div>
+                  <Icon
+                    type="ios-help-circle-outline"
+                    class="provider-help-icon"
+                  />
+                </Tooltip>
+              </span>
+              <InputNumber
+                v-model="formData.key_affinity.penalty_ttl_auth"
+                :min="60"
+                :max="1800"
+                :precision="0"
+                style="width: 100%;"
+              />
+            </FormItem>
+          </div>
         </div>
       </Card>
 
@@ -977,7 +1029,9 @@ function defaultKeyAffinity() {
         enabled: true,
         ttl: 600,
         redis_prefix: 'bfe:ai:key_affinity',
-        penalty_enable: true
+        penalty_enable: true,
+        penalty_ttl_429: 60,
+        penalty_ttl_auth: 300
     };
 }
 
@@ -1284,6 +1338,25 @@ export default {
             }
             callback();
         };
+        const validateKeyAffinityPenaltyTtl = invalidKey => (rule, value, callback) => {
+            if (!that.formData.key_affinity.enabled || !that.formData.key_affinity.penalty_enable) {
+                callback();
+                return;
+            }
+            if (value === undefined || value === null || value === '') {
+                callback();
+                return;
+            }
+            const n = Number(value);
+            const range = invalidKey === 'gatewayConfig.keyAffinityPenaltyTtl429Invalid'
+                ? { min: 10, max: 600 }
+                : { min: 60, max: 1800 };
+            if (!Number.isInteger(n) || n < range.min || n > range.max) {
+                callback(new Error(that.$t(invalidKey)));
+                return;
+            }
+            callback();
+        };
         const validateKeyAffinityRedisPrefix = (rule, value, callback) => {
             if (!that.formData.key_affinity.enabled) {
                 callback();
@@ -1546,6 +1619,12 @@ export default {
                 'key_policy.retry_backoff_max': [{ validator: validateBackoffMax, trigger: 'change' }],
                 'key_affinity.ttl': [{ validator: validateKeyAffinityTtl, trigger: 'change' }],
                 'key_affinity.redis_prefix': [{ validator: validateKeyAffinityRedisPrefix, trigger: 'blur' }],
+                'key_affinity.penalty_ttl_429': [
+                    { validator: validateKeyAffinityPenaltyTtl('gatewayConfig.keyAffinityPenaltyTtl429Invalid'), trigger: 'change' }
+                ],
+                'key_affinity.penalty_ttl_auth': [
+                    { validator: validateKeyAffinityPenaltyTtl('gatewayConfig.keyAffinityPenaltyTtlAuthInvalid'), trigger: 'change' }
+                ],
                 'epp_config.session_affinity_header': [{ validator: validateSessionAffinityHeader, trigger: 'blur' }],
                 'epp_config.kv_cache_utilization_max': [
                     { validator: validateKvCacheUtilizationMax, trigger: 'change' }
@@ -1787,7 +1866,9 @@ export default {
                 enabled: toBoolean(affinitySrc.enabled, true),
                 ttl: affinitySrc.ttl != null ? Number(affinitySrc.ttl) : 600,
                 redis_prefix: affinitySrc.redis_prefix || 'bfe:ai:key_affinity',
-                penalty_enable: toBoolean(affinitySrc.penalty_enable, true)
+                penalty_enable: toBoolean(affinitySrc.penalty_enable, true),
+                penalty_ttl_429: affinitySrc.penalty_ttl_429 != null ? Number(affinitySrc.penalty_ttl_429) : 60,
+                penalty_ttl_auth: affinitySrc.penalty_ttl_auth != null ? Number(affinitySrc.penalty_ttl_auth) : 300
             };
             const nueSrc = src.normalize_upstream_error || {};
             const nueDefault = defaultNormalizeUpstreamError();
@@ -2217,7 +2298,15 @@ export default {
                     enabled: !!affinity.enabled,
                     ttl: Number(affinity.ttl) || 600,
                     redis_prefix: String(affinity.redis_prefix || 'bfe:ai:key_affinity'),
-                    penalty_enable: toBoolean(affinity.penalty_enable, true)
+                    penalty_enable: toBoolean(affinity.penalty_enable, true),
+                    penalty_ttl_429:
+                        affinity.penalty_ttl_429 != null && affinity.penalty_ttl_429 !== ''
+                            ? Number(affinity.penalty_ttl_429)
+                            : 60,
+                    penalty_ttl_auth:
+                        affinity.penalty_ttl_auth != null && affinity.penalty_ttl_auth !== ''
+                            ? Number(affinity.penalty_ttl_auth)
+                            : 300
                 };
                 const nue = tmpData.normalize_upstream_error || {};
                 tmpData.normalize_upstream_error = {

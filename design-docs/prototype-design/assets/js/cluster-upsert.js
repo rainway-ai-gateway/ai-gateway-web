@@ -70,6 +70,8 @@ window.ClusterUpsert = (function () {
         ttl: 600,
         redis_prefix: 'bfe:ai:key_affinity',
         penalty_enable: true,
+        penalty_ttl_429: 60,
+        penalty_ttl_auth: 300,
       };
     }
     if (!data.llmConfigData.normalize_upstream_error) {
@@ -155,6 +157,19 @@ window.ClusterUpsert = (function () {
           ttl: 600,
           redis_prefix: 'bfe:ai:key_affinity',
           penalty_enable: true,
+          // 2026-11-04 issue #1448：惩罚时长默认值（429: 60s / 401/402/403: 300s）
+          penalty_ttl_429:
+            row.llm_config && row.llm_config.key_affinity
+              ? row.llm_config.key_affinity.penalty_ttl_429 != null
+                ? row.llm_config.key_affinity.penalty_ttl_429
+                : 60
+              : 60,
+          penalty_ttl_auth:
+            row.llm_config && row.llm_config.key_affinity
+              ? row.llm_config.key_affinity.penalty_ttl_auth != null
+                ? row.llm_config.key_affinity.penalty_ttl_auth
+                : 300
+              : 300,
         },
         normalize_upstream_error:
           row.llm_config && row.llm_config.normalize_upstream_error
@@ -777,7 +792,30 @@ window.ClusterUpsert = (function () {
               '" /></div>',
             true,
           ) +
-          '</div></div>'
+          '</div></div>' +
+          (ka.penalty_enable
+            ? '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+              '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+              IvuUI.formTopItem(
+                '429 惩罚时长(秒)' +
+                  helpIcon('上游返回 429 时 Key 的惩罚窗口，10–600 秒，默认 60'),
+                IvuUI.inputNumber(
+                  ka.penalty_ttl_429 != null ? ka.penalty_ttl_429 : 60,
+                  'class="proto-field" data-field="llm.key_affinity.penalty_ttl_429" min="10" max="600"',
+                ),
+              ) +
+              '</div>' +
+              '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+              IvuUI.formTopItem(
+                '401/402/403 惩罚时长(秒)' +
+                  helpIcon('上游返回 401/402/403 时 Key 的惩罚窗口，60–1800 秒，默认 300'),
+                IvuUI.inputNumber(
+                  ka.penalty_ttl_auth != null ? ka.penalty_ttl_auth : 300,
+                  'class="proto-field" data-field="llm.key_affinity.penalty_ttl_auth" min="60" max="1800"',
+                ),
+              ) +
+              '</div></div>'
+            : '')
         : '');
 
     var nue = llm.normalize_upstream_error || {};
@@ -1358,7 +1396,15 @@ window.ClusterUpsert = (function () {
           '</div>' +
           '<div>Key 惩罚：' +
           (ka.penalty_enable ? '开启' : '关闭') +
-          '</div>'
+          '</div>' +
+          (ka.penalty_enable
+            ? '<div>429 惩罚时长(秒)：' +
+              IvuUI.escapeHtml(ka.penalty_ttl_429 != null ? ka.penalty_ttl_429 : 60) +
+              '</div>' +
+              '<div>401/402/403 惩罚时长(秒)：' +
+              IvuUI.escapeHtml(ka.penalty_ttl_auth != null ? ka.penalty_ttl_auth : 300) +
+              '</div>'
+            : '')
         : '') +
       '</div></div></li></ul>';
 
@@ -1820,6 +1866,27 @@ window.ClusterUpsert = (function () {
     var kp = llm.key_policy || {};
     if (Number(kp.retry_backoff_max) < Number(kp.retry_backoff_initial)) {
       return '最大退避时间必须大于或等于初始退避时间';
+    }
+
+    // 2026-11-04 issue #1448：Key 惩罚时长范围校验（0/负数/越界拒绝，0 不表示关闭）
+    var ka = llm.key_affinity || {};
+    if (ka.enabled && ka.penalty_enable) {
+      var ttl429 = Number(ka.penalty_ttl_429);
+      if (
+        ka.penalty_ttl_429 != null &&
+        ka.penalty_ttl_429 !== '' &&
+        (!Number.isInteger(ttl429) || ttl429 < 10 || ttl429 > 600)
+      ) {
+        return '429 惩罚时长须为 10–600 的整数（秒）';
+      }
+      var ttlAuth = Number(ka.penalty_ttl_auth);
+      if (
+        ka.penalty_ttl_auth != null &&
+        ka.penalty_ttl_auth !== '' &&
+        (!Number.isInteger(ttlAuth) || ttlAuth < 60 || ttlAuth > 1800)
+      ) {
+        return '401/402/403 惩罚时长须为 60–1800 的整数（秒）';
+      }
     }
 
     var nue = llm.normalize_upstream_error || {};

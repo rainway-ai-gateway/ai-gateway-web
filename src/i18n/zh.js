@@ -966,6 +966,14 @@ export default {
     keyAffinityPenalty: 'Key 惩罚',
     keyAffinityPenaltyTip:
       '开启后，失败的 Key 会被临时惩罚，降低再次被选中概率',
+    keyAffinityPenaltyTtl429: '429 惩罚时长（秒）',
+    keyAffinityPenaltyTtlAuth: '401/402/403 惩罚时长（秒）',
+    keyAffinityPenaltyTtl429Tip:
+      '上游返回 429 时 Key 的惩罚窗口，10–600 秒，默认 60；0 不表示关闭',
+    keyAffinityPenaltyTtlAuthTip:
+      '上游返回 401/402/403 时 Key 的惩罚窗口，60–1800 秒，默认 300；0 不表示关闭',
+    keyAffinityPenaltyTtl429Invalid: '429 惩罚时长须为 10–600 的整数（秒）',
+    keyAffinityPenaltyTtlAuthInvalid: '401/402/403 惩罚时长须为 60–1800 的整数（秒）',
     matchPrefix: '匹配前缀',
     matchPrefixTip:
       '需要匹配的 provider/model 前缀，例如 openrouter/，必须以 / 结尾',

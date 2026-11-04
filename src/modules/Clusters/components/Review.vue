@@ -365,6 +365,31 @@
                     </div>
                   </Col>
                 </Row>
+                <Row
+                  v-if="displayKeyAffinity.penalty_enable"
+                  :gutter="24"
+                >
+                  <Col span="12">
+                    <div class="review-item">
+                      <div class="review-label">
+                        {{ $t('gatewayConfig.keyAffinityPenaltyTtl429') }}:
+                      </div>
+                      <div class="review-value">
+                        {{ displayKeyAffinity.penalty_ttl_429 }}
+                      </div>
+                    </div>
+                  </Col>
+                  <Col span="12">
+                    <div class="review-item">
+                      <div class="review-label">
+                        {{ $t('gatewayConfig.keyAffinityPenaltyTtlAuth') }}:
+                      </div>
+                      <div class="review-value">
+                        {{ displayKeyAffinity.penalty_ttl_auth }}
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
               </template>
             </Card>
           </li>
@@ -842,7 +867,9 @@ export default {
                 enabled: false,
                 ttl: 600,
                 redis_prefix: 'bfe:ai:key_affinity',
-                penalty_enable: true
+                penalty_enable: true,
+                penalty_ttl_429: 60,
+                penalty_ttl_auth: 300
             };
             const getValue = key => {
                 const value = affinity[key];
@@ -853,7 +880,9 @@ export default {
                 enabled: isTrue(getValue('enabled')),
                 ttl: getValue('ttl'),
                 redis_prefix: getValue('redis_prefix'),
-                penalty_enable: isTrue(getValue('penalty_enable'))
+                penalty_enable: isTrue(getValue('penalty_enable')),
+                penalty_ttl_429: getValue('penalty_ttl_429'),
+                penalty_ttl_auth: getValue('penalty_ttl_auth')
             };
         },
         displayNormalizeUpstreamError() {

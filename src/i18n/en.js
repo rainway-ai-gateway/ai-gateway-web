@@ -1019,6 +1019,16 @@ export default {
     keyAffinityPenalty: 'Key Penalty',
     keyAffinityPenaltyTip:
       'When enabled, recently failing Keys are temporarily penalized and less likely to be selected',
+    keyAffinityPenaltyTtl429: '429 Penalty TTL (s)',
+    keyAffinityPenaltyTtlAuth: '401/402/403 Penalty TTL (s)',
+    keyAffinityPenaltyTtl429Tip:
+      'Penalty window for Keys when upstream returns 429: 10-600 s, default 60; 0 does not mean off',
+    keyAffinityPenaltyTtlAuthTip:
+      'Penalty window for Keys when upstream returns 401/402/403: 60-1800 s, default 300; 0 does not mean off',
+    keyAffinityPenaltyTtl429Invalid:
+      '429 penalty TTL must be an integer between 10 and 600 (seconds)',
+    keyAffinityPenaltyTtlAuthInvalid:
+      '401/402/403 penalty TTL must be an integer between 60 and 1800 (seconds)',
     matchPrefix: 'Match Prefix',
     matchPrefixTip:
       'Provider/model prefix to match, e.g. openrouter/; must end with /',
