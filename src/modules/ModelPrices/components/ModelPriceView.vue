@@ -105,7 +105,7 @@
                 v-for="(entry, index) in pricesEntries"
                 :key="`price-${index}`"
               >
-                <td>{{ entry.key }}</td>
+                <td>{{ priceKeyLabel(entry.key) }}</td>
                 <td>{{ formatPriceCell(entry) }}</td>
               </tr>
             </tbody>
@@ -131,7 +131,7 @@
                     v-for="(entry, index) in group.entries"
                     :key="`tier-${group.name}-${index}`"
                   >
-                    <td>{{ entry.key }}</td>
+                    <td>{{ priceKeyLabel(entry.key) }}</td>
                     <td>{{ formatPriceCell(entry) }}</td>
                   </tr>
                 </tbody>
@@ -175,7 +175,8 @@
 import {
     formatPriceDisplay,
     formatPriceDisplayMillion,
-    isTokenBasedPriceKey
+    isTokenBasedPriceKey,
+    priceKeyLabel as formatPriceKeyLabel
 } from '@/utils/price';
 
 export default {
@@ -243,6 +244,10 @@ export default {
                 return `¥${formatPriceDisplayMillion(entry.value)} / ${this.$t('modelPrices.priceUnitPerMillionTokens')}`;
             }
             return `¥${this.formatPrice(entry.value)}`;
+        },
+        // 价格项键名 + 中文备注（issue #140）
+        priceKeyLabel(key) {
+            return formatPriceKeyLabel(key);
         }
     }
 };

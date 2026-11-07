@@ -207,7 +207,7 @@
                           v-for="item in priceKeyOptions"
                           :key="item"
                           :value="item"
-                          :label="item"
+                          :label="priceKeyLabel(item)"
                         />
                       </el-select>
                     </td>
@@ -308,7 +308,7 @@
                           v-for="item in priceKeyOptions"
                           :key="item"
                           :value="item"
-                          :label="item"
+                          :label="priceKeyLabel(item)"
                         />
                       </el-select>
                     </td>
@@ -419,7 +419,8 @@ import {
     formatPriceForMillionInput,
     isTokenBasedPriceKey,
     isPriceOverflow,
-    millionToTokenPrice
+    millionToTokenPrice,
+    priceKeyLabel as formatPriceKeyLabel
 } from '@/utils/price';
 
 const MODE_OPTIONS = [
@@ -703,6 +704,11 @@ export default {
             return isTokenBasedPriceKey(key)
                 ? this.$t('modelPrices.priceUnitPerMillionInput')
                 : this.$t('modelPrices.priceUnitOther');
+        },
+
+        // 价格项键名 + 中文备注（issue #140），键值本身不变
+        priceKeyLabel(key) {
+            return formatPriceKeyLabel(key);
         },
 
         onPriceBlur(entry) {
