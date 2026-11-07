@@ -134,13 +134,13 @@
       <Card :title="$t('apiKey.quotaInfo')" class="form-card">
         <Row :gutter="24">
           <Col span="12">
-            <FormItem :label="$t('apiKey.unlimitedQuota')">
+            <FormItem :label="$t('apiKey.quotaLimited')">
               <Select
                 v-model="formData.quota_plan.unlimited"
                 style="width: 100%"
               >
-                <Option value="true">{{ $t("apiKey.yes") }}</Option>
-                <Option value="false">{{ $t("apiKey.no") }}</Option>
+                <Option value="false">{{ $t("apiKey.yes") }}</Option>
+                <Option value="true">{{ $t("apiKey.no") }}</Option>
               </Select>
             </FormItem>
           </Col>
@@ -169,8 +169,6 @@
                   :max="quotaInputMax"
                   :precision="quotaPrecision"
                   :step="quotaStep"
-                  :formatter="isRMB ? null : formatNumberInput"
-                  :parser="isRMB ? null : parseNumberInput"
                   style="width: 100%"
                   @on-change="validateQuotaField"
                   @on-blur="validateQuotaField"
@@ -182,8 +180,10 @@
             <Col span="12">
               <FormItem :label="$t('apiKey.quotaUnit')">
                 <Select v-model="formData.quota_plan.unit" style="width: 100%">
-                  <Option value="total_token">total_token</Option>
-                  <Option value="RMB">RMB</Option>
+                  <Option value="total_token">{{
+                    $t("apiKey.quotaUnitMillionToken")
+                  }}</Option>
+                  <Option value="RMB">{{ $t("apiKey.quotaUnitYuan") }}</Option>
                 </Select>
               </FormItem>
             </Col>
@@ -564,7 +564,7 @@
 <script>
 import { cloneDeep } from "lodash";
 import moment from "moment";
-import { isCidr, isCidrEqual, isCidrContained, RateLimitRuleNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX } from "@/utils/const";
+import { isCidr, isCidrEqual, isCidrContained, RateLimitRuleNameRegCheck, TOKEN_QUOTA_DISPLAY_MAX, RMB_QUOTA_MAX, quotaToMillionDisplay, millionToQuotaTokens } from "@/utils/const";
 import { getModelGroupsFromServices } from "@/utils/model";
 
 const INT64_MAX = 9223372036854775807;
@@ -630,22 +630,18 @@ export default {
           return;
         }
         const isRMB = that.formData.quota_plan.unit === 'RMB';
-        if (!isRMB && !Number.isInteger(value)) {
-          callback(new Error(this.$t("apiKey.quotaMustBeNonNegative")));
-          return;
-        }
         if (isRMB) {
           const decimals = (String(value).split('.')[1] || '').length;
-          if (decimals > 4) {
-            callback(new Error(this.$t("apiKey.quotaRmbPrecisionError") || 'RMB 配额最多保留 4 位小数'));
+          if (decimals > 2) {
+            callback(new Error(this.$t("apiKey.quotaRmbPrecisionError") || '金额配额最多保留 2 位小数'));
             return;
           }
         }
-        if (that.isRMB && value > RMB_QUOTA_MAX) {
-          callback(new Error(this.$t("apiKey.quotaRmbMaxError") || 'RMB 配额不能超过 9000 万元'));
+        if (isRMB && value > RMB_QUOTA_MAX) {
+          callback(new Error(this.$t("apiKey.quotaRmbMaxError") || '金额配额不能超过 9000 万元'));
           return;
         }
-        if (!isRMB && value > TOKEN_QUOTA_MAX) {
+        if (!isRMB && value > TOKEN_QUOTA_DISPLAY_MAX) {
           callback(new Error(this.$t("apiKey.quotaMaxError")));
           return;
         }
@@ -768,7 +764,6 @@ export default {
 
     return {
       INT64_MAX,
-      TOKEN_QUOTA_MAX,
       RMB_QUOTA_MAX,
       INT_MAX,
       DESCRIPTION_MAX_LENGTH,
@@ -789,7 +784,7 @@ export default {
         quota_plan: {
           unlimited: "true",
           pass_when_no_enough_quota: "false",
-          quota: 100000000,
+          quota: 100,
           unit: "total_token",
           reset_period: "never",
         },
@@ -858,13 +853,13 @@ export default {
       return this.formData.quota_plan && this.formData.quota_plan.unit === 'RMB';
     },
     quotaPrecision() {
-      return this.isRMB ? 4 : 0;
+      return 2;
     },
     quotaStep() {
-      return this.isRMB ? 0.0001 : 1;
+      return 0.01;
     },
     quotaInputMax() {
-      return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_MAX;
+      return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_DISPLAY_MAX;
     },
     maxConcurrencyCustomRules() {
       return [
@@ -940,6 +935,15 @@ export default {
       if (value === false || value === "false") return "false";
       return defaultValue ? "true" : "false";
     },
+    // 存储值 → 录入单位值：total_token 换算为百万Token，RMB 保留 2 位小数
+    quotaToDisplay(quota, unit) {
+      if (quota === null || quota === undefined) return quota;
+      if (unit === "RMB") {
+        const num = Number(quota);
+        return Number.isFinite(num) ? Number(num.toFixed(2)) : quota;
+      }
+      return quotaToMillionDisplay(quota);
+    },
     initFormData(data) {
       this.formData = cloneDeep(data);
 
@@ -979,7 +983,7 @@ export default {
         this.formData.quota_plan = {
           unlimited: "true",
           pass_when_no_enough_quota: "false",
-          quota: 100000000,
+          quota: 100,
           unit: "total_token",
           reset_period: "never",
         };
@@ -993,6 +997,11 @@ export default {
             this.formData.quota_plan.pass_when_no_enough_quota,
             false
           );
+        // 配额按录入单位回显（issue #139）
+        this.formData.quota_plan.quota = this.quotaToDisplay(
+          this.formData.quota_plan.quota,
+          this.formData.quota_plan.unit
+        );
       }
 
       // Ensure rate_limit_policy exists and convert boolean values to strings
@@ -1579,7 +1588,7 @@ export default {
       if (this.isRMB) {
         return num > RMB_QUOTA_MAX;
       }
-      return !Number.isInteger(num) || num > TOKEN_QUOTA_MAX;
+      return num > TOKEN_QUOTA_DISPLAY_MAX;
     },
 
     handleSubmit(name) {
@@ -1613,9 +1622,13 @@ export default {
             submitData.quota_plan.pass_when_no_enough_quota =
               submitData.quota_plan.pass_when_no_enough_quota === "true";
             if (!submitData.quota_plan.unlimited) {
-              // RMB 模式保留 4 位小数，total_token 模式截断为整数
-              if (submitData.quota_plan.unit !== 'RMB') {
-                submitData.quota_plan.quota = Math.trunc(
+              // 录入单位 → 存储值：RMB 保留 2 位小数，total_token 换算回 token 整数
+              if (submitData.quota_plan.unit === "RMB") {
+                submitData.quota_plan.quota = Number(
+                  Number(submitData.quota_plan.quota).toFixed(2)
+                );
+              } else {
+                submitData.quota_plan.quota = millionToQuotaTokens(
                   submitData.quota_plan.quota
                 );
               }

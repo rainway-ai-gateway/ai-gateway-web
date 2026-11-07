@@ -146,13 +146,13 @@
     <Card :title="$t('entity.quotaInfo')" class="form-card">
       <Row :gutter="24">
         <Col span="12">
-          <FormItem :label="$t('entity.unlimitedQuota')">
+          <FormItem :label="$t('entity.quotaLimited')">
             <Select
               v-model="formData.quota_plan.unlimited"
               style="width: 100%;"
             >
-              <Option value="true">{{ $t('entity.yes') }}</Option>
-              <Option value="false">{{ $t('entity.no') }}</Option>
+              <Option value="false">{{ $t('entity.yes') }}</Option>
+              <Option value="true">{{ $t('entity.no') }}</Option>
             </Select>
           </FormItem>
         </Col>
@@ -179,8 +179,6 @@
                 :max="quotaInputMax"
                 :precision="quotaPrecision"
                 :step="quotaStep"
-                :formatter="isRMB ? null : formatNumberInput"
-                :parser="isRMB ? null : parseNumberInput"
                 style="width: 100%;"
                 @on-change="validateQuotaField"
                 @on-blur="validateQuotaField"
@@ -193,8 +191,10 @@
           <Col span="12">
             <FormItem :label="$t('entity.quotaUnit')">
               <Select v-model="formData.quota_plan.unit" style="width: 100%;">
-                <Option value="total_token">total_token</Option>
-                <Option value="RMB">RMB</Option>
+                <Option value="total_token">{{
+                  $t('entity.quotaUnitMillionToken')
+                }}</Option>
+                <Option value="RMB">{{ $t('entity.quotaUnitYuan') }}</Option>
               </Select>
             </FormItem>
           </Col>
@@ -544,7 +544,7 @@
 <script>
 import { cloneDeep } from 'lodash';
 import { getModelGroupsFromServices } from '@/utils/model';
-import { EntityNameRegCheck, RateLimitRuleNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
+import { EntityNameRegCheck, RateLimitRuleNameRegCheck, TOKEN_QUOTA_DISPLAY_MAX, RMB_QUOTA_MAX, quotaToMillionDisplay, millionToQuotaTokens, utf8ByteLength } from '@/utils/const';
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
@@ -642,22 +642,18 @@ export default {
                     return;
                 }
                 const isRMB = that.formData.quota_plan.unit === 'RMB';
-                if (!isRMB && !Number.isInteger(value)) {
-                    callback(new Error(this.$t('entity.quotaMustBeNonNegative')));
-                    return;
-                }
                 if (isRMB) {
                     const decimals = (String(value).split('.')[1] || '').length;
-                    if (decimals > 4) {
-                        callback(new Error(this.$t('entity.quotaRmbPrecisionError') || 'RMB 配额最多保留 4 位小数'));
+                    if (decimals > 2) {
+                        callback(new Error(this.$t('entity.quotaRmbPrecisionError') || '金额配额最多保留 2 位小数'));
                         return;
                     }
                 }
                 if (isRMB && value > RMB_QUOTA_MAX) {
-                    callback(new Error(this.$t('entity.quotaRmbMaxError') || 'RMB 配额不能超过 9000 万元'));
+                    callback(new Error(this.$t('entity.quotaRmbMaxError') || '金额配额不能超过 9000 万元'));
                     return;
                 }
-                if (!isRMB && value > TOKEN_QUOTA_MAX) {
+                if (!isRMB && value > TOKEN_QUOTA_DISPLAY_MAX) {
                     callback(new Error(this.$t('entity.quotaMaxError')));
                     return;
                 }
@@ -708,7 +704,6 @@ export default {
 
         return {
             INT64_MAX,
-            TOKEN_QUOTA_MAX,
             RMB_QUOTA_MAX,
             INT_MAX,
             batchLimitFields: BATCH_LIMIT_FIELDS,
@@ -725,7 +720,7 @@ export default {
                 quota_plan: {
                     unlimited: 'true',
                     pass_when_no_enough_quota: 'false',
-                    quota: 100000000,
+                    quota: 100,
                     unit: 'total_token',
                     reset_period: 'never'
                 },
@@ -815,13 +810,13 @@ export default {
             return this.formData.quota_plan && this.formData.quota_plan.unit === 'RMB';
         },
         quotaPrecision() {
-            return this.isRMB ? 4 : 0;
+            return 2;
         },
         quotaStep() {
-            return this.isRMB ? 0.0001 : 1;
+            return 0.01;
         },
         quotaInputMax() {
-            return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_MAX;
+            return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_DISPLAY_MAX;
         }
     },
     watch: {
@@ -912,6 +907,15 @@ export default {
             });
             return Object.keys(result).length > 0 ? result : null;
         },
+        // 存储值 → 录入单位值：total_token 换算为百万Token，RMB 保留 2 位小数
+        quotaToDisplay(quota, unit) {
+            if (quota === null || quota === undefined) return quota;
+            if (unit === 'RMB') {
+                const num = Number(quota);
+                return Number.isFinite(num) ? Number(num.toFixed(2)) : quota;
+            }
+            return quotaToMillionDisplay(quota);
+        },
         initFormData(data) {
             this.formData = cloneDeep(data);
 
@@ -932,7 +936,7 @@ export default {
                 this.formData.quota_plan = {
                     unlimited: 'true',
                     pass_when_no_enough_quota: 'false',
-                    quota: 100000000,
+                    quota: 100,
                     unit: 'total_token',
                     reset_period: 'never'
                 };
@@ -940,6 +944,11 @@ export default {
                 // Convert boolean values to strings
                 this.formData.quota_plan.unlimited = String(this.formData.quota_plan.unlimited);
                 this.formData.quota_plan.pass_when_no_enough_quota = String(this.formData.quota_plan.pass_when_no_enough_quota);
+                // 配额按录入单位回显（issue #139）
+                this.formData.quota_plan.quota = this.quotaToDisplay(
+                    this.formData.quota_plan.quota,
+                    this.formData.quota_plan.unit
+                );
             }
 
             // Ensure rate_limit_policy exists and convert boolean values to strings
@@ -1386,7 +1395,7 @@ export default {
             if (this.isRMB) {
                 return num > RMB_QUOTA_MAX;
             }
-            return !Number.isInteger(num) || num > TOKEN_QUOTA_MAX;
+            return num > TOKEN_QUOTA_DISPLAY_MAX;
         },
 
         handleSubmit(name) {
@@ -1404,9 +1413,11 @@ export default {
                     submitData.quota_plan.unlimited = submitData.quota_plan.unlimited === 'true';
                     submitData.quota_plan.pass_when_no_enough_quota = submitData.quota_plan.pass_when_no_enough_quota === 'true';
                     if (!submitData.quota_plan.unlimited) {
-                        // RMB 模式保留 4 位小数，total_token 模式截断为整数
-                        if (submitData.quota_plan.unit !== 'RMB') {
-                            submitData.quota_plan.quota = Math.trunc(submitData.quota_plan.quota);
+                        // 录入单位 → 存储值：RMB 保留 2 位小数，total_token 换算回 token 整数
+                        if (submitData.quota_plan.unit === 'RMB') {
+                            submitData.quota_plan.quota = Number(Number(submitData.quota_plan.quota).toFixed(2));
+                        } else {
+                            submitData.quota_plan.quota = millionToQuotaTokens(submitData.quota_plan.quota);
                         }
                     }
                     submitData.rate_limit_policy.enabled = submitData.rate_limit_policy.enabled === 'true';
