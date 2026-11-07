@@ -74,3 +74,42 @@ export function formatPriceForInput(raw) {
     if (!Number.isFinite(num) || num < 0) return text;
     return formatPriceNumber(num);
 }
+
+/**
+ * 判断价格键是否为按 token 计价。按 token 计价的键（含缓存与阈值档位，
+ * 如 input_cost_per_token、cache_read_input_token_cost、
+ * *_above_200k_tokens）录入与展示按「元/百万 tokens」单位换算；
+ * 按次/张/秒/页等计价的键按原值输入。
+ */
+export function isTokenBasedPriceKey(key) {
+    return typeof key === 'string' && key.indexOf('_token') !== -1;
+}
+
+/** 存储值（每 token 单价）→ 百万 token 单位的输入/展示值 */
+export function tokenPriceToMillion(raw) {
+    const num = typeof raw === 'number' ? raw : parsePrice(raw);
+    if (!Number.isFinite(num)) return NaN;
+    return num * 1e6;
+}
+
+/** 百万 token 单位的输入值 → 存储值（每 token 单价） */
+export function millionToTokenPrice(raw) {
+    const num = typeof raw === 'number' ? raw : parsePrice(raw);
+    if (!Number.isFinite(num)) return NaN;
+    return num / 1e6;
+}
+
+/** 编辑回显：存储值换算为百万 token 单位输入串；非法值原样保留，交给校验提示 */
+export function formatPriceForMillionInput(raw) {
+    if (raw === null || raw === undefined) return '';
+    const million = tokenPriceToMillion(raw);
+    if (Number.isNaN(million) || million < 0) return String(raw);
+    return formatPriceNumber(million);
+}
+
+/** 详情展示：存储值换算为百万 token 单位显示串；非法值显示 '-' */
+export function formatPriceDisplayMillion(raw) {
+    const million = tokenPriceToMillion(raw);
+    if (Number.isNaN(million) || million < 0) return '-';
+    return formatPriceNumber(million);
+}

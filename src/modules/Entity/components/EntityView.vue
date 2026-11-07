@@ -417,7 +417,11 @@ export default {
             if (this.quotaPlanUnlimited || this.quotaPlanQuota === 0) {
                 return 0;
             }
-            return Math.round(this.quotaPlanUsed / this.quotaPlanQuota * 10000) / 100;
+            // used 允许超过 quota（欠费，issue #1476），进度百分比封顶 100；剩余量仍按 max(0,…) 展示
+            return Math.min(
+                100,
+                Math.round(this.quotaPlanUsed / this.quotaPlanQuota * 10000) / 100
+            );
         },
         rateLimitPolicyEnabled() {
             return this.displayData.rate_limit_policy && this.displayData.rate_limit_policy.enabled;

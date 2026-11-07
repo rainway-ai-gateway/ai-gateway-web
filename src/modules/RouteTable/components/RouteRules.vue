@@ -230,8 +230,10 @@ export default {
           key: 'name',
           searchable: true,
           sortable: 'custom',
+          ellipsis: true,
           render(h, params) {
-            return <span>{params.row.name || '-'}</span>;
+            const text = params.row.name || '-';
+            return <span class="cell-ellipsis" title={text}>{text}</span>;
           }
         },
         {

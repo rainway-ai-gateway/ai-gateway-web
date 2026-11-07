@@ -184,6 +184,14 @@
             <dd>{{ fmtCacheStatus(selectedRow.ai_cache_status) }}</dd>
           </div>
           <div class="detail-item">
+            <dt>{{ $t('report.priceMissField') }}</dt>
+            <dd>{{ selectedRow.ai_price_miss == null ? '-' : (selectedRow.ai_price_miss ? $t('report.priceMissYes') : $t('report.priceMissNo')) }}</dd>
+          </div>
+          <div class="detail-item">
+            <dt>{{ $t('report.priceWarnField') }}</dt>
+            <dd>{{ fmtPriceWarn(selectedRow.ai_price_warn) }}</dd>
+          </div>
+          <div class="detail-item">
             <dt>{{ $t('report.mirrorHit') }}</dt>
             <dd>{{ selectedRow.mirror_hit == null ? '-' : (selectedRow.mirror_hit ? $t('report.yes') + (selectedRow.mirror_cluster ? '（' + selectedRow.mirror_cluster + '）' : '') : $t('report.no')) }}</dd>
           </div>
@@ -403,6 +411,19 @@ export default {
           render: (h, params) => h('span', { style: tdStyle }, params.row.ai_cache_status || '-')
         },
         {
+          title: this.$t('report.colPriceMiss'),
+          key: 'ai_price_miss',
+          width: 110,
+          renderHeader: (h) => h('span', { style: thStyle }, this.$t('report.colPriceMiss')),
+          render: (h, params) => {
+            const row = params.row;
+            if (!row.ai_price_miss) return h('span', { style: tdStyle }, '-');
+            return h('span', {
+              style: { ...tdStyle, color: '#ed4014' }
+            }, this.fmtPriceWarn(row.ai_price_warn));
+          }
+        },
+        {
           title: this.$t('report.colMirror'),
           key: 'mirror_hit',
           width: 110,
@@ -540,6 +561,20 @@ export default {
     fmtCacheStatus(status) {
       if (status == null) return '-';
       return status === '' ? this.$t('report.cacheDisabled') : status;
+    },
+
+    // 缺价形态枚举 → 文案；未缺价（null）展示 -
+    fmtPriceWarn(warn) {
+      if (warn == null) return '-';
+      const map = {
+        fallback: this.$t('report.priceWarnFallback'),
+        no_entry: this.$t('report.priceWarnNoEntry'),
+        no_baseline: this.$t('report.priceWarnNoBaseline'),
+        reject: this.$t('report.priceWarnReject'),
+        subitem_missing: this.$t('report.priceWarnSubitemMissing'),
+        no_model_table: this.$t('report.priceWarnNoModelTable')
+      };
+      return map[warn] || warn;
     },
 
     handlePageChange({ page, pageSize }) {

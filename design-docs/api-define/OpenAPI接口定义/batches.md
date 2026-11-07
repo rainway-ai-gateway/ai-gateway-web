@@ -14,7 +14,7 @@
 
 **全局约定**
 
-- **产品线隔离**：`product_name` 由认证中间件从调用凭证解析并**强制注入**为查询条件，不接受外部传参；请求中携带一律被忽略。所有查询仅返回调用方所属产品线的数据。
+- **产品线口径**：本组接口为**单产品线视角**，`product_name` **不出现在本组接口的入参与返回值中**——服务端内部按配置项 `AIRouteInnerProductName` 对应的默认产品线过滤查询（解析逻辑见 `endpoints/openapi_v1/batches/product.go` 的 `resolveProduct`）；数据面经 api_key 解析落入其他产品线的任务/文件，对本组接口不可见（按不存在处理），见 §6「已知限制」。
 - **金额口径**：`reserve_units` / `settle_units` 等金额字段为 **1e-8 定点整数**（单位 RMB，1 单位 = 0.00000001 元），与 RMB 配额 / 报表链路口径一致（见 [00-common.md](./00-common.md) QuotaPlan 说明），**不做 ÷1e8 换算**。
 - **分页**：列表接口使用主键游标分页（`cursor` / `limit`），响应携带 `next_cursor`；`next_cursor` 为空串表示无更多数据。
 - **审计**：写操作（取消）记录 operation_logs，见 §5。
@@ -27,7 +27,6 @@
 {
   "batch_id": "batch_abc123",
   "api_key_id": "ak-2v8x9k3m7p",
-  "product_name": "AI_product",
   "entity_id": "entity-5",
   "provider": "openai",
   "endpoint": "/v1/batches",
@@ -78,7 +77,6 @@
 |------|------|------|----------|
 | `batch_id` | string | 批量任务标识（provider 侧 batch id） | 非空；详情/取消接口的路径参数 |
 | `api_key_id` | string | 发起任务的网关 API Key ID | - |
-| `product_name` | string | 产品线 | 中间件强制注入，只读 |
 | `entity_id` | string | 任务归属实体 | - |
 | `provider` | string | provider 名称 | - |
 | `endpoint` | string | 透传端点 | 如 `/v1/batches` |
@@ -99,6 +97,13 @@
 | `updated_at` | string | 更新时间（RFC3339） | 只读 |
 | `terminal_at` | string | 进入终态时间（RFC3339） | 未终结为空 |
 | `batch_files` | array | 关联批量文件元数据列表 | 元素结构见 §2.2 |
+
+> **字段必现规则**（issue #271 起显式化）：`est_lines` / `usage_input_tokens` /
+> `usage_output_tokens` / `reserve_units` / `settle_units` 五个 int64 字段约束为 `≥0`，
+> `0` 是合法值，响应中必须显式出现（值为 `0`），不得用省略键表达"为零 / 未知"；
+> `output_file_id`（未完成时为空）与 `terminal_at`（未终结为空）必须显式出现，
+> 空值输出为空串 `""`。其余未标注"为空"语义的字段，取不到值时按省略处理
+> （键不出现在响应中）。
 
 ### 2.2 BatchFile（批量文件元数据）
 
@@ -152,7 +157,6 @@
 | `limit` | int | 每页条数 | N | 默认 50 | 取值范围 1-200，超出截断为 200 |
 
 > **约束**
-> - `product_name` 由中间件强制注入，不接受外部传参（见 §1）。
 > - 不使用全局通用 `page` / `page_size` 分页参数；游标为主键游标，翻页过程不受并发写入影响。
 
 **返回数据（Data内容）**
@@ -173,7 +177,6 @@
             {
                 "batch_id": "batch_abc123",
                 "api_key_id": "ak-2v8x9k3m7p",
-                "product_name": "AI_product",
                 "entity_id": "entity-5",
                 "provider": "openai",
                 "endpoint": "/v1/batches",
@@ -241,7 +244,6 @@
     "Data": {
         "batch_id": "batch_abc123",
         "api_key_id": "ak-2v8x9k3m7p",
-        "product_name": "AI_product",
         "entity_id": "entity-5",
         "provider": "openai",
         "endpoint": "/v1/batches",
@@ -275,7 +277,7 @@
 }
 ```
 
-**错误码**：401；402（无 FeatureBatch 读权限）；404（DB 与 Redis 均不存在该任务，或任务不属于调用方产品线）。
+**错误码**：401；402（无 FeatureBatch 读权限）；404（DB 与 Redis 均不存在该任务）。
 
 ---
 
@@ -294,6 +296,7 @@
 **前置依赖**
 
 - 控制面 → provider **出网**可达（降级部署无出网时，本接口退化为不可用，批量任务仅支持展示）。
+- provider 未配置 API-Key（`keys: []`，见 `providers.md` keys 条款）时，取消请求**不携带鉴权头**出网——与数据面对 keyless cluster 的转发语义一致（issue #274）。
 
 **输入参数（URI）**
 
@@ -307,7 +310,7 @@
 
 **处理逻辑**
 
-1. **DB 条件更新抢占**：`UPDATE ... SET status='cancelling' WHERE batch_id=? AND status NOT IN (终态)`；`affected_rows=0` → 返回 409（已终态，或其他实例正在处理）；
+1. **DB 条件更新抢占**：`UPDATE ... SET status='cancelling' WHERE batch_id=? AND status NOT IN (终态, cancelling)`——**affected_rows=0 时取任务当前状态判别**：已终态 → 返回 409；已为 `cancelling` → **200 幂等重放**（重发 provider cancel 保证取消意图落地，provider cancel 幂等；预留释放为幂等 no-op，不新增 release/charge/settlement transition）；
 2. **出网调用 provider**：向任务所属 provider 的 cancel 端点发起 `POST`（透传取消语义）；
 3. **成功处理**：置 `status=cancelling`，Redis **幂等**释放该任务的金额预留（重复 cancel / 重复释放安全）；
 4. **审计**：写入 operation_logs（`resource_type=batch`，含操作者、`batch_id`、处理结果）。
@@ -325,7 +328,6 @@
     "Data": {
         "batch_id": "batch_abc123",
         "api_key_id": "ak-2v8x9k3m7p",
-        "product_name": "AI_product",
         "entity_id": "entity-5",
         "provider": "openai",
         "endpoint": "/v1/batches",
@@ -355,7 +357,7 @@
 | - | - |
 | 401 / 402 | 未认证 / 无 FeatureBatch 取消权限 |
 | 404 | 任务不存在（DB 与 Redis 均 miss）；或 provider 侧 batch 不存在 |
-| 409 | 任务已终态，或他实例正在处理（条件更新抢占失败） |
+| 409 | 任务已终态（`cancelling` 受理中的重放返回 200，见处理逻辑 1） |
 | 502 | provider 不可达（出网调用失败） |
 
 ---
@@ -384,7 +386,7 @@
 | - | - | - | - | - | - |
 | `provider` | string | provider 名称 | Y | 与 `file_id` 联合唯一定位文件 | 必填；非空 |
 
-> **约束**：`product_name` 由中间件强制注入（见 §1）；文件不属于调用方产品线时按不存在处理（404）。
+> **约束**：文件按服务端默认产品线过滤；非默认产品线的文件按不存在处理（404，见 §6「已知限制」）。
 
 **返回数据（Data内容）**
 
@@ -407,7 +409,7 @@
 }
 ```
 
-**错误码**：401；402（无 FeatureBatch 读权限）；404（`(file_id, provider)` 不存在，或不属于调用方产品线）；422（`provider` 缺失）。
+**错误码**：401；402（无 FeatureBatch 读权限）；404（`(file_id, provider)` 不存在）；422（`provider` 缺失）。
 
 ---
 
@@ -422,7 +424,8 @@
 - **操作日志**：取消（写操作）记录 operation_logs（`resource_type=batch`，含操作者、目标 `batch_id`、结果与失败归因）。
 - 全部接口遵循 [00-common.md](./00-common.md) 的鉴权与返回值约定。
 
-## 6. 向后兼容
+## 6. 向后兼容与已知限制
 
 - `/batches`、`/batch-files` 为本期新增端点，无存量接口变更。
-- 批量价格（`mode=batch`）由 [model-prices.md](./model-prices.md) 的 `batch_discount` 系数展开或手工价格行提供；批量限流（`batch_limits`）由 InnerAPI 导出的 `rules.batch` 段提供（见 [InnerAPI rate-limit-policy.md](../../../../ai-gateway-api/design-docs/api-define/InnerAPI接口定义/rate-limit-policy.md)）。
+- **已知限制（issue #276，2026-10-23 校准）**：v1 批次控制面为**单产品线视角**——`product_name` 为内部字段，不出现在本组接口的入参与返回值中；服务端内部按默认产品线 `AIRouteInnerProductName` 过滤。Token 不绑定产品线（见 `design-docs/sys-design/details/认证授权机制.md` §2.3 与 `design-docs/modifications/2026-07-27-openapi-optimize/design-changes.md` §2.4）。数据面经 api_key 解析落入其他产品线的任务/文件，对本组接口不可见（按不存在处理）。该语义的回归用例见 `test/integration/tests/batch/`（BT-1-002 / BT-2-003 / BT-4-004 过滤口径；BT-2-002 / BT-4-001 键缺席口径）。若未来重新引入 Product Scope，本组接口的契约按届时设计另行修订。
+- 批量价格（`mode=batch`）由 [model-prices.md](./model-prices.md) 的 `batch_discount` 系数展开或手工价格行提供；批量限流（`batch_limits`）由 InnerAPI 导出的 `rules.batch` 段提供（见 [InnerAPI rate-limit-policy.md](../InnerAPI接口定义/rate-limit-policy.md)）。

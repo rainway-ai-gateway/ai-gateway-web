@@ -23,23 +23,28 @@
       @submit.native.prevent
     >
       <FormItem :label="$t('entity.typeName')" prop="type_name">
-        <Input
-          v-model="formData.type_name"
-          :disabled="!isAdd"
-          :placeholder="$t('entity.typeNamePlaceholder')"
-          :maxlength="32"
-          show-word-limit
-        ></Input>
+        <div class="word-limit-field">
+          <Input
+            v-model="formData.type_name"
+            :disabled="!isAdd"
+            :placeholder="$t('entity.typeNamePlaceholder')"
+            :maxlength="32"
+          ></Input>
+          <!-- iView 3.5.4 Input 无 show-word-limit（无效属性），自实现计数器 -->
+          <span class="ivu-input-word-count">{{ (formData.type_name || '').length }}/32</span>
+        </div>
         <p class="form-tip">{{ $t('entity.typeNameRule') }}</p>
       </FormItem>
 
       <FormItem :label="$t('entity.description')" prop="description">
-        <Input
-          v-model="formData.description"
-          :placeholder="$t('entity.descriptionPlaceholder')"
-          :maxlength="255"
-          show-word-limit
-        ></Input>
+        <div class="word-limit-field">
+          <Input
+            v-model="formData.description"
+            :placeholder="$t('entity.descriptionPlaceholder')"
+            :maxlength="255"
+          ></Input>
+          <span class="ivu-input-word-count">{{ (formData.description || '').length }}/255</span>
+        </div>
         <p class="form-tip">{{ $t('entity.typeDescriptionTip') }}</p>
       </FormItem>
 
@@ -138,6 +143,22 @@ export default {
 </script>
 
 <style lang="less" scoped>
+.word-limit-field {
+    position: relative;
+    ::v-deep .ivu-input {
+        padding-right: 56px;
+    }
+    .ivu-input-word-count {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #808695;
+        font-size: 12px;
+        line-height: 1;
+        pointer-events: none;
+    }
+}
 .form-footer {
     display: flex;
     justify-content: flex-end;

@@ -23,12 +23,15 @@
   >
     <Card :title="$t('entity.basicInfo')" class="form-card">
       <FormItem :label="$t('entity.name')" prop="name">
-        <Input
-          v-model="formData.name"
-          :disabled="!isAdd"
-          :placeholder="$t('entity.namePlaceholder')"
-          show-word-limit
-        ></Input>
+        <div class="word-limit-field">
+          <Input
+            v-model="formData.name"
+            :disabled="!isAdd"
+            :placeholder="$t('entity.namePlaceholder')"
+          ></Input>
+          <!-- iView 3.5.4 Input 无 show-word-limit（无效属性），自实现计数器（名称上限 64，校验拦截非 maxlength） -->
+          <span class="ivu-input-word-count">{{ (formData.name || '').length }}/64</span>
+        </div>
         <p v-if="isAdd" class="form-tip">{{ $t('entity.nameRule') }}</p>
       </FormItem>
 
@@ -541,7 +544,7 @@
 <script>
 import { cloneDeep } from 'lodash';
 import { getModelGroupsFromServices } from '@/utils/model';
-import { EntityNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
+import { EntityNameRegCheck, RateLimitRuleNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
@@ -1318,6 +1321,11 @@ export default {
                 callback(new Error(this.$t('entity.ruleNameLengthError')));
                 return;
             }
+            // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]
+            if (!RateLimitRuleNameRegCheck(trimmed)) {
+                callback(new Error(this.$t('entity.ruleNameFormatError')));
+                return;
+            }
             const tpm = this.formData.rate_limit_policy.rules.tpm || [];
             const count = tpm.filter(r => r.name === trimmed).length;
             if (count > 1) {
@@ -1340,6 +1348,11 @@ export default {
             }
             if (trimmed.length < 1 || trimmed.length > 128) {
                 callback(new Error(this.$t('entity.ruleNameLengthError')));
+                return;
+            }
+            // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]
+            if (!RateLimitRuleNameRegCheck(trimmed)) {
+                callback(new Error(this.$t('entity.ruleNameFormatError')));
                 return;
             }
             const rpm = this.formData.rate_limit_policy.rules.rpm || [];
@@ -1429,6 +1442,23 @@ export default {
 </script>
 
 <style lang="less" scoped>
+/* iView 3.5.4 Input 无 show-word-limit，自实现字数计数器（名称 1–64，校验拦截） */
+.word-limit-field {
+    position: relative;
+    /deep/ .ivu-input {
+        padding-right: 56px;
+    }
+    .ivu-input-word-count {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #808695;
+        font-size: 12px;
+        line-height: 1;
+        pointer-events: none;
+    }
+}
 .form-card {
     margin-bottom: 16px;
 

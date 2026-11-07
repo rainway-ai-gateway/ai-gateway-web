@@ -267,7 +267,6 @@ window.MockData = {
       ],
       instance_source: 'instance_pool',
       k8s_pool_name: '',
-      k8s_instance_pool: [],
       model_protocols: ['openai'],
       protocol_paths: { openai: '/v1' },
       time_zone: 'Asia/Shanghai',
@@ -294,7 +293,6 @@ window.MockData = {
       ],
       instance_source: 'instance_pool',
       k8s_pool_name: '',
-      k8s_instance_pool: [],
       model_protocols: ['openai'],
       create_time: 1704067200,
       update_time: 1717209600,
@@ -310,10 +308,6 @@ window.MockData = {
       ],
       instance_source: 'k8s_pool',
       k8s_pool_name: 'llm-inference-pool',
-      k8s_instance_pool: [
-        { addr: '10.0.0.11', port: 8000, weight: 100 },
-        { addr: '10.0.0.12', port: 8000, weight: 100 },
-      ],
       model_protocols: ['anthropic'],
       create_time: 1714521600,
       update_time: 1719878400,
@@ -570,7 +564,37 @@ window.MockData = {
       },
     ],
   },
-  k8sPoolNames: ['llm-inference-pool', 'deepseek-prod-pool', 'openai-shared-pool'],
+  // 对应 GET /open-api/v1/k8s_pools 的 Data.list 元素
+  k8sPools: [
+    {
+      name: 'llm-inference-pool',
+      instance_count: 3,
+      last_sync_time: 1716883200,
+    },
+    {
+      name: 'deepseek-prod-pool',
+      instance_count: 2,
+      last_sync_time: 1716883200,
+    },
+    {
+      name: 'openai-shared-pool',
+      instance_count: 0,
+      last_sync_time: 1716883200,
+    },
+  ],
+  // 对应 GET /open-api/v1/k8s_pools/{name} 的 Data.instances
+  k8sPoolInstances: {
+    'llm-inference-pool': [
+      { addr: '10.0.0.11', port: 8000, weight: 100, disable: false },
+      { addr: '10.0.0.12', port: 8000, weight: 100, disable: false },
+      { addr: '10.0.0.13', port: 8000, weight: 100, disable: false },
+    ],
+    'deepseek-prod-pool': [
+      { addr: '10.0.1.21', port: 9000, weight: 100, disable: false },
+      { addr: '10.0.1.22', port: 9000, weight: 50, disable: false },
+    ],
+    'openai-shared-pool': [],
+  },
   forwardRules: [
     {
       name: 'vip-user-route',

@@ -235,7 +235,10 @@ export default {
     tipConfirmLogout: '确认注销？',
     tipCodeError: '验证码输入错误',
     tipNotLogin: '当前未登录或者登录已过期请前往登录',
-    tipUrlIllegal: '当前url非法',
+    tipRoleNoAccess:
+      '当前账号没有控制台访问权限：控制台仅支持「系统管理员」角色，请使用管理员账号登录，或联系管理员调整角色',
+    tipRoleVersionMismatch:
+      '控制台前端与后端版本不一致，无法识别当前账号的角色。请强制刷新页面（Ctrl/Cmd+Shift+R）后重试；若仍失败，请联系管理员把前后端升级到同一版本',
     tipSelectProductLine: '请先选择产品线',
     tip404: '啊嘞，找不到路了~',
     loginFailed: '登录失败',
@@ -777,6 +780,8 @@ export default {
     rpmRuleNameRequired: '第{index}条RPM规则请输入规则名称',
     rpmRuleNameDuplicate: 'RPM规则名称 {name} 重复',
     ruleNameLengthError: '规则名称长度不能超过128字符',
+    // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]、长度 1–128
+    ruleNameFormatError: '规则名称字符集为 [a-zA-Z0-9_-]，长度 1–128',
     tpmCombinationDuplicate:
       '存在相同的TPM规则组合（模型、时间窗口、最大Token数、滑动步长）',
     rpmCombinationDuplicate:
@@ -832,6 +837,7 @@ export default {
     modelExists: '已存在同名模型',
   },
   eppPool: {
+    loadFailed: '加载 EPP 实例池失败',
     title: 'EPP 实例池',
     poolName: '池名称',
     groupCount: '实例组数',
@@ -960,12 +966,36 @@ export default {
     keyAffinityPenalty: 'Key 惩罚',
     keyAffinityPenaltyTip:
       '开启后，失败的 Key 会被临时惩罚，降低再次被选中概率',
+    keyAffinityPenaltyTtl429: '429 惩罚时长（秒）',
+    keyAffinityPenaltyTtlAuth: '401/402/403 惩罚时长（秒）',
+    keyAffinityPenaltyTtl429Tip:
+      '上游返回 429 时 Key 的惩罚窗口，10–600 秒，默认 60；0 不表示关闭',
+    keyAffinityPenaltyTtlAuthTip:
+      '上游返回 401/402/403 时 Key 的惩罚窗口，60–1800 秒，默认 300；0 不表示关闭',
+    keyAffinityPenaltyTtl429Invalid: '429 惩罚时长须为 10–600 的整数（秒）',
+    keyAffinityPenaltyTtlAuthInvalid: '401/402/403 惩罚时长须为 60–1800 的整数（秒）',
     matchPrefix: '匹配前缀',
     matchPrefixTip:
       '需要匹配的 provider/model 前缀，例如 openrouter/，必须以 / 结尾',
     matchPrefixPlaceholder: '例如 openrouter/',
     matchPrefixRequiredWhenStrip: '开启裁剪前缀时，匹配前缀必填',
     matchPrefixMustEndWithSlash: '匹配前缀必须以 / 结尾',
+    priceMissAction: '缺价处置动作',
+    priceMissActionTip:
+      '请求的（模型，接口类型）无价格条目时的动作：回退 chat 价计费（默认）/ 按 0 计费 / 转发前拒绝（HTTP 503 + PRICE_NOT_CONFIGURED，不调用上游、不计费）',
+    priceMissActionFallbackChat: 'fallback_chat（回退 chat 价计费，默认）',
+    priceMissActionBillZero: 'bill_zero（按 0 计费）',
+    priceMissActionReject: 'reject（转发前拒绝）',
+    priceMissActionInvalid: '缺价处置动作须为 fallback_chat / bill_zero / reject',
+    priceMissActionFallbackChatShort: '回退 chat 价计费',
+    priceMissActionBillZeroShort: '按 0 计费',
+    priceMissActionRejectShort: '转发前拒绝',
+    ensureReasoningContent: '推理内容补齐协议',
+    ensureReasoningContentTip:
+      '为选中协议自动补齐缺失的 reasoning_content：部分思考模式上游要求最后一条 user 消息后的 assistant 消息回传 reasoning_content，而它自身有不产出 reasoning 的回合；开启后网关在转发请求体里为该窗口内的 assistant 补空串（openai）或空 thinking 块（anthropic），只增不改、异常原样透传。空选 = 关闭；元素须在所属服务商的协议范围内',
+    ensureReasoningContentInvalid: '推理内容补齐协议仅支持 openai / anthropic，且不重复',
+    ensureReasoningContentNotInProvider:
+      '推理内容补齐协议 {proto} 不在所属服务商协议（{protocols}）内',
     stripPrefix: '裁剪前缀',
     stripPrefixTip: '开启后转发给下游前会从请求 model 字段中去掉该前缀',
     ownedProvider: '所属服务商',
@@ -1011,9 +1041,9 @@ export default {
     waitingQueueMax: '排队长度过滤阈值',
     waitingQueueMaxTip: '后端排队长度超过该值的端点被过滤；0 = 不启用该项过滤',
     waitingQueueMaxInvalid: '排队长度过滤阈值须为 >= 0 的数',
-    runningRequestsMax: '在飞请求数过滤阈值',
-    runningRequestsMaxTip: '后端运行中请求数超过该值的端点被过滤；0 = 不启用该项过滤',
-    runningRequestsMaxInvalid: '在飞请求数过滤阈值须为 >= 0 的数',
+    runningRequestsMax: '执行中请求数过滤阈值',
+    runningRequestsMaxTip: '后端执行中请求数超过该值的端点被过滤；0 = 不启用该项过滤',
+    runningRequestsMaxInvalid: '执行中请求数过滤阈值须为 >= 0 的数',
     fallbackOnEmpty: '无端点时回退派发',
     fallbackOnEmptyTip: '所有端点被过滤时：关闭=不派发；开启=派发"最不差"的端点',
     metricsStalenessThresholdMs: '指标失效剔除阈值（ms）',
@@ -1075,6 +1105,8 @@ export default {
     eppCallTimeout: '调用超时',
     eppCallTimeoutTip: '首条消息收发超时，合法 Go duration 且 > 0，默认 3s',
     eppCallTimeoutInvalid: '调用超时须为合法的 Go duration 且 > 0（如 3s）',
+    eppCallTimeoutVsQueueTtlInvalid:
+      '调用超时需大于队列 TTL（秒）与无端点队列 TTL（秒）的最大值（{max} 秒）',
     eppRuntimeUnset: '未配置（BFE 补默认）',
   },
   provider: {
@@ -1109,6 +1141,11 @@ export default {
     k8sPoolNameRule:
       'K8s 池名称长度 1-64 字符；仅允许字母、数字、下划线_、短横线-、点.；不能以点、短横线、下划线开头或结尾；不能包含空白字符',
     k8sPoolEmpty: '暂无镜像实例（池不存在 ≡ 零实例）',
+    k8sPoolSelectPlaceholder: '请选择 K8s 实例池',
+    k8sPoolNoOptions: '暂无可用的 K8s 实例池',
+    k8sPoolNotExistOption: '池不存在',
+    k8sPoolNotFound: 'K8s 池不存在（≡ 零实例）',
+    k8sPoolInstanceAddress: '实例地址',
     instanceHostPlaceholder: '填写实例后显示',
     tipNameRule:
       '长度1-64字符；仅允许字母、数字、下划线_、短横线-、点.；不能以点、短横线、下划线开头或结尾；不能包含空白字符',
@@ -1229,13 +1266,17 @@ export default {
     priceItemKey: '价格项',
     priceItemValue: '价格',
     priceItemKeyPlaceholder: '请选择价格项',
-    priceItemValuePlaceholder: '如 1.5e-6 或 0.0000015',
+    priceItemValuePlaceholder: '如 0.05',
+    priceItemValuePlaceholderMillion: '如 2（= ¥2/百万 tokens）',
+    priceUnitPerMillionInput: '元/百万 tokens',
+    priceUnitPerMillionTokens: '百万 tokens',
+    priceUnitOther: '元',
     priceHint:
-      '可输入 1.5e-6 或 0.0000015，失焦后按量级自动格式化（小于 1e-4 或 ≥ 1e6 用科学计数法）。单价格 × 1e8 不得超过 2^53（约 9e15）。',
+      '按 token 计价的价格项（含缓存、超长阈值档位）以「元/百万 tokens」为单位输入（如 2），保存时自动换算为每 token 单价；按次/张/秒/页等计价项按原值（元）输入。失焦后按量级自动格式化（小于 1e-4 或 ≥ 1e6 用科学计数法）。单价格 × 1e8 不得超过 2^53（约 9e15）。',
     priceMergeHint:
       '编辑提交时 prices / tier_prices 为键级合并：表单中的键覆盖原值，未出现的键保留（删除某行不会清除后端已有键）。',
     priceDefaultTip:
-      '科学计数法与十进制等价合法（如 1.5e-6 与 0.0000015）。编辑时未提交的价格键保留原值。',
+      '按 token 计价项以「元/百万 tokens」输入并自动换算存储；其余计价项按原值输入；科学计数法与十进制等价合法（如 1.5e-3 与 0.0015）。编辑时未提交的价格键保留原值。',
     tierPriceObject: '分时段价格',
     tierObject: '时段对象',
     tierPriceTip:
@@ -1458,6 +1499,17 @@ export default {
     intentQuestionsVersion: '意图问题版本',
     colCache: '缓存',
     colMirror: '镜像',
+    colPriceMiss: '缺价',
+    priceMissField: '是否缺价',
+    priceWarnField: '缺价形态',
+    priceMissYes: '是',
+    priceMissNo: '否',
+    priceWarnFallback: '回退 chat 价计费',
+    priceWarnNoEntry: '按 0 计费',
+    priceWarnNoBaseline: '无 chat 基线按 0',
+    priceWarnReject: '转发前拒绝',
+    priceWarnSubitemMissing: '回退条目缺子项价格',
+    priceWarnNoModelTable: '价格表缺失',
   },
   aiCache: {
     pageTitle: 'AI 缓存规则（集合级，按优先级顺序匹配，首条命中生效）',

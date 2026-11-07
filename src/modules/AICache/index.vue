@@ -330,8 +330,10 @@ export default {
           minWidth: 160,
           sortable: 'custom',
           searchable: true,
+          ellipsis: true,
           render(h, params) {
-            return h('span', params.row.name || '-');
+            const text = params.row.name || '-';
+            return h('span', { class: 'cell-ellipsis', attrs: { title: text } }, text);
           }
         },
         {

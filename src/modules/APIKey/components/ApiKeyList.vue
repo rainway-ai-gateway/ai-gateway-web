@@ -29,6 +29,11 @@
       :tableData="tableData"
       :columns="columns"
       :loading="tableLoading"
+      :total="total"
+      :server-pagination="true"
+      :current-page="page"
+      :page-size="pageSize"
+      @on-page-change="onPageChange"
       @on-row-click="onView"
     />
 
@@ -155,6 +160,9 @@ export default {
             modelsModal: false,
             currentModels: [],
             tableData: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
             columns: [
                 {
                     title: that.$t('apiKey.keyId'),
@@ -543,12 +551,14 @@ export default {
             this.$request({
                 url: this.$urlFormat('api-keys'),
                 method: 'get',
+                params: { page: this.page, page_size: this.pageSize },
                 openapi: true
             })
                 .then(res => {
                     if (res.status === 200) {
                         const data = res.data.Data || {};
                         const list = Array.isArray(data.list) ? data.list : [];
+                        this.total = (data.pagination && data.pagination.total) || list.length;
                         this.tableData = list.map(item => {
                             const quotaPlan = item.quota_plan || {};
                             const entity = item.entity || {};
@@ -566,6 +576,11 @@ export default {
                 .finally(() => {
                     this.tableLoading = false;
                 });
+        },
+        onPageChange(pageInfo) {
+            this.page = pageInfo.page;
+            this.pageSize = pageInfo.pageSize;
+            this.fetchData();
         },
         showModelsModal(models) {
             this.currentModels = models || [];

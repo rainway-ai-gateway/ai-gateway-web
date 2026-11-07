@@ -83,7 +83,9 @@ export default {
                     title: that.$t('entity.description'),
                     key: 'description',
                     minWidth: 180,
-                    sortable: 'custom'
+                    sortable: 'custom',
+                    ellipsis: true,
+                    tooltip: true
                 },
                 {
                     title: that.$t('entity.level'),
