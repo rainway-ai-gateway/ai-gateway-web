@@ -47,6 +47,18 @@ export function quotaToMillionDisplay(raw) {
   return Math.floor((num / TOKEN_QUOTA_MILLION) * 100) / 100;
 }
 
+/** 存储值 → 录入单位展示串（不含单位名）：token 转百万Token、RMB 保留 2 位小数 */
+export function formatQuotaDisplay(raw, unit) {
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num < 0) {
+    return "0.00";
+  }
+  if (unit === "RMB") {
+    return num.toFixed(2);
+  }
+  return (Math.floor((num / TOKEN_QUOTA_MILLION) * 100) / 100).toFixed(2);
+}
+
 /** 百万Token 录入值 → 存储值（整数 token 数） */
 export function millionToQuotaTokens(raw) {
   const num = Number(raw);

@@ -146,6 +146,7 @@ import CustomModal from '@/components/CustomModal';
 import Upsert from './Upsert.vue';
 import ApiKeyView from './ApiKeyView.vue';
 import { cloneDeep } from 'lodash';
+import { formatQuotaDisplay } from '@/utils/const';
 export default {
     components: {
         pageTable,
@@ -257,7 +258,7 @@ export default {
                 {
                     title: that.$t('apiKey.quota'),
                     key: 'quota_plan_used',
-                    minWidth: 140,
+                    minWidth: 200,
                     sortable: 'custom',
                     searchable: true,
                     render(h, params) {
@@ -267,12 +268,11 @@ export default {
                             return h('span', '-');
                         }
                         const isRMB = quotaPlan.unit === 'RMB';
-                        const decimals = isRMB ? 4 : 0;
-                        const unitText = isRMB ? '¥' : ' tokens';
+                        const unitText = isRMB ? that.$t('apiKey.quotaUnitYuan') : that.$t('apiKey.quotaUnitMillionToken');
                         const used = quotaPlan.balance && quotaPlan.balance.used || 0;
                         const quota = quotaPlan.quota || 0;
-                        const usedText = isRMB ? '¥' + that.formatNumber(used, decimals) : that.formatNumber(used, decimals) + unitText;
-                        const quotaText = isRMB ? '¥' + that.formatNumber(quota, decimals) : that.formatNumber(quota, decimals) + unitText;
+                        const usedText = `${formatQuotaDisplay(used, quotaPlan.unit)} ${unitText}`;
+                        const quotaText = `${formatQuotaDisplay(quota, quotaPlan.unit)} ${unitText}`;
                         return h('span', `${usedText} / ${quotaText}`);
                     }
                 },
@@ -403,22 +403,6 @@ export default {
         this.fetchData();
     },
     methods: {
-        formatNumber(num, decimals = 0) {
-            const value = Number(num);
-            if (Number.isNaN(value)) return '-';
-            if (decimals === 0) {
-                if (value >= 1000000) {
-                    return (value / 1000000).toFixed(1) + 'M';
-                }
-                if (value >= 1000) {
-                    return (value / 1000).toFixed(1) + 'K';
-                }
-            }
-            return value.toLocaleString('zh-CN', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: decimals
-            });
-        },
         showKeyModal(key) {
             this.currentKey = key;
             this.keyModal = true;

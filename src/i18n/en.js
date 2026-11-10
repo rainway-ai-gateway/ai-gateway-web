@@ -665,6 +665,7 @@ export default {
     usageProgress: 'Usage Progress',
     resetQuota: 'Reset Quota',
     newQuotaTotal: 'New Quota Total',
+    newQuotaTotalWithUnit: 'New Quota Total ({unit})',
     resetQuotaTip:
       'After setting, used amount will be reset to 0 and quota total will be the new value',
     resetReason: 'Reset Reason',
@@ -795,6 +796,7 @@ export default {
     noData: 'No Data',
     resetQuota: 'Reset Quota',
     newQuotaTotal: 'New Quota Total',
+    newQuotaTotalWithUnit: 'New Quota Total ({unit})',
     resetQuotaTip:
       'After setting, the used amount will be reset to 0, and the quota total will be the newly set value',
     resetReason: 'Reset Reason',

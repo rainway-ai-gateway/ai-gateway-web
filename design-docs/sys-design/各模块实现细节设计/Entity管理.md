@@ -50,7 +50,7 @@
 | `parent_id` | 可选；选项为 level 低于当前类型的 Entity，不可选自己 | 父级实体。 |
 | `allow_models` | 多选；`*` 与具体模型互斥 | 模型白名单。 |
 | `block_models` | 多选；空时提交为 `['*']` | 模型黑名单。 |
-| `quota_plan` / `rate_limit` | 与 API Key 类似；`quota_plan.unit` 支持 `total_token` / `RMB`；限流启用时至少配置 TPM/RPM/最大并发/批量限流之一 | 配额与限流。`total_token` 上限 9,999,999,999；RMB 上限 90,000,000.00，4 位小数。 |
+| `quota_plan` / `rate_limit` | 与 API Key 类似；`quota_plan.unit` 支持 `total_token` / `RMB`；限流启用时至少配置 TPM/RPM/最大并发/批量限流之一 | 配额与限流。`total_token` 以百万Token 录入（≤ 9999.99、2 位小数，提交换算整数 Token）；`RMB` 以元录入（2 位小数，≤ 90,000,000.00）。 |
 
 ### 5.2 EntityTypeUpsert
 
@@ -92,7 +92,7 @@ Entity/index.vue (Tab 容器)
 | `EntityTypeList.vue` | `PATCH` | `entity-types/{id}` | 更新类型。 |
 | `EntityTypeList.vue` | `DELETE` | `entity-types/{id}` | 删除类型。 |
 
-配额重置弹窗按当前 `unit` 限制精度与上限（`total_token` ≤ 9,999,999,999；RMB 4 位小数 / 9000 万元）。
+配额单位口径（issue #139）在**表单、列表「配额」列、详情、重置配额弹窗**四处保持一致：`total_token` 一律展示/录入为「百万Token」（2 位小数，存储仍是整数 Token），`RMB` 一律展示/录入为「元」（2 位小数）；换算由 `src/utils/const.js` 的 `quotaToMillionDisplay` / `millionToQuotaTokens` / `formatQuotaDisplay` 承担。详情与表单的开关统一表述为「配额限制：是/否」（是=有限），不再出现「无限配额」；详情「配额单位」行展示「百万Token」/「元」，不再露出 `total_token` 枚举。
 
 ## 8. 边界情况
 

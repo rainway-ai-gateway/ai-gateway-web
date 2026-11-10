@@ -163,16 +163,13 @@
                 :label="$t('apiKey.quotaTotal')"
                 prop="quota_plan.quota"
               >
-                <InputNumber
+                <NumberInput
                   v-model="formData.quota_plan.quota"
-                  :min="0"
-                  :max="quotaInputMax"
-                  :precision="quotaPrecision"
-                  :step="quotaStep"
+                  :precision="2"
                   style="width: 100%"
                   @on-change="validateQuotaField"
                   @on-blur="validateQuotaField"
-                ></InputNumber>
+                ></NumberInput>
               </FormItem>
             </Col>
           </Row>
@@ -292,16 +289,12 @@
                     "
                     :rules="[{ validator: validateTpmWindowMinutes }]"
                   >
-                    <InputNumber
+                    <NumberInput
                       v-model="rule.window_minutes"
-                      :min="1"
-                      :max="360"
                       :precision="0"
-                      :formatter="formatNumberInput"
-                      :parser="parseNumberInput"
+                      thousands
                       style="width: 100%"
-                      @on-change="onTpmWindowChange(index)"
-                    ></InputNumber>
+                    ></NumberInput>
                   </FormItem>
                 </Col>
                 <Col span="4">
@@ -312,15 +305,12 @@
                     "
                     :rules="[{ validator: validateTpmMaxTokens }]"
                   >
-                    <InputNumber
+                    <NumberInput
                       v-model="rule.max_tokens"
-                      :min="0"
-                      :max="INT64_MAX"
                       :precision="0"
-                      :formatter="formatNumberInput"
-                      :parser="parseNumberInput"
+                      thousands
                       style="width: 100%"
-                    ></InputNumber>
+                    ></NumberInput>
                   </FormItem>
                 </Col>
                 <Col span="3">
@@ -333,16 +323,12 @@
                       { validator: validateTpmStepMinutes, trigger: 'change' },
                     ]"
                   >
-                    <InputNumber
+                    <NumberInput
                       v-model="rule.step_minutes"
-                      :min="1"
-                      :max="rule.window_minutes"
                       :precision="0"
-                      :formatter="formatNumberInput"
-                      :parser="parseNumberInput"
+                      thousands
                       style="width: 100%"
-                      @on-change="validateTpmStepMinutesField(index)"
-                    ></InputNumber>
+                    ></NumberInput>
                   </FormItem>
                 </Col>
                 <Col span="2">
@@ -424,15 +410,12 @@
                     "
                     :rules="[{ validator: validateRpmWindowMinutes }]"
                   >
-                    <InputNumber
+                    <NumberInput
                       v-model="rule.window_minutes"
-                      :min="1"
-                      :max="360"
                       :precision="0"
-                      :formatter="formatNumberInput"
-                      :parser="parseNumberInput"
+                      thousands
                       style="width: 100%"
-                    ></InputNumber>
+                    ></NumberInput>
                   </FormItem>
                 </Col>
                 <Col span="5">
@@ -443,15 +426,12 @@
                     "
                     :rules="[{ validator: validateRpmMaxRequests }]"
                   >
-                    <InputNumber
+                    <NumberInput
                       v-model="rule.max_requests"
-                      :min="0"
-                      :max="INT64_MAX"
                       :precision="0"
-                      :formatter="formatNumberInput"
-                      :parser="parseNumberInput"
+                      thousands
                       style="width: 100%"
-                    ></InputNumber>
+                    ></NumberInput>
                   </FormItem>
                 </Col>
                 <Col span="2">
@@ -501,17 +481,12 @@
                   :rules="maxConcurrencyCustomRules"
                   class="max-concurrency-custom-input"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="formData.rate_limit_policy.rules.max_concurrency"
-                    :min="1"
-                    :max="INT_MAX"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%"
-                    @on-change="onMaxConcurrencyValueChange"
-                    @on-blur="validateMaxConcurrencyField"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </FormItem>
             </Col>
@@ -531,16 +506,14 @@
                   :prop="'rate_limit_policy.rules.batch_limits.' + field.key"
                   :rules="[{ validator: validateBatchLimit }]"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="
                       formData.rate_limit_policy.rules.batch_limits[field.key]
                     "
-                    :max="INT64_MAX"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </Col>
             </Row>
@@ -566,6 +539,7 @@ import { cloneDeep } from "lodash";
 import moment from "moment";
 import { isCidr, isCidrEqual, isCidrContained, RateLimitRuleNameRegCheck, TOKEN_QUOTA_DISPLAY_MAX, RMB_QUOTA_MAX, quotaToMillionDisplay, millionToQuotaTokens } from "@/utils/const";
 import { getModelGroupsFromServices } from "@/utils/model";
+import NumberInput from "@/components/NumberInput";
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
@@ -579,6 +553,7 @@ const BATCH_LIMIT_FIELDS = [
 ];
 
 export default {
+  components: { NumberInput },
   props: {
     currentData: {
       type: Object,
@@ -852,15 +827,6 @@ export default {
     isRMB() {
       return this.formData.quota_plan && this.formData.quota_plan.unit === 'RMB';
     },
-    quotaPrecision() {
-      return 2;
-    },
-    quotaStep() {
-      return 0.01;
-    },
-    quotaInputMax() {
-      return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_DISPLAY_MAX;
-    },
     maxConcurrencyCustomRules() {
       return [
         {
@@ -921,15 +887,6 @@ export default {
     this.fetchModelServices();
   },
   methods: {
-    formatNumberInput(value) {
-      if (value === null || value === undefined || value === "") {
-        return "";
-      }
-      return Number(value).toLocaleString();
-    },
-    parseNumberInput(value) {
-      return String(value).replace(/,/g, "");
-    },
     normalizeSelectBool(value, defaultValue = true) {
       if (value === true || value === "true") return "true";
       if (value === false || value === "false") return "false";

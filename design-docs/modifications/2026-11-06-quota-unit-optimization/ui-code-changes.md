@@ -14,6 +14,8 @@
 | `src/utils/const.js` | 新增 `TOKEN_QUOTA_MILLION`、`TOKEN_QUOTA_DISPLAY_MAX`（9999.99）、`quotaToMillionDisplay()`、`millionToQuotaTokens()` | node 断言 18 例 |
 | `src/i18n/zh.js` / `en.js`（apiKey 段 + entity 段各一份） | 新增 `quotaLimited`（配额限制）、`quotaUnitMillionToken`（百万Token）、`quotaUnitYuan`（元）；`quotaRmbPrecisionError` 改 2 位小数口径、`quotaRmbMaxError` 改「金额配额」口径 | — |
 
+> **后续（2026-11-10）**：列表 / 详情页 / 重置配额弹窗已按同一口径补齐，见 [`../2026-11-10-quota-unit-display-alignment/ui-code-changes.md`](../2026-11-10-quota-unit-display-alignment/ui-code-changes.md)。
+
 **本次不做（按卡片范围收敛）**：详情页单位展示（`ApiKeyView.vue` / `EntityView.vue` 仍显示原始 token 数与 `¥` 原值）、重置配额弹窗、APIKey 顶部「执行配额检查」（`unlimited_quota`）语义统一——均未在卡片中点名，留作后续。
 
 ## 2. 接口变更（diff）
