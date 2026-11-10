@@ -1042,6 +1042,8 @@ export default {
     sessionAffinityHeader: '会话亲和性 Header',
     sessionAffinityHeaderPlaceholder: '会话亲和性启用时必填，如 x-session-id',
     sessionAffinityHeaderRequired: '启用会话亲和性时，Header 不能为空',
+    sessionAffinityHeaderRequiredWhenOff:
+      '亲和强度为「关闭」时会话亲和性不生效；如需填写 Header，请先把亲和强度调回低/中/高，或关闭会话亲和性',
     kvCacheUtilizationMax: 'KV 缓存利用率上限',
     kvCacheUtilizationMaxInvalid: 'KV 缓存利用率上限必须大于 0 且小于等于 1',
     waitingQueueMax: '排队长度过滤阈值',
