@@ -33,6 +33,40 @@
 export const TOKEN_QUOTA_MAX = 9999999999;
 // RMB cap aligned with Redis Lua IEEE-754 integer precision (see OpenAPI QuotaPlan).
 export const RMB_QUOTA_MAX = 90000000;
+// 配额录入单位：total_token 以「百万Token」录入（2 位小数，粒度 1 万 token）。
+export const TOKEN_QUOTA_MILLION = 1e6;
+export const TOKEN_QUOTA_DISPLAY_MAX =
+  Math.floor((TOKEN_QUOTA_MAX / TOKEN_QUOTA_MILLION) * 100) / 100;
+
+/** 存储值（token 数）→ 百万Token 录入/展示值，截断 2 位小数 */
+export function quotaToMillionDisplay(raw) {
+  const num = Number(raw);
+  if (raw === null || raw === undefined || !Number.isFinite(num) || num < 0) {
+    return raw;
+  }
+  return Math.floor((num / TOKEN_QUOTA_MILLION) * 100) / 100;
+}
+
+/** 存储值 → 录入单位展示串（不含单位名）：token 转百万Token、RMB 保留 2 位小数 */
+export function formatQuotaDisplay(raw, unit) {
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num < 0) {
+    return "0.00";
+  }
+  if (unit === "RMB") {
+    return num.toFixed(2);
+  }
+  return (Math.floor((num / TOKEN_QUOTA_MILLION) * 100) / 100).toFixed(2);
+}
+
+/** 百万Token 录入值 → 存储值（整数 token 数） */
+export function millionToQuotaTokens(raw) {
+  const num = Number(raw);
+  if (!Number.isFinite(num)) {
+    return NaN;
+  }
+  return Math.round(num * TOKEN_QUOTA_MILLION);
+}
 
 /**
 * 检查集群名称是否符合规范

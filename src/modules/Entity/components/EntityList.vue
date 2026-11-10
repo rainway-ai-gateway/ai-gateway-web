@@ -74,6 +74,7 @@ import pageTable from '@/components/table/pageTable';
 import CustomModal from '@/components/CustomModal';
 import EntityUpsert from './EntityUpsert.vue';
 import EntityView from './EntityView.vue';
+import { formatQuotaDisplay } from '@/utils/const';
 
 export default {
     components: {
@@ -159,7 +160,7 @@ export default {
                 {
                     title: that.$t('entity.quota'),
                     key: 'quota_plan_used',
-                    minWidth: 140,
+                    minWidth: 200,
                     sortable: 'custom',
                     searchable: true,
                     render(h, params) {
@@ -167,12 +168,11 @@ export default {
                         let text = '-';
                         if (!quotaPlan.unlimited) {
                             const isRMB = quotaPlan.unit === 'RMB';
-                            const decimals = isRMB ? 4 : 0;
-                            const unitText = isRMB ? '¥' : ' tokens';
+                            const unitText = isRMB ? that.$t('entity.quotaUnitYuan') : that.$t('entity.quotaUnitMillionToken');
                             const used = quotaPlan.balance && quotaPlan.balance.used || 0;
                             const quota = quotaPlan.quota || 0;
-                            const usedText = isRMB ? '¥' + that.formatNumber(used, decimals) : that.formatNumber(used, decimals) + unitText;
-                            const quotaText = isRMB ? '¥' + that.formatNumber(quota, decimals) : that.formatNumber(quota, decimals) + unitText;
+                            const usedText = `${formatQuotaDisplay(used, quotaPlan.unit)} ${unitText}`;
+                            const quotaText = `${formatQuotaDisplay(quota, quotaPlan.unit)} ${unitText}`;
                             text = `${usedText} / ${quotaText}`;
                         }
                         return h('span', text);
@@ -294,22 +294,6 @@ export default {
         this.fetchData();
     },
     methods: {
-        formatNumber(num, decimals = 0) {
-            const value = Number(num);
-            if (Number.isNaN(value)) return '-';
-            if (decimals === 0) {
-                if (value >= 1000000) {
-                    return (value / 1000000).toFixed(1) + 'M';
-                }
-                if (value >= 1000) {
-                    return (value / 1000).toFixed(1) + 'K';
-                }
-            }
-            return value.toLocaleString('zh-CN', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: decimals
-            });
-        },
         onViewSubmit() {
             this.isHiden = false;
             this.fetchData();
