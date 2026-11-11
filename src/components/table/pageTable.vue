@@ -129,6 +129,15 @@ export default {
             type: Boolean,
             default: false
         },
+        /**
+         * 服务端分页 + 仅前端过滤当前页：表格数据仍是「服务端返回的当前页」，
+         * 但列搜索/列排序在本地完成（不派发 on-search-change、不触发重新请求）。
+         * 用于后端暂不支持筛选/排序参数、且产品接受「只搜当前页」的列表。
+         */
+        clientFilter: {
+            type: Boolean,
+            default: false
+        },
         draggable: {
             type: Boolean,
             default: false
@@ -269,12 +278,17 @@ export default {
                 if (!data) {
                     data = [];
                 }
-                if (this.serverPagination) {
+                if (this.serverPagination && !this.clientFilter) {
                     this.showTableData = cloneDeep(data);
                     this.cloneShowData = cloneDeep(data);
                     this.showSrcIndex = data.map((row, index) => index);
                     this.cloneShowSrcIndex = this.showSrcIndex.slice();
                     this.handlePageData(this.showTableData, this.page);
+                    return;
+                }
+                if (this.serverPagination && this.clientFilter) {
+                    // 只过滤当前页：翻页/刷新拿到新的当页数据后，保留列搜索条件并重新过滤
+                    this.applyLocalFilter();
                     return;
                 }
                 // Clear search conditions when external data is refreshed (e.g. after add/edit submit)
@@ -289,7 +303,10 @@ export default {
                 this.cloneShowData = cloneDeep(data);
                 this.showSrcIndex = data.map((row, index) => index);
                 this.cloneShowSrcIndex = this.showSrcIndex.slice();
-                if (this.page.currentPage !== 1) {
+                if (this.serverPagination) {
+                    // 服务端分页的页码由父组件控制，刷新数据时不重置（clientFilter 仅本地过滤/排序）
+                    this.handlePageData(this.showTableData, this.page);
+                } else if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
                     this.handlePageData(this.showTableData, this.page);
@@ -385,7 +402,7 @@ export default {
                 }
             }
 
-            if (this.serverPagination) {
+            if (this.serverPagination && !this.clientFilter) {
                 const filters = {};
                 for (let key in this.searchMessage) {
                     if (key.indexOf('_render_') === -1) {
@@ -396,12 +413,31 @@ export default {
                 return;
             }
 
+            this.applyLocalFilter();
+        },
+        clearSearchConditions() {
+            this.columns.forEach(item => {
+                if (item.searchable) {
+                    item.searchValue = null;
+                }
+            });
+            this.searchMessage = {};
+            this.filterMessage = {};
+            this.applyLocalFilter();
+        },
+        /**
+         * 按 searchMessage / filterMessage 过滤当前 tableData 并刷新展示数据。
+         *
+         * clientFilter + serverPagination 时 tableData 只是「服务端返回的当前页」，
+         * 因此过滤只在当页范围内生效；翻页/刷新后重新调用本方法即可让筛选继续作用于新的当页数据。
+         */
+        applyLocalFilter() {
             if (isEmpty(this.searchMessage) && isEmpty(this.filterMessage)) {
                 this.showTableData = cloneDeep(this.tableData);
                 this.cloneShowData = cloneDeep(this.showTableData);
                 this.showSrcIndex = this.tableData.map((row, index) => index);
                 this.cloneShowSrcIndex = this.showSrcIndex.slice();
-                if (this.page.currentPage !== 1) {
+                if (!this.serverPagination && this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
                     this.handlePageData(this.showTableData, this.page);
@@ -485,7 +521,7 @@ export default {
                         this.showSrcIndex.push(i);
                     }
                 }
-                if (this.page.currentPage !== 1) {
+                if (!this.serverPagination && this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
                     this.handlePageData(this.showTableData, this.page);
@@ -581,7 +617,9 @@ export default {
                 this.showTableData = sortedRows.map(item => item.row);
                 this.showSrcIndex = sortedRows.map(item => item.srcIndex);
             }
-            if (this.page.currentPage !== 1) {
+            if (this.serverPagination) {
+                this.handlePageData(this.showTableData, this.page);
+            } else if (this.page.currentPage !== 1) {
                 this.page.currentPage = 1;
             } else {
                 this.handlePageData(this.showTableData, this.page);

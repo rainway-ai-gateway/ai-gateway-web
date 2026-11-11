@@ -31,6 +31,7 @@
       :loading="tableLoading"
       :total="total"
       :server-pagination="true"
+      client-filter
       :current-page="page"
       :page-size="pageSize"
       @on-page-change="onPageChange"
@@ -403,6 +404,13 @@ export default {
         this.fetchData();
     },
     methods: {
+        // 增删改成功后清空列搜索/筛选条件，避免新数据被旧的筛选条件挡住
+        resetTableSearch() {
+            const table = this.$refs.pageTable;
+            if (table && table.clearSearchConditions) {
+                table.clearSearchConditions();
+            }
+        },
         showKeyModal(key) {
             this.currentKey = key;
             this.keyModal = true;
@@ -479,6 +487,7 @@ export default {
                     this.$Message.success({
                         content: this.$t('com.tipAddSucc')
                     });
+                    this.resetTableSearch();
                     this.fetchData();
                 }
             }).finally(() => {
@@ -501,6 +510,7 @@ export default {
                         this.$Message.success({
                             content: this.$t('com.tipEditSucc')
                         });
+                        this.resetTableSearch();
                         this.fetchData();
                     }
                 })
@@ -523,6 +533,7 @@ export default {
                         this.$Message.success({
                             content: this.$t('com.tipDelSucc')
                         });
+                        this.resetTableSearch();
                         this.fetchData();
                     }
                 })
