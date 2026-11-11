@@ -1136,7 +1136,7 @@ export default {
     maxRequestsTip: 'An integer > 0, or -1 for unlimited; omitted means unlimited',
     queueTtl: 'Queue TTL（s）',
     queueTtlTip:
-      'Queueing budget when a pool has endpoints; 0 = explicitly disable eviction; omitted means decided by EPP (default 60s)',
+      'Queueing budget when a pool has endpoints; 0 = explicitly disable eviction; default 9s (must stay below the call timeout)',
     noEndpointQueueTtl: 'No Endpoint Queue TTL(s)',
     noEndpointQueueTtlTip:
       'Queueing budget when the pool has no endpoint (cold-start scaling); omitted follows Queue TTL',
@@ -1191,7 +1191,7 @@ export default {
       'Connect timeout must be a valid Go duration and > 0 (e.g. 500ms)',
     eppCallTimeout: 'Call Timeout',
     eppCallTimeoutTip:
-      'Timeout for sending/receiving the first message, valid Go duration and > 0, default 3s',
+      'Timeout for sending/receiving the first message, valid Go duration and > 0, default 11s (must exceed the queue TTL)',
     eppCallTimeoutInvalid:
       'Call timeout must be a valid Go duration and > 0 (e.g. 3s)',
     eppCallTimeoutVsQueueTtlInvalid:

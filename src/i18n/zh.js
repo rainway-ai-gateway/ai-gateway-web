@@ -1066,7 +1066,7 @@ export default {
     maxRequestsLimited: '限制',
     maxRequestsTip: '大于 0 的整数或 -1 表示不限制；缺省表示不限',
     queueTtl: '队列 TTL（秒）',
-    queueTtlTip: '有端点时的排队预算；0 = 显式禁用驱逐；缺省由 EPP 决定（默认 60s）',
+    queueTtlTip: '有端点时的排队预算；0 = 显式禁用驱逐；默认 9 秒（需小于调用超时）',
     noEndpointQueueTtl: '无端点队列 TTL（秒）',
     noEndpointQueueTtlTip: '无端点（冷启动扩容）时的排队预算；缺省跟随队列 TTL',
     enableEviction: '启用驱逐',
@@ -1113,7 +1113,7 @@ export default {
     eppConnectTimeout: '连接超时',
     eppConnectTimeoutInvalid: '连接超时须为合法的 Go duration 且 > 0（如 500ms）',
     eppCallTimeout: '调用超时',
-    eppCallTimeoutTip: '首条消息收发超时，合法 Go duration 且 > 0，默认 3s',
+    eppCallTimeoutTip: '首条消息收发超时，合法 Go duration 且 > 0，默认 11s（需大于队列 TTL）',
     eppCallTimeoutInvalid: '调用超时须为合法的 Go duration 且 > 0（如 3s）',
     eppCallTimeoutVsQueueTtlInvalid:
       '调用超时需大于队列 TTL（秒）与无端点队列 TTL（秒）的最大值（{max} 秒）',

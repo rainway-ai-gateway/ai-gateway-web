@@ -1049,8 +1049,9 @@ function defaultEppConfig() {
         metrics_staleness_threshold_ms: 200,
         flow_control: {
             max_requests: -1,
-            queue_ttl: 60,
-            no_endpoint_queue_ttl: 60,
+            // EPP 默认排队预算 9s（与 epp_runtime 调用超时默认 11s 搭配，满足 call > max(TTL)）
+            queue_ttl: 9,
+            no_endpoint_queue_ttl: 9,
             enable_eviction: false
         }
     };
@@ -1077,7 +1078,7 @@ function defaultEppRuntime() {
         },
         timeout: {
             connect: '500ms',
-            call: '3s'
+            call: '11s'
         }
     };
 }
@@ -1917,10 +1918,10 @@ export default {
                     max_requests: maxRequests,
                     queue_ttl: (eppSrc.flow_control || {}).queue_ttl != null
                         ? Number((eppSrc.flow_control || {}).queue_ttl)
-                        : 60,
+                        : defaultEppConfig().flow_control.queue_ttl,
                     no_endpoint_queue_ttl: (eppSrc.flow_control || {}).no_endpoint_queue_ttl != null
                         ? Number((eppSrc.flow_control || {}).no_endpoint_queue_ttl)
-                        : 60,
+                        : defaultEppConfig().flow_control.no_endpoint_queue_ttl,
                     enable_eviction: false
                 }
             };
@@ -2102,11 +2103,14 @@ export default {
                         : 200,
                 flow_control: {
                     max_requests: maxRequests,
-                    queue_ttl: fc.queue_ttl != null && fc.queue_ttl !== '' ? Number(fc.queue_ttl) : 60,
+                    queue_ttl:
+                        fc.queue_ttl != null && fc.queue_ttl !== ''
+                            ? Number(fc.queue_ttl)
+                            : defaultEppConfig().flow_control.queue_ttl,
                     no_endpoint_queue_ttl:
                         fc.no_endpoint_queue_ttl != null && fc.no_endpoint_queue_ttl !== ''
                             ? Number(fc.no_endpoint_queue_ttl)
-                            : 60,
+                            : defaultEppConfig().flow_control.no_endpoint_queue_ttl,
                     enable_eviction: false
                 }
             };

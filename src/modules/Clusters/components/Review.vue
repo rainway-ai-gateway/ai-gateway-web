@@ -983,8 +983,9 @@ export default {
             if (!epp) return null;
             return {
                 max_requests: -1,
-                queue_ttl: 60,
-                no_endpoint_queue_ttl: 60,
+                // 与 api 默认一致：排队预算 9s（调用超时默认 11s，需 call > max(TTL)）
+                queue_ttl: 9,
+                no_endpoint_queue_ttl: 9,
                 enable_eviction: false,
                 ...(epp.flow_control || {})
             };
@@ -1024,7 +1025,7 @@ export default {
                         timeout && timeout.connect != null
                             ? timeout.connect
                             : '500ms',
-                    call: timeout && timeout.call != null ? timeout.call : '3s'
+                    call: timeout && timeout.call != null ? timeout.call : '11s'
                 }
             };
         }
