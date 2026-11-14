@@ -105,8 +105,8 @@
                 v-for="(entry, index) in pricesEntries"
                 :key="`price-${index}`"
               >
-                <td>{{ entry.key }}</td>
-                <td>¥{{ formatPrice(entry.value) }}</td>
+                <td>{{ priceKeyLabel(entry.key) }}</td>
+                <td>{{ formatPriceCell(entry) }}</td>
               </tr>
             </tbody>
           </table>
@@ -131,8 +131,8 @@
                     v-for="(entry, index) in group.entries"
                     :key="`tier-${group.name}-${index}`"
                   >
-                    <td>{{ entry.key }}</td>
-                    <td>¥{{ formatPrice(entry.value) }}</td>
+                    <td>{{ priceKeyLabel(entry.key) }}</td>
+                    <td>{{ formatPriceCell(entry) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -172,7 +172,12 @@
 </template>
 
 <script>
-import { formatPriceDisplay } from '@/utils/price';
+import {
+    formatPriceDisplay,
+    formatPriceDisplayMillion,
+    isTokenBasedPriceKey,
+    priceKeyLabel as formatPriceKeyLabel
+} from '@/utils/price';
 
 export default {
     name: 'ModelPriceView',
@@ -232,6 +237,17 @@ export default {
         },
         formatPrice(value) {
             return formatPriceDisplay(value);
+        },
+        // 按 token 计价项以「元/百万 tokens」展示，与录入单位一致
+        formatPriceCell(entry) {
+            if (isTokenBasedPriceKey(entry.key)) {
+                return `¥${formatPriceDisplayMillion(entry.value)} / ${this.$t('modelPrices.priceUnitPerMillionTokens')}`;
+            }
+            return `¥${this.formatPrice(entry.value)}`;
+        },
+        // 价格项键名 + 中文备注（issue #140）
+        priceKeyLabel(key) {
+            return formatPriceKeyLabel(key);
         }
     }
 };

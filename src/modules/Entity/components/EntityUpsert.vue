@@ -23,12 +23,15 @@
   >
     <Card :title="$t('entity.basicInfo')" class="form-card">
       <FormItem :label="$t('entity.name')" prop="name">
-        <Input
-          v-model="formData.name"
-          :disabled="!isAdd"
-          :placeholder="$t('entity.namePlaceholder')"
-          show-word-limit
-        ></Input>
+        <div class="word-limit-field">
+          <Input
+            v-model="formData.name"
+            :disabled="!isAdd"
+            :placeholder="$t('entity.namePlaceholder')"
+          ></Input>
+          <!-- iView 3.5.4 Input 无 show-word-limit（无效属性），自实现计数器（名称上限 64，校验拦截非 maxlength） -->
+          <span class="ivu-input-word-count">{{ (formData.name || '').length }}/64</span>
+        </div>
         <p v-if="isAdd" class="form-tip">{{ $t('entity.nameRule') }}</p>
       </FormItem>
 
@@ -143,13 +146,13 @@
     <Card :title="$t('entity.quotaInfo')" class="form-card">
       <Row :gutter="24">
         <Col span="12">
-          <FormItem :label="$t('entity.unlimitedQuota')">
+          <FormItem :label="$t('entity.quotaLimited')">
             <Select
               v-model="formData.quota_plan.unlimited"
               style="width: 100%;"
             >
-              <Option value="true">{{ $t('entity.yes') }}</Option>
-              <Option value="false">{{ $t('entity.no') }}</Option>
+              <Option value="false">{{ $t('entity.yes') }}</Option>
+              <Option value="true">{{ $t('entity.no') }}</Option>
             </Select>
           </FormItem>
         </Col>
@@ -170,18 +173,13 @@
           </Col>
           <Col span="12">
             <FormItem :label="$t('entity.quotaTotal')" prop="quota_plan.quota">
-              <InputNumber
+              <NumberInput
                 v-model="formData.quota_plan.quota"
-                :min="0"
-                :max="quotaInputMax"
-                :precision="quotaPrecision"
-                :step="quotaStep"
-                :formatter="isRMB ? null : formatNumberInput"
-                :parser="isRMB ? null : parseNumberInput"
+                :precision="2"
                 style="width: 100%;"
                 @on-change="validateQuotaField"
                 @on-blur="validateQuotaField"
-              ></InputNumber>
+              ></NumberInput>
             </FormItem>
           </Col>
         </Row>
@@ -190,8 +188,10 @@
           <Col span="12">
             <FormItem :label="$t('entity.quotaUnit')">
               <Select v-model="formData.quota_plan.unit" style="width: 100%;">
-                <Option value="total_token">total_token</Option>
-                <Option value="RMB">RMB</Option>
+                <Option value="total_token">{{
+                  $t('entity.quotaUnitMillionToken')
+                }}</Option>
+                <Option value="RMB">{{ $t('entity.quotaUnitYuan') }}</Option>
               </Select>
             </FormItem>
           </Col>
@@ -291,16 +291,12 @@
                   :prop="'rate_limit_policy.rules.tpm.' + index + '.window_minutes'"
                   :rules="[{ validator: validateTpmWindowMinutes, trigger: 'change,blur' }]"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="rule.window_minutes"
-                    :min="1"
-                    :max="360"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%;"
-                    @on-change="onTpmWindowChange(index)"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </Col>
               <Col span="4">
@@ -309,14 +305,12 @@
                   :prop="'rate_limit_policy.rules.tpm.' + index + '.max_tokens'"
                   :rules="[{ validator: validateTpmMaxTokens, trigger: 'change,blur' }]"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="rule.max_tokens"
-                    :min="0"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%;"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </Col>
               <Col span="4">
@@ -325,16 +319,12 @@
                   :prop="'rate_limit_policy.rules.tpm.' + index + '.step_minutes'"
                   :rules="[{ validator: validateTpmStepMinutes, trigger: 'change,blur' }]"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="rule.step_minutes"
-                    :min="1"
-                    :max="rule.window_minutes"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%;"
-                    @on-change="validateTpmStepMinutesField(index)"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </Col>
               <Col span="2">
@@ -405,15 +395,12 @@
                   :prop="'rate_limit_policy.rules.rpm.' + index + '.window_minutes'"
                   :rules="[{ validator: validateRpmWindowMinutes, trigger: 'change,blur' }]"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="rule.window_minutes"
-                    :min="1"
-                    :max="360"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%;"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </Col>
               <Col span="5">
@@ -422,15 +409,12 @@
                   :prop="'rate_limit_policy.rules.rpm.' + index + '.max_requests'"
                   :rules="[{ validator: validateRpmMaxRequests, trigger: 'change,blur' }]"
                 >
-                  <InputNumber
+                  <NumberInput
                     v-model="rule.max_requests"
-                    :min="0"
-                    :max="INT64_MAX"
                     :precision="0"
-                    :formatter="formatNumberInput"
-                    :parser="parseNumberInput"
+                    thousands
                     style="width: 100%;"
-                  ></InputNumber>
+                  ></NumberInput>
                 </FormItem>
               </Col>
               <Col span="2">
@@ -482,17 +466,12 @@
                 :rules="maxConcurrencyCustomRules"
                 class="max-concurrency-custom-input"
               >
-                <InputNumber
+                <NumberInput
                   v-model="formData.rate_limit_policy.rules.max_concurrency"
-                  :min="1"
-                  :max="INT_MAX"
                   :precision="0"
-                  :formatter="formatNumberInput"
-                  :parser="parseNumberInput"
+                  thousands
                   style="width: 100%;"
-                  @on-change="onMaxConcurrencyValueChange"
-                  @on-blur="validateMaxConcurrencyField"
-                ></InputNumber>
+                ></NumberInput>
               </FormItem>
             </FormItem>
           </Col>
@@ -507,14 +486,12 @@
                 :prop="'rate_limit_policy.rules.batch_limits.' + field.key"
                 :rules="[{ validator: validateBatchLimit }]"
               >
-                <InputNumber
+                <NumberInput
                   v-model="formData.rate_limit_policy.rules.batch_limits[field.key]"
-                  :max="INT64_MAX"
                   :precision="0"
-                  :formatter="formatNumberInput"
-                  :parser="parseNumberInput"
+                  thousands
                   style="width: 100%;"
-                ></InputNumber>
+                ></NumberInput>
               </FormItem>
             </Col>
           </Row>
@@ -541,7 +518,8 @@
 <script>
 import { cloneDeep } from 'lodash';
 import { getModelGroupsFromServices } from '@/utils/model';
-import { EntityNameRegCheck, TOKEN_QUOTA_MAX, RMB_QUOTA_MAX, utf8ByteLength } from '@/utils/const';
+import { EntityNameRegCheck, RateLimitRuleNameRegCheck, TOKEN_QUOTA_DISPLAY_MAX, RMB_QUOTA_MAX, quotaToMillionDisplay, millionToQuotaTokens, utf8ByteLength } from '@/utils/const';
+import NumberInput from '@/components/NumberInput';
 
 const INT64_MAX = 9223372036854775807;
 const INT_MAX = 2147483647;
@@ -555,6 +533,7 @@ const BATCH_LIMIT_FIELDS = [
 ];
 
 export default {
+    components: { NumberInput },
     props: {
         currentData: {
             type: Object,
@@ -639,22 +618,18 @@ export default {
                     return;
                 }
                 const isRMB = that.formData.quota_plan.unit === 'RMB';
-                if (!isRMB && !Number.isInteger(value)) {
-                    callback(new Error(this.$t('entity.quotaMustBeNonNegative')));
-                    return;
-                }
                 if (isRMB) {
                     const decimals = (String(value).split('.')[1] || '').length;
-                    if (decimals > 4) {
-                        callback(new Error(this.$t('entity.quotaRmbPrecisionError') || 'RMB 配额最多保留 4 位小数'));
+                    if (decimals > 2) {
+                        callback(new Error(this.$t('entity.quotaRmbPrecisionError') || '金额配额最多保留 2 位小数'));
                         return;
                     }
                 }
                 if (isRMB && value > RMB_QUOTA_MAX) {
-                    callback(new Error(this.$t('entity.quotaRmbMaxError') || 'RMB 配额不能超过 9000 万元'));
+                    callback(new Error(this.$t('entity.quotaRmbMaxError') || '金额配额不能超过 9000 万元'));
                     return;
                 }
-                if (!isRMB && value > TOKEN_QUOTA_MAX) {
+                if (!isRMB && value > TOKEN_QUOTA_DISPLAY_MAX) {
                     callback(new Error(this.$t('entity.quotaMaxError')));
                     return;
                 }
@@ -705,7 +680,6 @@ export default {
 
         return {
             INT64_MAX,
-            TOKEN_QUOTA_MAX,
             RMB_QUOTA_MAX,
             INT_MAX,
             batchLimitFields: BATCH_LIMIT_FIELDS,
@@ -722,7 +696,7 @@ export default {
                 quota_plan: {
                     unlimited: 'true',
                     pass_when_no_enough_quota: 'false',
-                    quota: 100000000,
+                    quota: 100,
                     unit: 'total_token',
                     reset_period: 'never'
                 },
@@ -811,15 +785,6 @@ export default {
         isRMB() {
             return this.formData.quota_plan && this.formData.quota_plan.unit === 'RMB';
         },
-        quotaPrecision() {
-            return this.isRMB ? 4 : 0;
-        },
-        quotaStep() {
-            return this.isRMB ? 0.0001 : 1;
-        },
-        quotaInputMax() {
-            return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_MAX;
-        }
     },
     watch: {
         currentData: {
@@ -853,15 +818,6 @@ export default {
         this.fetchModelServices();
     },
     methods: {
-        formatNumberInput(value) {
-            if (value === null || value === undefined || value === '') {
-                return '';
-            }
-            return Number(value).toLocaleString();
-        },
-        parseNumberInput(value) {
-            return String(value).replace(/,/g, '');
-        },
         normalizeBatchLimits(batchLimits) {
             const src = batchLimits || {};
             const result = {};
@@ -909,6 +865,15 @@ export default {
             });
             return Object.keys(result).length > 0 ? result : null;
         },
+        // 存储值 → 录入单位值：total_token 换算为百万Token，RMB 保留 2 位小数
+        quotaToDisplay(quota, unit) {
+            if (quota === null || quota === undefined) return quota;
+            if (unit === 'RMB') {
+                const num = Number(quota);
+                return Number.isFinite(num) ? Number(num.toFixed(2)) : quota;
+            }
+            return quotaToMillionDisplay(quota);
+        },
         initFormData(data) {
             this.formData = cloneDeep(data);
 
@@ -929,7 +894,7 @@ export default {
                 this.formData.quota_plan = {
                     unlimited: 'true',
                     pass_when_no_enough_quota: 'false',
-                    quota: 100000000,
+                    quota: 100,
                     unit: 'total_token',
                     reset_period: 'never'
                 };
@@ -937,6 +902,11 @@ export default {
                 // Convert boolean values to strings
                 this.formData.quota_plan.unlimited = String(this.formData.quota_plan.unlimited);
                 this.formData.quota_plan.pass_when_no_enough_quota = String(this.formData.quota_plan.pass_when_no_enough_quota);
+                // 配额按录入单位回显（issue #139）
+                this.formData.quota_plan.quota = this.quotaToDisplay(
+                    this.formData.quota_plan.quota,
+                    this.formData.quota_plan.unit
+                );
             }
 
             // Ensure rate_limit_policy exists and convert boolean values to strings
@@ -1318,6 +1288,11 @@ export default {
                 callback(new Error(this.$t('entity.ruleNameLengthError')));
                 return;
             }
+            // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]
+            if (!RateLimitRuleNameRegCheck(trimmed)) {
+                callback(new Error(this.$t('entity.ruleNameFormatError')));
+                return;
+            }
             const tpm = this.formData.rate_limit_policy.rules.tpm || [];
             const count = tpm.filter(r => r.name === trimmed).length;
             if (count > 1) {
@@ -1340,6 +1315,11 @@ export default {
             }
             if (trimmed.length < 1 || trimmed.length > 128) {
                 callback(new Error(this.$t('entity.ruleNameLengthError')));
+                return;
+            }
+            // 与接口文档 00-common.md §10/§11 对齐：字符集 [a-zA-Z0-9_-]
+            if (!RateLimitRuleNameRegCheck(trimmed)) {
+                callback(new Error(this.$t('entity.ruleNameFormatError')));
                 return;
             }
             const rpm = this.formData.rate_limit_policy.rules.rpm || [];
@@ -1373,7 +1353,7 @@ export default {
             if (this.isRMB) {
                 return num > RMB_QUOTA_MAX;
             }
-            return !Number.isInteger(num) || num > TOKEN_QUOTA_MAX;
+            return num > TOKEN_QUOTA_DISPLAY_MAX;
         },
 
         handleSubmit(name) {
@@ -1391,9 +1371,11 @@ export default {
                     submitData.quota_plan.unlimited = submitData.quota_plan.unlimited === 'true';
                     submitData.quota_plan.pass_when_no_enough_quota = submitData.quota_plan.pass_when_no_enough_quota === 'true';
                     if (!submitData.quota_plan.unlimited) {
-                        // RMB 模式保留 4 位小数，total_token 模式截断为整数
-                        if (submitData.quota_plan.unit !== 'RMB') {
-                            submitData.quota_plan.quota = Math.trunc(submitData.quota_plan.quota);
+                        // 录入单位 → 存储值：RMB 保留 2 位小数，total_token 换算回 token 整数
+                        if (submitData.quota_plan.unit === 'RMB') {
+                            submitData.quota_plan.quota = Number(Number(submitData.quota_plan.quota).toFixed(2));
+                        } else {
+                            submitData.quota_plan.quota = millionToQuotaTokens(submitData.quota_plan.quota);
                         }
                     }
                     submitData.rate_limit_policy.enabled = submitData.rate_limit_policy.enabled === 'true';
@@ -1429,6 +1411,23 @@ export default {
 </script>
 
 <style lang="less" scoped>
+/* iView 3.5.4 Input 无 show-word-limit，自实现字数计数器（名称 1–64，校验拦截） */
+.word-limit-field {
+    position: relative;
+    /deep/ .ivu-input {
+        padding-right: 56px;
+    }
+    .ivu-input-word-count {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #808695;
+        font-size: 12px;
+        line-height: 1;
+        pointer-events: none;
+    }
+}
 .form-card {
     margin-bottom: 16px;
 

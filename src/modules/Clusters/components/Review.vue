@@ -201,6 +201,14 @@
           <li class="title">{{ $t('gatewayConfig.matchPrefix') }}:</li>
           <li class="value">{{ displayMatchPrefix }}</li>
         </ul>
+        <ul class="clearFloat">
+          <li class="title">{{ $t('gatewayConfig.priceMissAction') }}:</li>
+          <li class="value">{{ displayPriceMissAction }}</li>
+        </ul>
+        <ul class="clearFloat">
+          <li class="title">{{ $t('gatewayConfig.ensureReasoningContent') }}:</li>
+          <li class="value">{{ displayEnsureReasoningContent }}</li>
+        </ul>
         <ul class="clearFloat detail-row detail-row-block">
           <li class="title">{{ $t('gatewayConfig.modelRedirect') }}:</li>
           <li class="value">
@@ -353,6 +361,31 @@
                       </div>
                       <div class="review-value">
                         {{ displayKeyAffinity.redis_prefix }}
+                      </div>
+                    </div>
+                  </Col>
+                </Row>
+                <Row
+                  v-if="displayKeyAffinity.penalty_enable"
+                  :gutter="24"
+                >
+                  <Col span="12">
+                    <div class="review-item">
+                      <div class="review-label">
+                        {{ $t('gatewayConfig.keyAffinityPenaltyTtl429') }}:
+                      </div>
+                      <div class="review-value">
+                        {{ displayKeyAffinity.penalty_ttl_429 }}
+                      </div>
+                    </div>
+                  </Col>
+                  <Col span="12">
+                    <div class="review-item">
+                      <div class="review-label">
+                        {{ $t('gatewayConfig.keyAffinityPenaltyTtlAuth') }}:
+                      </div>
+                      <div class="review-value">
+                        {{ displayKeyAffinity.penalty_ttl_auth }}
                       </div>
                     </div>
                   </Col>
@@ -740,6 +773,22 @@ export default {
             const prefix = this.llmConfigData && this.llmConfigData.match_prefix;
             return prefix || '-';
         },
+        displayPriceMissAction() {
+            const action = this.llmConfigData && this.llmConfigData.price_miss_action;
+            const map = {
+                fallback_chat: this.$t('gatewayConfig.priceMissActionFallbackChatShort'),
+                bill_zero: this.$t('gatewayConfig.priceMissActionBillZeroShort'),
+                reject: this.$t('gatewayConfig.priceMissActionRejectShort')
+            };
+            return map[action] || action || '-';
+        },
+        displayEnsureReasoningContent() {
+            const list =
+                this.llmConfigData && Array.isArray(this.llmConfigData.ensure_reasoning_content)
+                    ? this.llmConfigData.ensure_reasoning_content
+                    : [];
+            return list.length ? list.join(', ') : '-';
+        },
         displayPassiveHealthData() {
             return formatPassiveHealthCheckForApi(this.passiveHealthData);
         },
@@ -818,7 +867,9 @@ export default {
                 enabled: false,
                 ttl: 600,
                 redis_prefix: 'bfe:ai:key_affinity',
-                penalty_enable: true
+                penalty_enable: true,
+                penalty_ttl_429: 60,
+                penalty_ttl_auth: 300
             };
             const getValue = key => {
                 const value = affinity[key];
@@ -829,7 +880,9 @@ export default {
                 enabled: isTrue(getValue('enabled')),
                 ttl: getValue('ttl'),
                 redis_prefix: getValue('redis_prefix'),
-                penalty_enable: isTrue(getValue('penalty_enable'))
+                penalty_enable: isTrue(getValue('penalty_enable')),
+                penalty_ttl_429: getValue('penalty_ttl_429'),
+                penalty_ttl_auth: getValue('penalty_ttl_auth')
             };
         },
         displayNormalizeUpstreamError() {
@@ -930,8 +983,9 @@ export default {
             if (!epp) return null;
             return {
                 max_requests: -1,
-                queue_ttl: 60,
-                no_endpoint_queue_ttl: 60,
+                // 与 api 默认一致：排队预算 9s（调用超时默认 11s，需 call > max(TTL)）
+                queue_ttl: 9,
+                no_endpoint_queue_ttl: 9,
                 enable_eviction: false,
                 ...(epp.flow_control || {})
             };
@@ -971,7 +1025,7 @@ export default {
                         timeout && timeout.connect != null
                             ? timeout.connect
                             : '500ms',
-                    call: timeout && timeout.call != null ? timeout.call : '3s'
+                    call: timeout && timeout.call != null ? timeout.call : '11s'
                 }
             };
         }

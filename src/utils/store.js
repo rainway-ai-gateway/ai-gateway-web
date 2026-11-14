@@ -29,6 +29,7 @@
  * limitations under the License.
  */
 import Vue from 'vue';
+import { resolveRole, ROLE_SYSTEM_ADMIN_READONLY } from './role';
 
 const DEFAULT_NAV_KEY = 'admin';
 const NAV_KEY_BY_ROLE = {
@@ -49,7 +50,22 @@ export default {
     }
     let ls = localStorage.getItem('user');
     if (ls) {
-      return JSON.parse(ls);
+      // 升级域名/版本后仍可能读到 0.10 写入的 {name, sessionKey, is_admin}
+      let user;
+      try {
+        user = JSON.parse(ls);
+      } catch (e) {
+        // 本地数据不可解析时直接清掉，按"未登录"处理，避免每次导航都抛错卡住
+        localStorage.removeItem('user');
+        return null;
+      }
+      if (!user) {
+        return null;
+      }
+      return {
+        ...user,
+        role: resolveRole(user),
+      };
     }
     return null;
   },
@@ -68,7 +84,7 @@ export default {
       return null;
     }
     const user = this.getUser();
-    const navKey = NAV_KEY_BY_ROLE[(user && user.role)] || DEFAULT_NAV_KEY;
+    const navKey = NAV_KEY_BY_ROLE[resolveRole(user)] || DEFAULT_NAV_KEY;
     return nav[navKey] || nav[DEFAULT_NAV_KEY] || null;
   },
   findNav(routeName) {
@@ -81,13 +97,12 @@ export default {
     this.state.user = {
       name: newVal.user_name,
       sessionKey: newVal.session_key,
-      role: newVal.role,
+      role: resolveRole(newVal),
     };
     localStorage.setItem('user', JSON.stringify(this.state.user));
   },
   isReadonly() {
-    const user = this.getUser();
-    return !!(user && user.role === 'system_admin_readonly');
+    return resolveRole(this.getUser()) === ROLE_SYSTEM_ADMIN_READONLY;
   },
   removeUserData() {
     this.state.user = null;

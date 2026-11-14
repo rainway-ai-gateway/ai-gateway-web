@@ -51,7 +51,7 @@
         @on-row-click="handleRowClick"
         :loading="loading"
         :class="loading ? 'show-iView-Table-list' : ''"
-        :draggable="draggable"
+        :draggable="canDrag"
         @on-drag-drop="onDragDrop"
       >
       </Table>
@@ -129,6 +129,15 @@ export default {
             type: Boolean,
             default: false
         },
+        /**
+         * 服务端分页 + 仅前端过滤当前页：表格数据仍是「服务端返回的当前页」，
+         * 但列搜索/列排序在本地完成（不派发 on-search-change、不触发重新请求）。
+         * 用于后端暂不支持筛选/排序参数、且产品接受「只搜当前页」的列表。
+         */
+        clientFilter: {
+            type: Boolean,
+            default: false
+        },
         draggable: {
             type: Boolean,
             default: false
@@ -147,6 +156,19 @@ export default {
          * 属性在视图模式没有响应式属主（v-else 分支根本不含它），因此在此精确清理是安全的。
          */
         draggable(isDraggable) {
+            if (isDraggable) {
+                return;
+            }
+            this.$nextTick(() => {
+                const rows = this.$el
+                    ? this.$el.querySelectorAll(
+                          '.show-iView-Table tbody tr[draggable]',
+                      )
+                    : [];
+                rows.forEach(row => row.removeAttribute('draggable'));
+            });
+        },
+        canDrag(isDraggable) {
             if (isDraggable) {
                 return;
             }
@@ -256,12 +278,17 @@ export default {
                 if (!data) {
                     data = [];
                 }
-                if (this.serverPagination) {
+                if (this.serverPagination && !this.clientFilter) {
                     this.showTableData = cloneDeep(data);
                     this.cloneShowData = cloneDeep(data);
                     this.showSrcIndex = data.map((row, index) => index);
                     this.cloneShowSrcIndex = this.showSrcIndex.slice();
                     this.handlePageData(this.showTableData, this.page);
+                    return;
+                }
+                if (this.serverPagination && this.clientFilter) {
+                    // 只过滤当前页：翻页/刷新拿到新的当页数据后，保留列搜索条件并重新过滤
+                    this.applyLocalFilter();
                     return;
                 }
                 // Clear search conditions when external data is refreshed (e.g. after add/edit submit)
@@ -276,7 +303,10 @@ export default {
                 this.cloneShowData = cloneDeep(data);
                 this.showSrcIndex = data.map((row, index) => index);
                 this.cloneShowSrcIndex = this.showSrcIndex.slice();
-                if (this.page.currentPage !== 1) {
+                if (this.serverPagination) {
+                    // 服务端分页的页码由父组件控制，刷新数据时不重置（clientFilter 仅本地过滤/排序）
+                    this.handlePageData(this.showTableData, this.page);
+                } else if (this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
                     this.handlePageData(this.showTableData, this.page);
@@ -331,8 +361,30 @@ export default {
             page: {
                 currentPage: 1,
                 pageSize: 20
-            }
+            },
+            // 2026-11-02：排序/列筛选激活时禁用拖拽（视图顺序 ≠ 优先级顺序，
+            // 拖拽会改错行——route RT-D-28 #79 实测）。见 computed.canDrag
+            activeSortKey: '',
+            activeSortOrder: ''
         };
+    },
+
+    computed: {
+        /** 已生效的列筛选数量（排除内部 _render_ 键） */
+        activeFilterCount() {
+            return Object.keys(this.searchMessage || {}).filter(
+                (k) => !k.endsWith('_render_'),
+            ).length;
+        },
+        /** 可拖拽 = 父组件允许 + 无排序 + 无列搜索 + 无列过滤 */
+        canDrag() {
+            return (
+                !!this.draggable &&
+                !this.activeSortKey &&
+                this.activeFilterCount === 0 &&
+                Object.keys(this.filterMessage || {}).length === 0
+            );
+        }
     },
 
     methods: {
@@ -350,7 +402,7 @@ export default {
                 }
             }
 
-            if (this.serverPagination) {
+            if (this.serverPagination && !this.clientFilter) {
                 const filters = {};
                 for (let key in this.searchMessage) {
                     if (key.indexOf('_render_') === -1) {
@@ -361,12 +413,31 @@ export default {
                 return;
             }
 
+            this.applyLocalFilter();
+        },
+        clearSearchConditions() {
+            this.columns.forEach(item => {
+                if (item.searchable) {
+                    item.searchValue = null;
+                }
+            });
+            this.searchMessage = {};
+            this.filterMessage = {};
+            this.applyLocalFilter();
+        },
+        /**
+         * 按 searchMessage / filterMessage 过滤当前 tableData 并刷新展示数据。
+         *
+         * clientFilter + serverPagination 时 tableData 只是「服务端返回的当前页」，
+         * 因此过滤只在当页范围内生效；翻页/刷新后重新调用本方法即可让筛选继续作用于新的当页数据。
+         */
+        applyLocalFilter() {
             if (isEmpty(this.searchMessage) && isEmpty(this.filterMessage)) {
                 this.showTableData = cloneDeep(this.tableData);
                 this.cloneShowData = cloneDeep(this.showTableData);
                 this.showSrcIndex = this.tableData.map((row, index) => index);
                 this.cloneShowSrcIndex = this.showSrcIndex.slice();
-                if (this.page.currentPage !== 1) {
+                if (!this.serverPagination && this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
                     this.handlePageData(this.showTableData, this.page);
@@ -450,7 +521,7 @@ export default {
                         this.showSrcIndex.push(i);
                     }
                 }
-                if (this.page.currentPage !== 1) {
+                if (!this.serverPagination && this.page.currentPage !== 1) {
                     this.page.currentPage = 1;
                 } else {
                     this.handlePageData(this.showTableData, this.page);
@@ -502,6 +573,14 @@ export default {
             return content.join(',').replace(/(^\s*)|(\s*$)/g, '');
         },
         sortChange(data) {
+            // 记录排序态：排序激活期间禁用拖拽（#79），清除排序后恢复
+            if (!data || data.order === 'normal') {
+                this.activeSortKey = '';
+                this.activeSortOrder = '';
+            } else {
+                this.activeSortKey = data.key || '';
+                this.activeSortOrder = data.order || '';
+            }
             if (data.order === 'normal') {
                 this.showTableData = cloneDeep(this.cloneShowData);
                 this.showSrcIndex = this.cloneShowSrcIndex.slice();
@@ -538,7 +617,9 @@ export default {
                 this.showTableData = sortedRows.map(item => item.row);
                 this.showSrcIndex = sortedRows.map(item => item.srcIndex);
             }
-            if (this.page.currentPage !== 1) {
+            if (this.serverPagination) {
+                this.handlePageData(this.showTableData, this.page);
+            } else if (this.page.currentPage !== 1) {
                 this.page.currentPage = 1;
             } else {
                 this.handlePageData(this.showTableData, this.page);
@@ -731,5 +812,15 @@ export default {
 }
 .show-iView-Table-list {
     min-height: 300px;
+}
+/* 长文本单元格省略号裁剪（render 函数自定义渲染的列用，配合 title 悬浮全文；
+   iView 原生列请用 ellipsis:true + tooltip:true，见 2026-11-02 布局缺陷修复） */
+.cell-ellipsis {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
 }
 </style>

@@ -46,11 +46,19 @@
           :label="$t('provider.k8sPoolName')"
           prop="k8s_pool_name"
         >
-          <Input
+          <Select
             v-model="formData.k8s_pool_name"
-            :maxlength="64"
-            :placeholder="$t('provider.k8sPoolNamePlaceholder')"
-          />
+            filterable
+            :placeholder="$t('provider.k8sPoolSelectPlaceholder')"
+          >
+            <Option
+              v-for="item in k8sPoolOptions"
+              :key="item.value"
+              :value="item.value"
+              :disabled="item.disabled"
+              >{{ item.label }}</Option
+            >
+          </Select>
         </FormItem>
         <InstancePool
           v-else
@@ -504,7 +512,8 @@ export default {
             batchModelsText: '',
             instancePoolData: [],
             manualPoolDraft: null,
-            k8sInstancePool: [],
+            k8sPoolOptions: [],
+            k8sPoolInstances: [],
             livePool: [],
             modelsList: [],
             formData: {
@@ -524,7 +533,9 @@ export default {
             ruleValidate: {
                 name: [{ required: true, validator: validateName, trigger: 'blur' }],
                 description: [{ validator: validateDescription, trigger: 'blur' }],
-                k8s_pool_name: [{ validator: validateK8sPoolName, trigger: 'blur' }],
+                k8s_pool_name: [
+                    { required: true, validator: validateK8sPoolName, trigger: 'change' }
+                ],
                 model_protocols: [{ validator: validateProtocols, trigger: 'change', required: true }],
                 model_endpoint: [{ validator: validateEndpoint, trigger: 'blur' }],
                 keys: [{ validator: validateKeys, trigger: 'change' }],
@@ -538,8 +549,12 @@ export default {
         isK8sPool() {
             return this.formData.instance_source === 'k8s_pool';
         },
-        // 切到 K8s 池时 InstancePool 会被 v-else 卸载，切回时用切走前的快照重建人工实例行
-        // （PR-C-22「切回人工维护实例池原值保留」）；其余情况沿用服务端回填的实例池
+        endpointPool() {
+            if (this.isK8sPool) {
+                return this.k8sPoolInstances;
+            }
+            return this.livePool.length ? this.livePool : this.instancePoolData;
+        },
         manualPoolRestore() {
             if (this.manualPoolDraft && this.formData.instance_source !== 'k8s_pool') {
                 return this.manualPoolDraft;
@@ -547,7 +562,7 @@ export default {
             return this.instancePoolData;
         },
         endpointHostDisplay() {
-            const pool = this.livePool.length ? this.livePool : this.instancePoolData;
+            const pool = this.endpointPool;
             const schema = this.formData.model_endpoint.schema;
             const hosts = getInstanceEndpointHosts(syncInstancePoolPortBySchema(pool, schema));
             return hosts[0] || '';
@@ -557,7 +572,7 @@ export default {
             if (!protocols.length) {
                 return false;
             }
-            const pool = this.livePool.length ? this.livePool : this.instancePoolData;
+            const pool = this.endpointPool;
             const schema = (this.formData.model_endpoint && this.formData.model_endpoint.schema) || 'https';
             const instances = formatInstancePoolForApi(pool, schema);
             return instances.some(item => String(item.addr || '').trim());
@@ -605,15 +620,20 @@ export default {
             }
         },
         'formData.instance_source'(val) {
-            // 切走前存档当前人工实例行，切回时由 manualPoolRestore 消费（PR-C-22）
             if (val === 'k8s_pool') {
                 this.manualPoolDraft = cloneDeep(this.livePool || []);
+                this.loadK8sPoolOptions();
             }
             this.$nextTick(() => {
                 if (this.$refs.formData && val === 'k8s_pool') {
                     this.$refs.formData.validateField('k8s_pool_name');
                 }
             });
+        },
+        'formData.k8s_pool_name'() {
+            if (this.formData.instance_source === 'k8s_pool') {
+                this.loadK8sPoolDetail();
+            }
         }
     },
 
@@ -648,12 +668,58 @@ export default {
             this.instancePoolData = data.instance_pool && data.instance_pool.length
                 ? cloneDeep(data.instance_pool)
                 : [];
-            this.k8sInstancePool = cloneDeep(data.k8s_instance_pool || []);
             this.livePool = this.instancePoolData.slice();
             this.manualPoolDraft = null;
+
+            if (this.formData.instance_source === 'k8s_pool') {
+                this.loadK8sPoolOptions();
+                this.loadK8sPoolDetail();
+            }
         },
         onPoolChange(pool) {
             this.livePool = pool || [];
+        },
+        loadK8sPoolOptions() {
+            this.$request({ url: 'k8s_pools', method: 'get', openapi: true })
+                .then(res => {
+                    if (res.status !== 200) return;
+                    const list = ((res.data.Data && res.data.Data.list) || []).filter(item => item && item.name);
+                    const options = list.map(item => ({ value: item.name, label: item.name }));
+                    const selected = String(this.formData.k8s_pool_name || '').trim();
+                    if (selected && !options.some(item => item.value === selected)) {
+                        options.push({
+                            value: selected,
+                            label: `${selected}(${this.$t('provider.k8sPoolNotExistOption')})`
+                        });
+                    }
+                    if (!options.length) {
+                        options.push({ value: '', label: this.$t('provider.k8sPoolNoOptions'), disabled: true });
+                    }
+                    this.k8sPoolOptions = options;
+                })
+                .catch(() => {
+
+                });
+        },
+        loadK8sPoolDetail() {
+            const name = String(this.formData.k8s_pool_name || '').trim();
+            if (!name) {
+                this.k8sPoolInstances = [];
+                return Promise.resolve();
+            }
+            return this.$request({
+                url: `k8s_pools/${encodeURIComponent(name)}`,
+                method: 'get',
+                openapi: true
+            })
+                .then(res => {
+                    if (res.status !== 200) return;
+                    const instances = (res.data.Data && res.data.Data.instances) || [];
+                    this.k8sPoolInstances = instances.slice();
+                })
+                .catch(() => {
+                    this.k8sPoolInstances = [];
+                });
         },
         emptyKey() {
             return { name: '', key: '', originalKey: '', keyModified: false };
@@ -829,7 +895,7 @@ export default {
             this.formData.protocol_paths.splice(index, 1);
         },
         buildDiscoverPayload() {
-            const pool = this.livePool.length ? this.livePool : this.instancePoolData;
+            const pool = this.endpointPool;
             const schema = (this.formData.model_endpoint && this.formData.model_endpoint.schema) || 'https';
             const instances = formatInstancePoolForApi(pool, schema)
                 .filter(item => String(item.addr || '').trim());
@@ -955,8 +1021,6 @@ export default {
                 keys
             };
             if (this.isK8sPool) {
-                // K8s 池模式：仅提交池名称；instance_pool 休眠保留（省略不清空），
-                // k8s_instance_pool 为只读镜像，请求体禁止携带
                 payload.k8s_pool_name = String(this.formData.k8s_pool_name || '').trim();
             } else {
                 payload.instance_pool = formatInstancePoolForApi(instances, schema);

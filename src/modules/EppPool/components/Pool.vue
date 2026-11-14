@@ -242,12 +242,15 @@ export default {
             this.poolData = res.data.Data || { name: 'EPP.pool', groups: [] };
           } else {
             this.poolData = { name: 'EPP.pool', groups: [] };
+            // 主数据接口异常时明确提示（此前 unneedTips 导致静默失败）
+            this.$Message.error({ content: this.$t('eppPool.loadFailed') });
           }
           this.assignUids(this.poolData.groups);
           this.version++;
         })
         .catch(() => {
           this.poolData = { name: 'EPP.pool', groups: [] };
+          this.$Message.error({ content: this.$t('eppPool.loadFailed') });
           this.version++;
         })
         .finally(() => {

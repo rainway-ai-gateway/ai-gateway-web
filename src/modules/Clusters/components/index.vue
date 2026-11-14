@@ -264,7 +264,11 @@ function formatLlmConfigForApi(llmConfig) {
             redis_prefix: 'bfe:ai:key_affinity',
             penalty_enable: true
         },
-        strip_prefix: !!src.strip_prefix
+        strip_prefix: !!src.strip_prefix,
+        price_miss_action: src.price_miss_action || 'fallback_chat',
+        ensure_reasoning_content: Array.isArray(src.ensure_reasoning_content)
+            ? src.ensure_reasoning_content
+            : []
     };
     if (result.strip_prefix) {
         result.match_prefix = src.match_prefix || '';

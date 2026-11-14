@@ -47,7 +47,7 @@
         <table v-if="instances.length" class="kv-table">
           <thead>
             <tr>
-              <th>{{ $t('instancePool.ipAddress') }}</th>
+              <th>{{ $t('provider.k8sPoolInstanceAddress') }}</th>
               <th>{{ $t('instancePool.port') }}</th>
               <th>{{ $t('instancePool.weight') }}</th>
             </tr>
@@ -60,7 +60,7 @@
             </tr>
           </tbody>
         </table>
-        <span v-else class="empty-text">{{ $t('provider.k8sPoolEmpty') }}</span>
+        <span v-else class="empty-text">{{ k8sPoolState === 'notfound' ? $t('provider.k8sPoolNotFound') : $t('provider.k8sPoolEmpty') }}</span>
       </template>
       <template v-else>
         <div class="info-row">
@@ -191,6 +191,13 @@ import {
 export default {
     name: 'ProviderView',
 
+    data() {
+        return {
+            k8sPoolInstances: [],
+            k8sPoolState: ''
+        };
+    },
+
     props: {
         currentData: {
             type: Object,
@@ -211,7 +218,7 @@ export default {
         },
         instances() {
             const pool = this.isK8sPool
-                ? this.currentData.k8s_instance_pool
+                ? this.k8sPoolInstances
                 : this.currentData.instance_pool;
             return parseInstancePool(pool);
         },
@@ -245,6 +252,39 @@ export default {
         peakTimeRanges() {
             const peak = (this.currentData.tiers || []).find(item => item && item.name === 'peak');
             return (peak && peak.time_ranges) || [];
+        }
+    },
+
+    watch: {
+        currentData: {
+            immediate: true,
+            handler() {
+                this.k8sPoolInstances = [];
+                this.k8sPoolState = '';
+                if (!this.isK8sPool) return;
+                const name = String(this.currentData.k8s_pool_name || '').trim();
+                if (!name) return;
+                this.$request({
+                    url: `k8s_pools/${encodeURIComponent(name)}`,
+                    method: 'get',
+                    openapi: true,
+                    unneedTips: true
+                })
+                    .then(res => {
+                        // 响应拦截器对 HTTP 错误 resolve 而非 reject，404 在此分支处理
+                        if (res && res.status === 404) {
+                            this.k8sPoolState = 'notfound';
+                            this.k8sPoolInstances = [];
+                            return;
+                        }
+                        if (!res || res.status !== 200) return;
+                        const instances = (res.data.Data && res.data.Data.instances) || [];
+                        this.k8sPoolInstances = instances.slice();
+                    })
+                    .catch(() => {
+                        this.k8sPoolInstances = [];
+                    });
+            }
         }
     },
 

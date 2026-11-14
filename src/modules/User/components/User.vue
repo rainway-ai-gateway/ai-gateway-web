@@ -293,27 +293,60 @@ export default {
             });
         },
         onDelAdminUser(name) {
-            let user = this.$store.getUser();
+            // 当前登录用户名：优先 store，其次 localStorage（与 request 拦截器同源）。
+            // 原实现只用 store 且未判空——user 为 null 时 `user.name` 抛错并被 then 静默吞掉，
+            // 表现为「自删成功但没有提示、也不退出」（覆盖缺口清单 #86）。
+            const currentUserName = (() => {
+                const storeUser = this.$store.getUser();
+                if (storeUser && storeUser.name) {
+                    return String(storeUser.name);
+                }
+                try {
+                    const lsUser = JSON.parse(
+                        localStorage.getItem('user') || '{}'
+                    );
+                    return String((lsUser && lsUser.name) || '');
+                } catch (e) {
+                    return '';
+                }
+            })();
             this.$request({
                 url: this.$urlFormat('auth/users/{user_name}', {
                     user_name: name
                 }),
                 method: 'delete'
             }).then(data => {
-                if (data.status === 200) {
-                    if (user.name === name) {
+                if (!data || data.status !== 200) {
+                    return;
+                }
+                const isSelf =
+                    currentUserName !== '' &&
+                    currentUserName.toLowerCase() ===
+                        String(name).toLowerCase();
+                if (isSelf) {
+                    // iView Modal 单实例：删除确认刚关闭时立刻弹 error 会被吞掉，
+                    // 先 remove 再在 nextTick 弹出（#86 实测）
+                    setTimeout(() => {
+                        this.$Modal.remove();
                         this.$Modal.error({
                             loading: true,
                             title: this.$t('com.informationTips'),
                             content: this.$t('user.tipUserDel'),
                             onOk: () => {
                                 this.$Modal.remove();
+                                try {
+                                    localStorage.removeItem('user');
+                                    localStorage.removeItem('token');
+                                } catch (e) {
+                                    /* ignore */
+                                }
+                                this.$store.state.user = null;
                                 location.href = `${window.location.protocol}//${window.location.host}/login`;
                             }
                         });
-                    } else {
-                        this.getUserList();
-                    }
+                    }, 400);
+                } else {
+                    this.getUserList();
                 }
             });
         },
