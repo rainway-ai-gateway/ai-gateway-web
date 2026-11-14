@@ -1,7 +1,7 @@
 # /report
 
-> 数据报表查询接口：总览指标、时序、维度排行、占比分布、日志明细五类只读端点。查询后端通过 `[Report].Backend` 配置切换 MySQL（轻量形态，log-reader `mod_log_mysql` 插件落库）、Doris（标准形态，既有 Kafka → Doris 链路）、ClickHouse（标准形态，Kafka → ClickHouse 链路，native TCP 9000，驱动 `Driver = "clickhouse"`）或 StarRocks（标准形态，Kafka → StarRocks 链路，FE 9030 MySQL 协议，驱动 `Driver = "mysql"` 零新驱动），同一套接口四种后端结构一致（差异仅在可选字段的有无，如 MySQL 后端无分位数）。ClickHouse 形态配置样例见 [modifications/2026-10-02-report-clickhouse-backend](../../../../ai-gateway-api/design-docs/modifications/2026-10-02-report-clickhouse-backend/design-changes.md)；StarRocks 形态配置样例见 [modifications/2026-10-02-report-starrocks-backend](../../../../ai-gateway-api/design-docs/modifications/2026-10-02-report-starrocks-backend/design-changes.md)。
-> 本接口消费 ai-cache / 流量镜像 / ai-intent 三组访问日志字段（明细表 +10 列、聚合表 +3 维度，见 [modifications/2026-09-27-report-cache-mirror-intent-fields](../../../../ai-gateway-api/design-docs/modifications/2026-09-27-report-cache-mirror-intent-fields/api-changes.md)）：新维度 `ai_cache_status` / `mirror_hit` / `ai_intent_answer` 一期仅 MySQL 后端可用，二期已对齐 Doris（见 [modifications/2026-10-01-report-doris-cache-mirror-intent-alignment](../../../../ai-gateway-api/design-docs/modifications/2026-10-01-report-doris-cache-mirror-intent-alignment/api-changes.md)，需 Doris 侧表结构先行升级），四后端均可用。模块细节设计见 [报表查询模块](../../../../ai-gateway-api/design-docs/sys-design/details/报表查询模块.md)。
+> 数据报表查询接口：总览指标、时序、维度排行、占比分布、日志明细五类只读端点。查询后端通过 `[Report].Backend` 配置切换 MySQL（轻量形态，log-reader `mod_log_mysql` 插件落库）、Doris（标准形态，既有 Kafka → Doris 链路）、ClickHouse（标准形态，Kafka → ClickHouse 链路，native TCP 9000，驱动 `Driver = "clickhouse"`）或 StarRocks（标准形态，Kafka → StarRocks 链路，FE 9030 MySQL 协议，驱动 `Driver = "mysql"` 零新驱动），同一套接口四种后端结构一致（差异仅在可选字段的有无，如 MySQL 后端无分位数）。ClickHouse 形态配置样例见 [modifications/2026-10-02-report-clickhouse-backend](../../modifications/2026-10-02-report-clickhouse-backend/design-changes.md)；StarRocks 形态配置样例见 [modifications/2026-10-02-report-starrocks-backend](../../modifications/2026-10-02-report-starrocks-backend/design-changes.md)。
+> 本接口消费 ai-cache / 流量镜像 / ai-intent 三组访问日志字段（明细表 +10 列、聚合表 +3 维度，见 [modifications/2026-09-27-report-cache-mirror-intent-fields](../../modifications/2026-09-27-report-cache-mirror-intent-fields/api-changes.md)）：新维度 `ai_cache_status` / `mirror_hit` / `ai_intent_answer` 一期仅 MySQL 后端可用，二期已对齐 Doris（见 [modifications/2026-10-01-report-doris-cache-mirror-intent-alignment](../../modifications/2026-10-01-report-doris-cache-mirror-intent-alignment/api-changes.md)，需 Doris 侧表结构先行升级），四后端均可用。模块细节设计见 [报表查询模块](../../sys-design/details/报表查询模块.md)。
 
 ## 1. 数据模型
 
@@ -48,6 +48,8 @@
   "ai_tpot_us": 25000,
   "ai_cost_value": 0.00005,
   "ai_cost_currency": "USD",
+  "ai_price_miss": true,
+  "ai_price_warn": "fallback",
   "ai_rate_limit_hits": null,
   "ai_auth_reject_quota_plans": null,
   "ai_cache_status": "hit",
@@ -87,6 +89,8 @@
 | `all_time` | int | 请求总耗时（毫秒） |
 | `ai_ttft_us` / `ai_tpot_us` | int64 | TTFT / TPOT（微秒）；未设置（非流式）为 **0**（历史口径：入库未做空值区分，与意图字段的 null 语义不同） |
 | `ai_cost_value` / `ai_cost_currency` | number / string | 成本金额（元/美元，服务端已完成 ÷1e8 换算）/ 币种；无成本为 null |
+| `ai_price_miss` | bool | 是否发生过缺价（请求的「模型 × 接口类型」无价格条目：含回退计费 / 按 0 / 转发前拒绝 / 价格表缺失）；**非 2xx 的拒绝行也会出现**，筛选时建议叠加 `res_status_code`；未缺价为 null |
+| `ai_price_warn` | string | 缺价形态：`fallback`（回退 chat 价计费）/ `no_entry`（按 0）/ `no_baseline`（无 chat 基线按 0）/ `reject`（转发前拒绝）/ `subitem_missing`（回退条目缺子项价格）/ `no_model_table`（价格表缺失）；多因取最具体；未缺价为 null |
 | `ai_rate_limit_hits` / `ai_auth_reject_quota_plans` | string | JSON 原文（限流命中列表 / 被拒绝配额计划），未命中为 null |
 | `ai_cache_status` | string | 缓存命中状态：`hit` / `miss` / `skip`；空串=未启用缓存 |
 | `mirror_hit` | bool | 是否被流量镜像 |

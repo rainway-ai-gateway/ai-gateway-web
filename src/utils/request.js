@@ -35,8 +35,31 @@ import { i18n, getLang } from '@/utils/i18n';
 import store from '@/utils/store';
 import router from '@/router/instance';
 
+// 超出 Number.MAX_SAFE_INTEGER（2^53）的标识类整数字段（logid/session_id 等，
+// 19 位 int64）：JSON.parse 前把原始文本中的数值转为字符串，避免 double 舍入
+// 导致精度丢失（ai-gateway-web issue #141）。仅处理已知 ID 字段，聚合数值不受影响。
+const BIG_INT_ID_FIELDS = ['logid', 'session_id'];
+const BIG_INT_ID_PATTERN = new RegExp(
+  `"(?:${BIG_INT_ID_FIELDS.join('|')})"\\s*:\\s*(\\d{16,})`,
+  'g',
+);
+
+function parseResponseText(text) {
+  if (typeof text !== 'string') return text;
+  const normalized = text.replace(
+    BIG_INT_ID_PATTERN,
+    (match, digits) => match.replace(digits, `"${digits}"`),
+  );
+  try {
+    return JSON.parse(normalized);
+  } catch (e) {
+    return text;
+  }
+}
+
 const request = axios.create({
   timeout: 30000,
+  transformResponse: [parseResponseText],
 });
 
 request.interceptors.request.use(

@@ -17,3 +17,5 @@ output
 .DS_Store
 node_modules
 dist
+# 用户手册离线站点构建产物（node docs/scripts/build-manual-site.js 生成）
+docs/zh-cn/site

@@ -70,6 +70,8 @@ window.ClusterUpsert = (function () {
         ttl: 600,
         redis_prefix: 'bfe:ai:key_affinity',
         penalty_enable: true,
+        penalty_ttl_429: 60,
+        penalty_ttl_auth: 300,
       };
     }
     if (!data.llmConfigData.normalize_upstream_error) {
@@ -131,6 +133,11 @@ window.ClusterUpsert = (function () {
         provider: providerName,
         strip_prefix: false,
         match_prefix: '',
+        // 2026-11-03 issue #1479：缺价处置动作（三态，默认 fallback_chat；控制台显式落值）
+        price_miss_action:
+          (row.llm_config && row.llm_config.price_miss_action) || 'fallback_chat',
+        ensure_reasoning_content:
+          (row.llm_config && row.llm_config.ensure_reasoning_content) || [],
         models: provider && provider.models ? provider.models.slice() : [],
         model_mappings: [
           { source_model: 'gpt-4-turbo', target_model: 'gpt-4o' },
@@ -150,6 +157,19 @@ window.ClusterUpsert = (function () {
           ttl: 600,
           redis_prefix: 'bfe:ai:key_affinity',
           penalty_enable: true,
+          // 2026-11-04 issue #1448：惩罚时长默认值（429: 60s / 401/402/403: 300s）
+          penalty_ttl_429:
+            row.llm_config && row.llm_config.key_affinity
+              ? row.llm_config.key_affinity.penalty_ttl_429 != null
+                ? row.llm_config.key_affinity.penalty_ttl_429
+                : 60
+              : 60,
+          penalty_ttl_auth:
+            row.llm_config && row.llm_config.key_affinity
+              ? row.llm_config.key_affinity.penalty_ttl_auth != null
+                ? row.llm_config.key_affinity.penalty_ttl_auth
+                : 300
+              : 300,
         },
         normalize_upstream_error:
           row.llm_config && row.llm_config.normalize_upstream_error
@@ -457,6 +477,58 @@ window.ClusterUpsert = (function () {
           )
         : '');
 
+    // 2026-11-03 issue #1479：缺价处置动作（llm_config.price_miss_action，三态）
+    var PRICE_MISS_ACTION_OPTIONS = [
+      {
+        value: 'fallback_chat',
+        label: 'fallback_chat（回退 chat 价计费，默认）',
+      },
+      { value: 'bill_zero', label: 'bill_zero（按 0 计费）' },
+      { value: 'reject', label: 'reject（转发前拒绝）' },
+    ];
+    var priceMissActionHtml = IvuUI.formTopItem(
+      '缺价处置动作' +
+        helpIcon(
+          '请求的（模型，接口类型）无价格条目时的动作：回退 chat 价计费（默认）/ 按 0 计费 / 转发前拒绝（HTTP 503，不调用上游、不计费）',
+        ),
+      '<select class="proto-field from-item-inp" data-field="llm.price_miss_action" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
+        PRICE_MISS_ACTION_OPTIONS.map(function (item) {
+          return (
+            '<option value="' +
+            item.value +
+            '"' +
+            (llm.price_miss_action === item.value ? ' selected' : '') +
+            '>' +
+            item.label +
+            '</option>'
+          );
+        }).join('') +
+        '</select>',
+    );
+
+    var ENSURE_RC_PROTOCOLS = ['openai', 'anthropic'];
+    var ensureRcChecked = llm.ensure_reasoning_content || [];
+    var ensureRcCheckboxHtml = ENSURE_RC_PROTOCOLS.map(function (p) {
+      var checked = ensureRcChecked.indexOf(p) !== -1 ? ' checked' : '';
+      return (
+        '<label style="margin-right:16px;cursor:pointer;">' +
+        '<input type="checkbox" class="proto-ensure-rc" data-value="' +
+        p +
+        '"' +
+        checked +
+        ' /> ' +
+        p +
+        '</label>'
+      );
+    }).join('');
+    var ensureReasoningHtml = IvuUI.formTopItem(
+      '推理内容补齐协议' +
+        helpIcon(
+          '需要补齐 reasoning_content 的协议列表：部分思考模式上游要求最后一条 user 消息后的 assistant 消息回传 reasoning_content；开启后网关为该窗口内 assistant 补空串（openai）或空 thinking 块（anthropic）。空选 = 关闭',
+        ),
+      '<div id="proto-ensure-rc-wrap">' + ensureRcCheckboxHtml + '</div>',
+    );
+
     var selectedModels = llm.models || [];
     var modelTagsHtml = selectedModels.length
       ? selectedModels
@@ -720,7 +792,30 @@ window.ClusterUpsert = (function () {
               '" /></div>',
             true,
           ) +
-          '</div></div>'
+          '</div></div>' +
+          (ka.penalty_enable
+            ? '<div class="ivu-row" style="margin-left:-12px;margin-right:-12px;">' +
+              '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+              IvuUI.formTopItem(
+                '429 惩罚时长(秒)' +
+                  helpIcon('上游返回 429 时 Key 的惩罚窗口，10–600 秒，默认 60'),
+                IvuUI.inputNumber(
+                  ka.penalty_ttl_429 != null ? ka.penalty_ttl_429 : 60,
+                  'class="proto-field" data-field="llm.key_affinity.penalty_ttl_429" min="10" max="600"',
+                ),
+              ) +
+              '</div>' +
+              '<div class="ivu-col ivu-col-span-12" style="padding:0 12px;">' +
+              IvuUI.formTopItem(
+                '401/402/403 惩罚时长(秒)' +
+                  helpIcon('上游返回 401/402/403 时 Key 的惩罚窗口，60–1800 秒，默认 300'),
+                IvuUI.inputNumber(
+                  ka.penalty_ttl_auth != null ? ka.penalty_ttl_auth : 300,
+                  'class="proto-field" data-field="llm.key_affinity.penalty_ttl_auth" min="60" max="1800"',
+                ),
+              ) +
+              '</div></div>'
+            : '')
         : '');
 
     var nue = llm.normalize_upstream_error || {};
@@ -832,7 +927,9 @@ window.ClusterUpsert = (function () {
             modelSelectHtml,
             true,
           ) +
-          stripPrefixHtml,
+          stripPrefixHtml +
+          priceMissActionHtml +
+          ensureReasoningHtml,
       ) +
       '</div></div>' +
       '<div class="llm-card"><div class="llm-card-title">模型重定向</div><div class="llm-card-body">' +
@@ -900,9 +997,6 @@ window.ClusterUpsert = (function () {
     var eppConfigHtml = '';
     if (isEpp) {
       var affinityOff = ec.affinity === 'off';
-      var offNote = affinityOff
-        ? '<span style="color:#ff9900;margin-left:6px;font-size:12px;">亲和强度为 off，不生效</span>'
-        : '';
 
       var loadProfileHtml = IvuUI.formTopItem(
         '实例负载画像' +
@@ -927,8 +1021,7 @@ window.ClusterUpsert = (function () {
 
       var affinityHtml = IvuUI.formTopItem(
         '亲和强度' +
-          helpIcon('off: 不注入亲和 scorer; low/medium/high: 权重 0.3/0.6/1.0') +
-          offNote,
+          helpIcon('off: 不注入亲和 scorer; low/medium/high: 权重 0.3/0.6/1.0'),
         '<select class="proto-field from-item-inp" data-field="epp.epp_config.affinity" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;">' +
           '<option value="off"' +
           (ec.affinity === 'off' ? ' selected' : '') +
@@ -954,8 +1047,7 @@ window.ClusterUpsert = (function () {
 
       var prefixCacheHtml = IvuUI.formTopItem(
         '前缀缓存亲和性' +
-          helpIcon('开启后将相同前缀的请求尽力收敛到同一后端') +
-          (affinityOff ? '（off 时不生效）' : ''),
+          helpIcon('开启后将相同前缀的请求尽力收敛到同一后端'),
         prefixCacheSwitchHtml,
       );
 
@@ -967,14 +1059,14 @@ window.ClusterUpsert = (function () {
 
       var sessionAffinityHtml = IvuUI.formTopItem(
         '会话亲和性' +
-          helpIcon('开启后将同一会话的请求尽力粘住同一后端') +
-          (affinityOff ? '（off 时不生效）' : ''),
+          helpIcon('开启后将同一会话的请求尽力粘住同一后端'),
         sessionAffinitySwitchHtml,
         true,
       );
 
-      var sessionAffinityHeaderHtml = ec.session_affinity_enabled
-        ? IvuUI.formTopItem(
+      var sessionAffinityHeaderHtml =
+        ec.session_affinity_enabled && !affinityOff
+          ? IvuUI.formTopItem(
             '会话亲和性 Header',
             '<div class="ivu-input-wrapper ivu-input-type-text"><input type="text" class="ivu-input proto-field" data-field="epp.epp_config.session_affinity_header" value="' +
               IvuUI.escapeHtml(ec.session_affinity_header || '') +
@@ -1086,8 +1178,7 @@ window.ClusterUpsert = (function () {
         IvuUI.formTop(
           loadProfileHtml +
             affinityHtml +
-            prefixCacheHtml +
-            sessionAffinityHtml +
+            (affinityOff ? '' : prefixCacheHtml + sessionAffinityHtml) +
             sessionAffinityHeaderHtml +
             kvCacheHtml +
             waitingQueueHtml +
@@ -1305,7 +1396,15 @@ window.ClusterUpsert = (function () {
           '</div>' +
           '<div>Key 惩罚：' +
           (ka.penalty_enable ? '开启' : '关闭') +
-          '</div>'
+          '</div>' +
+          (ka.penalty_enable
+            ? '<div>429 惩罚时长(秒)：' +
+              IvuUI.escapeHtml(ka.penalty_ttl_429 != null ? ka.penalty_ttl_429 : 60) +
+              '</div>' +
+              '<div>401/402/403 惩罚时长(秒)：' +
+              IvuUI.escapeHtml(ka.penalty_ttl_auth != null ? ka.penalty_ttl_auth : 300) +
+              '</div>'
+            : '')
         : '') +
       '</div></div></li></ul>';
 
@@ -1342,6 +1441,18 @@ window.ClusterUpsert = (function () {
       '</li></ul>' +
       reviewRow('裁剪前缀', llm.strip_prefix ? '开启' : '关闭') +
       (llm.strip_prefix ? reviewRow('匹配前缀', llm.match_prefix || '-') : '') +
+      reviewRow(
+        '缺价处置动作',
+        {
+          fallback_chat: '回退 chat 价计费',
+          bill_zero: '按 0 计费',
+          reject: '转发前拒绝',
+        }[llm.price_miss_action] || llm.price_miss_action || '-',
+      ) +
+      reviewRow(
+        '推理内容补齐协议',
+        (llm.ensure_reasoning_content || []).join(', ') || '-',
+      ) +
       '<ul class="clearFloat detail-row detail-row-block"><li class="title">模型重定向:</li><li class="value">' +
       (llm.model_mappings && llm.model_mappings.length
         ? '<table class="mapping-table"><thead><tr><th>原请求的模型名称</th><th>转发的后端模型名称</th></tr></thead><tbody>' +
@@ -1680,6 +1791,42 @@ window.ClusterUpsert = (function () {
       }
     }
 
+    if (
+      llm.price_miss_action != null &&
+      ['fallback_chat', 'bill_zero', 'reject'].indexOf(llm.price_miss_action) === -1
+    ) {
+      return '缺价处置动作须为 fallback_chat / bill_zero / reject';
+    }
+
+    var erc = llm.ensure_reasoning_content || [];
+    var ercSeen = {};
+    var providerProtocols =
+      provider && Array.isArray(provider.model_protocols) && provider.model_protocols.length
+        ? provider.model_protocols
+        : ['openai'];
+    for (var ei = 0; ei < erc.length; ei++) {
+      var proto = erc[ei];
+      if (!proto || !String(proto).trim()) {
+        return '推理内容补齐协议存在空元素';
+      }
+      if (['openai', 'anthropic'].indexOf(proto) === -1) {
+        return '推理内容补齐协议仅支持 openai / anthropic，不支持 ' + proto;
+      }
+      if (ercSeen[proto]) {
+        return '推理内容补齐协议重复：' + proto;
+      }
+      ercSeen[proto] = true;
+      if (providerProtocols.indexOf(proto) === -1) {
+        return (
+          '推理内容补齐协议 ' +
+          proto +
+          ' 不在所属服务商协议（' +
+          providerProtocols.join(', ') +
+          '）内'
+        );
+      }
+    }
+
     if (!llm.models || !llm.models.length) return '请至少选择一个模型';
     var providerModels = provider.models || [];
     for (var i = 0; i < llm.models.length; i++) {
@@ -1719,6 +1866,27 @@ window.ClusterUpsert = (function () {
     var kp = llm.key_policy || {};
     if (Number(kp.retry_backoff_max) < Number(kp.retry_backoff_initial)) {
       return '最大退避时间必须大于或等于初始退避时间';
+    }
+
+    // 2026-11-04 issue #1448：Key 惩罚时长范围校验（0/负数/越界拒绝，0 不表示关闭）
+    var ka = llm.key_affinity || {};
+    if (ka.enabled && ka.penalty_enable) {
+      var ttl429 = Number(ka.penalty_ttl_429);
+      if (
+        ka.penalty_ttl_429 != null &&
+        ka.penalty_ttl_429 !== '' &&
+        (!Number.isInteger(ttl429) || ttl429 < 10 || ttl429 > 600)
+      ) {
+        return '429 惩罚时长须为 10–600 的整数（秒）';
+      }
+      var ttlAuth = Number(ka.penalty_ttl_auth);
+      if (
+        ka.penalty_ttl_auth != null &&
+        ka.penalty_ttl_auth !== '' &&
+        (!Number.isInteger(ttlAuth) || ttlAuth < 60 || ttlAuth > 1800)
+      ) {
+        return '401/402/403 惩罚时长须为 60–1800 的整数（秒）';
+      }
     }
 
     var nue = llm.normalize_upstream_error || {};
@@ -2270,6 +2438,17 @@ window.ClusterUpsert = (function () {
         select.addEventListener('change', function () {
           syncFromDom(bodyEl, state.data);
           render();
+        });
+      });
+
+      bodyEl.querySelectorAll('.proto-ensure-rc').forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+          var value = checkbox.getAttribute('data-value');
+          var list = (state.data.llmConfigData.ensure_reasoning_content || []).slice();
+          var idx = list.indexOf(value);
+          if (checkbox.checked && idx === -1) list.push(value);
+          if (!checkbox.checked && idx !== -1) list.splice(idx, 1);
+          state.data.llmConfigData.ensure_reasoning_content = list;
         });
       });
 

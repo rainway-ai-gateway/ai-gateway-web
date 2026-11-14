@@ -430,6 +430,26 @@
         return (us / 1000).toFixed(1) + ' ms';
       }
 
+      // 2026-11-03 issue #1479：缺价形态枚举 → 文案
+      function fmtPriceWarnText(warn) {
+        if (warn == null) return '-';
+        var map = {
+          fallback: '回退 chat 价计费',
+          no_entry: '按 0 计费',
+          no_baseline: '无 chat 基线按 0',
+          reject: '转发前拒绝',
+          subitem_missing: '回退条目缺子项价格',
+          no_model_table: '价格表缺失'
+        };
+        return map[warn] || warn;
+      }
+
+      // 明细列表「缺价」列：未缺价展示 -，缺价展示形态文案（红字）
+      function fmtPriceMiss(log) {
+        if (!log.ai_price_miss) return '-';
+        return '<span style="color:#ed4014">' + fmtPriceWarnText(log.ai_price_warn) + '</span>';
+      }
+
       // ==================== Filter Bar ====================
       function setTimeShortcut(hours) {
         state.shortcut = hours;
@@ -948,7 +968,7 @@
 
           '<table class="ivu-table" style="width:100%"><thead><tr>' +
           '<th>Log ID</th><th>时间</th><th>API Key</th><th>请求模型</th><th>目标模型</th><th>提供商</th>' +
-          '<th>状态码</th><th>耗时</th><th>Token</th><th>TTFT</th><th>成本</th><th>缓存</th><th>镜像</th><th>意图答案</th><th>错误</th>' +
+          '<th>状态码</th><th>耗时</th><th>Token</th><th>TTFT</th><th>成本</th><th>缓存</th><th>缺价</th><th>镜像</th><th>意图答案</th><th>错误</th>' +
           '<th style="width:80px">操作</th>' +
           '</tr></thead><tbody>';
 
@@ -967,6 +987,7 @@
             '<td>' + fmtUs(log.ai_ttft_us) + '</td>' +
             '<td>' + (log.ai_cost_value != null ? log.ai_cost_value + ' ' + (log.ai_cost_currency || '') : '-') + '</td>' +
             '<td>' + (log.ai_cache_status || '-') + '</td>' +
+            '<td>' + fmtPriceMiss(log) + '</td>' +
             '<td>' + (log.mirror_hit ? '命中' + (log.mirror_cluster ? '（' + log.mirror_cluster + '）' : '') : '-') + '</td>' +
             '<td>' + (log.ai_intent_answer || '-') + '</td>' +
             '<td>' + (log.err_msg ? '<span style="color:#ed4014">' + (log.err_msg.length > 20 ? log.err_msg.substring(0, 20) + '…' : log.err_msg) + '</span>' : '-') + '</td>' +
@@ -1016,6 +1037,8 @@
           '<dt>header_host</dt><dd>' + (log.header_host || '-') + '</dd>' +
           '<dt>origin_uri</dt><dd>' + (log.origin_uri || '-') + '</dd>' +
           '<dt>缓存状态</dt><dd>' + (log.ai_cache_status || '-') + '</dd>' +
+          '<dt>是否缺价</dt><dd>' + (log.ai_price_miss == null ? '-' : (log.ai_price_miss ? '是' : '否')) + '</dd>' +
+          '<dt>缺价形态</dt><dd>' + (fmtPriceWarnText(log.ai_price_warn)) + '</dd>' +
           '<dt>镜像命中</dt><dd>' + (log.mirror_hit ? '是' + (log.mirror_cluster ? '（' + log.mirror_cluster + '）' : '') : '否') + '</dd>' +
           '<dt>意图问题</dt><dd>' + (log.ai_intent_question || '-') + '</dd>' +
           '<dt>意图答案</dt><dd>' + (log.ai_intent_answer || '-') + '</dd>' +

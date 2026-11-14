@@ -56,7 +56,7 @@
 | `subnet` | CIDR 格式，`*` 与具体网段互斥，需检测包含/重复 | 访问来源限制。 |
 | `entity` | 可选 | 挂载的 Entity。 |
 | `quota_plan.unit` | `total_token` 或 `RMB` | Token 计数或金额计费。 |
-| `quota_plan.quota` | 有限配额时必填；`total_token` 为非负整数且 ≤ 9,999,999,999，`RMB` 最多 4 位小数且 ≤ 90,000,000.00 | 配额数值。 |
+| `quota_plan.quota` | 有限配额时必填；`total_token` 以**百万Token** 录入（≤ 9999.99、2 位小数，提交换算为整数 Token），`RMB` 以**元** 录入（2 位小数且 ≤ 90,000,000.00） | 配额数值。 |
 | `rate_limit_policy` | 启用时至少配置 TPM/RPM/最大并发/批量限流之一 | 限流策略。 |
 | `rate_limit_policy.rules.batch_limits` | 四维度均 ≥0；留空或 `0` = 不配该维度，全部为空时不提交 | 批量限流（按 API-Key 计、与模型无关）。 |
 | `rate_limit_policy.rules` | 规则名不重复，TPM/RPM 各最多 3 条 | 限流规则。 |
@@ -100,7 +100,7 @@ APIKey/index.vue (Tab 容器)
 | `Upsert.vue` | `GET` | `entities` | 挂载 Entity 下拉。 |
 | `Upsert.vue` | `GET` | `clusters` | 集群模型列表（模型绑定）。 |
 
-配额重置弹窗按当前 `unit` 限制精度与上限（`total_token` ≤ 9,999,999,999；RMB 4 位小数 / 9000 万元）。
+配额单位口径（issue #139）在**表单、列表「配额」列、详情、重置配额弹窗**四处保持一致：`total_token` 一律展示/录入为「百万Token」（2 位小数，存储仍是整数 Token），`RMB` 一律展示/录入为「元」（2 位小数）；换算由 `src/utils/const.js` 的 `quotaToMillionDisplay` / `millionToQuotaTokens` / `formatQuotaDisplay` 承担。详情与表单的开关统一表述为「配额限制：是/否」（是=有限），不再出现「无限配额」。
 
 ## 8. 边界情况
 

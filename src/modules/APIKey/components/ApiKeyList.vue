@@ -29,6 +29,12 @@
       :tableData="tableData"
       :columns="columns"
       :loading="tableLoading"
+      :total="total"
+      :server-pagination="true"
+      client-filter
+      :current-page="page"
+      :page-size="pageSize"
+      @on-page-change="onPageChange"
       @on-row-click="onView"
     />
 
@@ -141,6 +147,7 @@ import CustomModal from '@/components/CustomModal';
 import Upsert from './Upsert.vue';
 import ApiKeyView from './ApiKeyView.vue';
 import { cloneDeep } from 'lodash';
+import { formatQuotaDisplay } from '@/utils/const';
 export default {
     components: {
         pageTable,
@@ -155,6 +162,9 @@ export default {
             modelsModal: false,
             currentModels: [],
             tableData: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
             columns: [
                 {
                     title: that.$t('apiKey.keyId'),
@@ -249,7 +259,7 @@ export default {
                 {
                     title: that.$t('apiKey.quota'),
                     key: 'quota_plan_used',
-                    minWidth: 140,
+                    minWidth: 200,
                     sortable: 'custom',
                     searchable: true,
                     render(h, params) {
@@ -259,12 +269,11 @@ export default {
                             return h('span', '-');
                         }
                         const isRMB = quotaPlan.unit === 'RMB';
-                        const decimals = isRMB ? 4 : 0;
-                        const unitText = isRMB ? '¥' : ' tokens';
+                        const unitText = isRMB ? that.$t('apiKey.quotaUnitYuan') : that.$t('apiKey.quotaUnitMillionToken');
                         const used = quotaPlan.balance && quotaPlan.balance.used || 0;
                         const quota = quotaPlan.quota || 0;
-                        const usedText = isRMB ? '¥' + that.formatNumber(used, decimals) : that.formatNumber(used, decimals) + unitText;
-                        const quotaText = isRMB ? '¥' + that.formatNumber(quota, decimals) : that.formatNumber(quota, decimals) + unitText;
+                        const usedText = `${formatQuotaDisplay(used, quotaPlan.unit)} ${unitText}`;
+                        const quotaText = `${formatQuotaDisplay(quota, quotaPlan.unit)} ${unitText}`;
                         return h('span', `${usedText} / ${quotaText}`);
                     }
                 },
@@ -395,21 +404,12 @@ export default {
         this.fetchData();
     },
     methods: {
-        formatNumber(num, decimals = 0) {
-            const value = Number(num);
-            if (Number.isNaN(value)) return '-';
-            if (decimals === 0) {
-                if (value >= 1000000) {
-                    return (value / 1000000).toFixed(1) + 'M';
-                }
-                if (value >= 1000) {
-                    return (value / 1000).toFixed(1) + 'K';
-                }
+        // 增删改成功后清空列搜索/筛选条件，避免新数据被旧的筛选条件挡住
+        resetTableSearch() {
+            const table = this.$refs.pageTable;
+            if (table && table.clearSearchConditions) {
+                table.clearSearchConditions();
             }
-            return value.toLocaleString('zh-CN', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: decimals
-            });
         },
         showKeyModal(key) {
             this.currentKey = key;
@@ -487,6 +487,7 @@ export default {
                     this.$Message.success({
                         content: this.$t('com.tipAddSucc')
                     });
+                    this.resetTableSearch();
                     this.fetchData();
                 }
             }).finally(() => {
@@ -509,6 +510,7 @@ export default {
                         this.$Message.success({
                             content: this.$t('com.tipEditSucc')
                         });
+                        this.resetTableSearch();
                         this.fetchData();
                     }
                 })
@@ -531,6 +533,7 @@ export default {
                         this.$Message.success({
                             content: this.$t('com.tipDelSucc')
                         });
+                        this.resetTableSearch();
                         this.fetchData();
                     }
                 })
@@ -543,12 +546,14 @@ export default {
             this.$request({
                 url: this.$urlFormat('api-keys'),
                 method: 'get',
+                params: { page: this.page, page_size: this.pageSize },
                 openapi: true
             })
                 .then(res => {
                     if (res.status === 200) {
                         const data = res.data.Data || {};
                         const list = Array.isArray(data.list) ? data.list : [];
+                        this.total = (data.pagination && data.pagination.total) || list.length;
                         this.tableData = list.map(item => {
                             const quotaPlan = item.quota_plan || {};
                             const entity = item.entity || {};
@@ -566,6 +571,11 @@ export default {
                 .finally(() => {
                     this.tableLoading = false;
                 });
+        },
+        onPageChange(pageInfo) {
+            this.page = pageInfo.page;
+            this.pageSize = pageInfo.pageSize;
+            this.fetchData();
         },
         showModelsModal(models) {
             this.currentModels = models || [];

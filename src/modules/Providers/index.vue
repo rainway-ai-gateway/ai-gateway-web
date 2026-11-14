@@ -111,13 +111,17 @@ export default {
                     title: this.$t('com.name'),
                     key: 'name',
                     sortable: 'custom',
-                    searchable: true
+                    searchable: true,
+                    ellipsis: true,
+                    tooltip: true
                 },
                 {
                     title: this.$t('com.desc'),
                     key: 'description',
                     sortable: 'custom',
-                    searchable: true
+                    searchable: true,
+                    ellipsis: true,
+                    tooltip: true
                 },
                 {
                     title: this.$t('provider.protocols'),

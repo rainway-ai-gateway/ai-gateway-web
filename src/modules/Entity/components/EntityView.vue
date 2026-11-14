@@ -61,10 +61,10 @@
 
     <Card :title="$t('entity.quotaInfo')" class="form-card">
       <div class="info-row">
-        <span class="info-label">{{ $t('entity.unlimitedQuota') }}</span>
+        <span class="info-label">{{ $t('entity.quotaLimited') }}</span>
         <span
           class="info-value"
-          >{{ quotaPlanUnlimited ? $t('entity.yes') : $t('entity.no') }}</span
+          >{{ quotaPlanUnlimited ? $t('entity.no') : $t('entity.yes') }}</span
         >
       </div>
       <div v-if="!quotaPlanUnlimited">
@@ -77,38 +77,21 @@
         </div>
         <div class="info-row">
           <span class="info-label">{{ $t('entity.quotaTotal') }}</span>
-          <span
-            class="info-value"
-            >{{ isRMB ? '¥' + formatNumber(quotaPlanQuota) : formatNumber(quotaPlanQuota) + ' tokens' }}</span
-          >
+          <span class="info-value">{{ quotaDisplayText(quotaPlanQuota) }}</span>
         </div>
         <div class="info-row">
           <span class="info-label">{{ $t('entity.quotaUnit') }}</span>
-          <span class="info-value">{{ quotaPlanUnit }}</span>
+          <span class="info-value">{{ quotaUnitText }}</span>
         </div>
         <div class="info-row">
           <span class="info-label">{{ $t('com.used') }}</span>
           <span class="info-value"
-            >{{ isRMB ? '¥' + formatNumber(quotaPlanUsed) : formatNumber(quotaPlanUsed) + ' tokens' }}
-            ({{ quotaPercent
-
-
-
-
-
-
-
-
-
-            }}%)</span
+            >{{ quotaDisplayText(quotaPlanUsed) }} ({{ quotaPercent }}%)</span
           >
         </div>
         <div class="info-row">
           <span class="info-label">{{ $t('com.remaining') }}</span>
-          <span
-            class="info-value"
-            >{{ isRMB ? '¥' + formatNumber(quotaPlanRemaining) : formatNumber(quotaPlanRemaining) + ' tokens' }}</span
-          >
+          <span class="info-value">{{ quotaDisplayText(quotaPlanRemaining) }}</span>
         </div>
         <div class="info-row">
           <span class="info-label">{{ $t('entity.resetPeriod') }}</span>
@@ -272,17 +255,14 @@
         <span
           class="info-label"
           style="line-height: 32px;"
-          >{{ $t('entity.newQuotaTotal') }}</span
+          >{{ $t('entity.newQuotaTotalWithUnit', { unit: quotaUnitText }) }}</span
         >
         <span>
-          <InputNumber
+          <NumberInput
             v-model="newQuota"
-            :min="0"
-            :max="quotaInputMax"
-            :precision="isRMB ? 4 : 0"
-            :step="isRMB ? 0.0001 : 1"
+            :precision="2"
             style="width: 100%;"
-          ></InputNumber>
+          ></NumberInput>
         </span>
       </div>
       <p class="form-tip">{{ $t('entity.resetQuotaTip') }}</p>
@@ -317,7 +297,14 @@
 </template>
 
 <script>
-import { TOKEN_QUOTA_MAX, RMB_QUOTA_MAX } from '@/utils/const';
+import {
+  TOKEN_QUOTA_DISPLAY_MAX,
+  RMB_QUOTA_MAX,
+  formatQuotaDisplay,
+  quotaToMillionDisplay,
+  millionToQuotaTokens
+} from '@/utils/const';
+import NumberInput from '@/components/NumberInput';
 
 // 批量限流（batch_limits）维度：只读展示共用
 const BATCH_LIMIT_FIELDS = [
@@ -328,6 +315,7 @@ const BATCH_LIMIT_FIELDS = [
 ];
 
 export default {
+    components: { NumberInput },
     props: {
       currentData: {
             type: Object,
@@ -344,7 +332,7 @@ export default {
     },
     data() {
         return {
-            TOKEN_QUOTA_MAX,
+            TOKEN_QUOTA_DISPLAY_MAX,
             RMB_QUOTA_MAX,
             resetModalVisible: false,
             newQuota: 0,
@@ -395,8 +383,8 @@ export default {
         isRMB() {
             return this.quotaPlanUnit === 'RMB';
         },
-        quotaInputMax() {
-            return this.isRMB ? RMB_QUOTA_MAX : TOKEN_QUOTA_MAX;
+        quotaUnitText() {
+            return this.$t(this.isRMB ? 'entity.quotaUnitYuan' : 'entity.quotaUnitMillionToken');
         },
         quotaPlanQuota() {
             return this.displayData.quota_plan ? this.displayData.quota_plan.quota || 0 : 0;
@@ -417,7 +405,11 @@ export default {
             if (this.quotaPlanUnlimited || this.quotaPlanQuota === 0) {
                 return 0;
             }
-            return Math.round(this.quotaPlanUsed / this.quotaPlanQuota * 10000) / 100;
+            // used 允许超过 quota（欠费，issue #1476），进度百分比封顶 100；剩余量仍按 max(0,…) 展示
+            return Math.min(
+                100,
+                Math.round(this.quotaPlanUsed / this.quotaPlanQuota * 10000) / 100
+            );
         },
         rateLimitPolicyEnabled() {
             return this.displayData.rate_limit_policy && this.displayData.rate_limit_policy.enabled;
@@ -488,15 +480,6 @@ export default {
             const date = new Date(timestamp * 1000);
             return date.toLocaleString('zh-CN');
         },
-        formatNumber(num, decimals = null) {
-            const value = Number(num);
-            if (Number.isNaN(value)) return '-';
-            const fractionDigits = decimals !== null ? decimals : (this.isRMB ? 4 : 0);
-            return value.toLocaleString('zh-CN', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: fractionDigits
-            });
-        },
         getResetPeriodText(period) {
             const map = {
                 'never': this.$t('entity.resetNever'),
@@ -505,9 +488,21 @@ export default {
             };
             return map[period] || period;
         },
+        // 存储值 → 录入单位值（issue #139：详情/重置配额与表单同口径）
+        quotaToDisplay(quota) {
+            if (quota === null || quota === undefined) return quota;
+            if (this.isRMB) {
+                const num = Number(quota);
+                return Number.isFinite(num) ? Number(num.toFixed(2)) : quota;
+            }
+            return quotaToMillionDisplay(quota);
+        },
+        quotaDisplayText(quota) {
+            return `${formatQuotaDisplay(quota, this.quotaPlanUnit)} ${this.quotaUnitText}`;
+        },
         showResetModal() {
             const quota = this.displayData.quota_plan && this.displayData.quota_plan.quota;
-            this.newQuota = quota !== undefined && quota !== null ? quota : 0;
+            this.newQuota = this.quotaToDisplay(quota !== undefined && quota !== null ? quota : 0);
             this.resetReason = '';
             this.resetModalVisible = true;
         },
@@ -521,22 +516,11 @@ export default {
                 this.$Message.error(this.$t('entity.quotaRangeError'));
                 return;
             }
-            if (!this.isRMB && !Number.isInteger(value)) {
-                this.$Message.error(this.$t('entity.quotaMustBeNonNegative'));
-                return;
-            }
-            if (this.isRMB) {
-                const decimalStr = String(this.newQuota).split('.')[1] || '';
-                if (decimalStr.length > 4) {
-                    this.$Message.error(this.$t('entity.quotaRmbPrecisionError'));
-                    return;
-                }
-            }
             if (this.isRMB && value > RMB_QUOTA_MAX) {
                 this.$Message.error(this.$t('entity.quotaRmbMaxError') || 'RMB 配额不能超过 9000 万元');
                 return;
             }
-            if (!this.isRMB && value > TOKEN_QUOTA_MAX) {
+            if (!this.isRMB && value > TOKEN_QUOTA_DISPLAY_MAX) {
                 this.$Message.error(this.$t('entity.quotaMaxError'));
                 return;
             }
@@ -545,7 +529,8 @@ export default {
                 method: 'post',
                 openapi: true,
                 data: {
-                    quota: this.newQuota,
+                    // 录入单位 → 存储值：RMB 保留 2 位小数，total_token 换算回 token 整数
+                    quota: this.isRMB ? Number(value.toFixed(2)) : millionToQuotaTokens(value),
                     reason: this.resetReason || undefined
                 }
             }).then(data => {

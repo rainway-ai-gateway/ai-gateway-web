@@ -31,6 +31,7 @@
 // eslint-disable
 import Vue from 'vue';
 import store from './store';
+import { roleIssue } from './role';
 
 let excludeRoute = {
   'product.home': true,
@@ -39,15 +40,20 @@ let excludeRoute = {
 export default async (to) => {
   let meta = store.getMeta();
   if (!meta) {
-    let navRsp = await Vue.prototype.$request({
+    const navRsp = await Vue.prototype.$request({
       url: 'meta',
       method: 'get',
       unneedTips: true,
       withoutAuth: true,
     });
 
-    store.setMeta(navRsp.data.Data);
-    meta = navRsp.data.Data;
+    // meta 拉取失败（网络/网关/后端异常）时不能让守卫抛错，否则导航被中断、
+    // 页面停在原地没有任何反馈；失败时不写 store，后续导航可再次尝试。
+    const nav = navRsp && navRsp.data ? navRsp.data.Data : null;
+    if (nav) {
+      store.setMeta(nav);
+    }
+    meta = nav;
   }
   if (to.name === 'LoginPassword') {
     return true;
@@ -58,11 +64,21 @@ export default async (to) => {
   if (!userData) {
     return loginRoute;
   }
-  if (!(userData.role === 'system_admin' || userData.role === 'system_admin_readonly')) {
-    return 'illegalAccess';
+  const issue = roleIssue(userData);
+  if (issue) {
+    // 这里是最容易误判的地方（本地残留的旧登录态 / 前后端版本不一致），
+    // 打印实际字段，便于把「版本不一致」和「确实没权限」区分开。
+    // eslint-disable-next-line no-console
+    console.warn('[auth] unusable role in user payload:', issue, Object.keys(userData));
+    return issue === 'version-mismatch' ? 'roleVersionMismatch' : 'illegalAccess';
   }
 
   if (excludeRoute[to.name]) {
+    return true;
+  }
+  // 导航树没拿到（meta 请求失败）时跳过菜单校验：前端校验只为体验，
+  // 真正的权限边界在服务端接口，不能因为一次 meta 失败就把人弹回登录页。
+  if (!meta) {
     return true;
   }
   let curNav = store.findNav(to.name);

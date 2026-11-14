@@ -8,7 +8,7 @@ window.ProviderUpsert = (function () {
   var INSTANCE_SOURCE_TIP =
     '实例来源决定后端实例从何而来：人工维护实例池（instance_pool）由本页手工录入 IP/域名；K8s 实例池（k8s_pool）由系统按 K8s 池名称从 /k8s_pools 同步，只读镜像。切换来源仅改变生效分支，另一分支数据休眠保留。';
   var K8S_POOL_NAME_TIP =
-    'K8s 池名称，1–64 字符，仅允许字母、数字、_、-、.，且不能以 _、-、. 开头或结尾。引用不存在的池等价于零实例，引用该 Provider 的集群将返回 500（BK_NO_BACKEND）。';
+    '从 GET /k8s_pools 返回的 K8s 实例池中下拉选择（池成员由 K8s 发现组件自动上报，控制台只读）。池名称 1–128 字符，仅允许字母、数字、_、-、.，且不能以 _、-、. 开头或结尾。引用不存在的池等价于零实例，引用该 Provider 的集群将返回 500（BK_NO_BACKEND）。';
 
   function helpIcon(tip) {
     return (
@@ -18,11 +18,12 @@ window.ProviderUpsert = (function () {
     );
   }
 
-  /** 有效池 = instance_source == "k8s_pool" ? k8s_instance_pool : instance_pool */
+  /** 有效池 = instance_source == "k8s_pool" ? k8s_pools[k8s_pool_name].instances（实时） : instance_pool */
   function effectivePool(data) {
     data = data || {};
     if (data.instance_source === 'k8s_pool') {
-      return data.k8s_instance_pool || [];
+      var poolDetail = fetchK8sPoolDetail(data.k8s_pool_name);
+      return (poolDetail && poolDetail.instances) || [];
     }
     return data.instance_pool || [];
   }
@@ -208,7 +209,6 @@ window.ProviderUpsert = (function () {
       instance_source:
         row.instance_source === 'k8s_pool' ? 'k8s_pool' : 'instance_pool',
       k8s_pool_name: row.k8s_pool_name || '',
-      k8s_instance_pool: clone(row.k8s_instance_pool || []),
       model_protocols: (row.model_protocols || ['openai']).slice(),
       protocol_paths: (function () {
         var src = row.protocol_paths || {};
@@ -399,24 +399,77 @@ window.ProviderUpsert = (function () {
     return IvuUI.formTopItem('实例形态', modeSelect, true) + bodyHtml;
   }
 
+  /** GET /open-api/v1/k8s_pools 返回的池摘要列表（原型用 MockData 模拟） */
+  function k8sPoolList() {
+    return (window.MockData && MockData.k8sPools) || [];
+  }
+
+  function findK8sPool(name) {
+    name = (name || '').trim();
+    if (!name) return null;
+    var pools = k8sPoolList();
+    for (var i = 0; i < pools.length; i++) {
+      if (pools[i].name === name) return pools[i];
+    }
+    return null;
+  }
+
+  /**
+   * 模拟 GET /open-api/v1/k8s_pools/{name}：返回池详情（含实例列表），
+   * 池不存在时返回 null（对应 404），空池返回 instances: []（200）。
+   */
+  function fetchK8sPoolDetail(name) {
+    name = (name || '').trim();
+    if (!name) return null;
+    var instancesMap = (window.MockData && MockData.k8sPoolInstances) || {};
+    var summary = findK8sPool(name);
+    if (!summary && !instancesMap[name]) return null;
+    var instances = instancesMap[name] || [];
+    return {
+      name: name,
+      instances: instances,
+      instance_count: instances.length,
+      last_sync_time: (summary && summary.last_sync_time) || 0,
+    };
+  }
+
   function renderK8sPoolBody(data, isView) {
     var disabled = isView ? ' disabled="disabled"' : '';
-    var poolName = data.k8s_pool_name || '';
-    var datalistOptions = ((window.MockData && MockData.k8sPoolNames) || [])
-      .map(function (name) {
-        return '<option value="' + IvuUI.escapeHtml(name) + '"></option>';
-      })
-      .join('');
-    var nameItem = IvuUI.formTopItem(
-      'K8s 池名称' + helpIcon(K8S_POOL_NAME_TIP),
-      '<input type="text" class="ivu-input proto-k8s-pool-name" list="proto-k8s-pool-names" value="' +
+    var poolName = (data.k8s_pool_name || '').trim();
+    var pools = k8sPoolList();
+    var selectedPool = findK8sPool(poolName);
+
+    var options = pools.length
+      ? '<option value="">请选择 K8s 实例池</option>'
+      : '<option value="">暂无可用的 K8s 实例池</option>';
+    pools.forEach(function (pool) {
+      options +=
+        '<option value="' +
+        IvuUI.escapeHtml(pool.name) +
+        '"' +
+        (pool.name === poolName ? ' selected' : '') +
+        '>' +
+        IvuUI.escapeHtml(pool.name) +
+        '</option>';
+    });
+    // 已保存但池已不存在：保留原值，避免打开表单即丢失配置
+    if (poolName && !selectedPool) {
+      options +=
+        '<option value="' +
         IvuUI.escapeHtml(poolName) +
-        '" placeholder="例如 llm-inference-pool"' +
+        '" selected>' +
+        IvuUI.escapeHtml(poolName) +
+        '（池不存在）</option>';
+    }
+
+    var nameItem = IvuUI.formTopItem(
+      'K8s 实例池' + helpIcon(K8S_POOL_NAME_TIP),
+      '<select class="ivu-input proto-k8s-pool-name" style="width:100%;height:32px;border:1px solid #dcdee2;border-radius:4px;padding:0 8px;"' +
         disabled +
-        ' />' +
-        '<datalist id="proto-k8s-pool-names">' +
-        datalistOptions +
-        '</datalist>',
+        (pools.length || poolName ? '' : ' disabled="disabled"') +
+        '>' +
+        options +
+        '</select>',
       true,
     );
 
@@ -659,7 +712,10 @@ window.ProviderUpsert = (function () {
 
     var instanceBody = '';
     if (data.instance_source === 'k8s_pool') {
-      var mirrorRows = (data.k8s_instance_pool || [])
+      // 实例列表实时取自 GET /k8s_pools/{name}，不再读 provider 的 k8s_instance_pool 镜像
+      var poolName = (data.k8s_pool_name || '').trim();
+      var poolDetail = fetchK8sPoolDetail(poolName);
+      var poolRows = ((poolDetail && poolDetail.instances) || [])
         .map(function (item) {
           return (
             '<tr><td>' +
@@ -672,22 +728,27 @@ window.ProviderUpsert = (function () {
           );
         })
         .join('');
+      var poolEmptyText = poolDetail
+        ? '当前池暂无实例（空池为合法状态）'
+        : 'K8s 池不存在（≡ 零实例）';
       instanceBody =
         IvuUI.formTop(
           IvuUI.formTopItem('实例来源', 'K8s 实例池（k8s_pool）') +
             IvuUI.formTopItem(
-              'K8s 池名称',
-              IvuUI.escapeHtml(data.k8s_pool_name || '-'),
+              'K8s 实例池',
+              IvuUI.escapeHtml(poolName || '-'),
             ),
         ) +
         renderDetailTable(
           [
-            { title: 'IP地址' },
+            { title: '实例地址' },
             { title: '端口', width: '110px' },
             { title: '权重', width: '110px' },
           ],
-          mirrorRows ||
-            '<tr><td colspan="3" style="text-align:center;color:#999;">暂无镜像实例（池不存在 ≡ 零实例）</td></tr>',
+          poolRows ||
+            '<tr><td colspan="3" style="text-align:center;color:#999;">' +
+              IvuUI.escapeHtml(poolEmptyText) +
+              '</td></tr>',
         );
     } else if (mode === 'domain') {
       var domain = ((data.instance_pool || [])[0] || {}).addr || '';
@@ -1060,12 +1121,12 @@ window.ProviderUpsert = (function () {
       data.instance_source === 'k8s_pool' ? 'k8s_pool' : 'instance_pool';
     if (source === 'k8s_pool') {
       var poolName = (data.k8s_pool_name || '').trim();
-      if (!poolName) return 'K8s 池名称必填';
-      if (poolName.length < 1 || poolName.length > 64) {
-        return 'K8s 池名称长度须为 1–64 字符';
+      if (!poolName) return '请选择 K8s 实例池';
+      if (poolName.length < 1 || poolName.length > 128) {
+        return 'K8s 实例池名称长度须为 1–128 字符';
       }
       if (!/^[A-Za-z0-9]([A-Za-z0-9_.-]*[A-Za-z0-9])?$/.test(poolName)) {
-        return 'K8s 池名称仅允许字母、数字、_、-、.，且不能以 _、-、. 开头或结尾';
+        return 'K8s 实例池名称仅允许字母、数字、_、-、.，且不能以 _、-、. 开头或结尾';
       }
     } else {
       var instances = data.instance_pool || [];

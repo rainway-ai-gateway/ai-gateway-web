@@ -52,7 +52,7 @@ Vue.use(requestPlugin);
 Vue.prototype.$urlFormat = urlFormat;
 Vue.prototype.$BFEProductLineId = 1;
 Vue.prototype.$store = store;
-Vue.prototype.Version = '_VERSION_';
+Vue.prototype.Version = '0.1.0@20261028184314';
 
 Vue.use(VueClipboard);
 Vue.use(JsonViewer);
@@ -88,12 +88,20 @@ router.beforeEach((to, from, next) => {
         content = i18n.t('login.tipSelectProductLine');
       }
 
-      if (result === 'illegalAccess') {
-        content = i18n.t('login.tipUrlIllegal');
+      if (result === 'illegalAccess' || result === 'roleVersionMismatch') {
+        const versionMismatch = result === 'roleVersionMismatch';
+        content = versionMismatch
+          ? i18n.t('login.tipRoleVersionMismatch')
+          : i18n.t('login.tipRoleNoAccess');
         Vue.prototype.$Modal.warning({
           title: i18n.t('com.tips'),
           content: content,
           onOk: () => {
+            if (versionMismatch) {
+              // 角色字段都对不上，再去登录页只会原地打转：强制回源一次拿新前端
+              window.location.reload();
+              return;
+            }
             next({
               name: 'LoginPassword',
             });
