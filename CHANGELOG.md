@@ -38,6 +38,46 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.1.0] - 2026-11-14
+
+### Added
+
+- Cluster LLM config: price-miss action (`price_miss_action`) and reasoning-content completion protocols (`ensure_reasoning_content`)
+- Cluster key affinity: 429 and 401-403 penalty duration settings
+- Provider instance source: K8s instance pool selection
+- Report detail: price-miss column and detail fields
+- Model price keys show a Chinese annotation next to the English key
+- New `NumberInput` component replacing iView `InputNumber` in quota and rate-limit forms
+- `utils/role.js` compatibility layer for the `is_admin`-to-`role` migration
+- EPP cross-field validation: call timeout must exceed max(queue TTL, no-endpoint queue TTL)
+
+### Changed
+
+- Quota units aligned end-to-end: tokens in millions and RMB in yuan with 2 decimals; quota "type" reworked to "quota limit yes/no"
+- EPP default timeouts self-consistent: queue TTL 60 → 9s, call timeout 3 → 11s
+- List pagination aligned with backend default paging (api #303/#306); ApiKeyList moved to true server-side pagination
+- API-Key list search/filter/sort now acts on the current page only
+- Route rule target/fallback cluster columns display full wrapped text instead of ellipsis + tooltip
+- `pageTable` drag-to-reorder disabled while sorting or column filtering is active
+- Cluster form layout reworked; EPP wording and validation tweaks
+- Delete cluster surfaces the backend 409 error directly; user manual and design docs synced, screenshots refreshed
+
+### Fixed
+
+- Report detail `logid` / `session_id` parsed as strings to avoid precision loss beyond 2^53 (#141)
+- Self-delete of the current admin user now clears the session and forces logout
+- Rate-limit rule names validated against `[a-zA-Z0-9_-]{1,128}`
+- Long-text columns inflated row heights: ellipsis + tooltip across Entity, EntityType, Provider, TrafficMirror, AICache and RouteRules lists
+- Input word counters re-implemented (`show-word-limit` never rendered in iView 3.5.4)
+- Missing Chinese i18n keys: K8s pool keys and `sessionAffinityHeaderRequiredWhenOff`
+- EPP instance pool load failure now shows an explicit error
+- Quota usage percent capped at 100% (api #1476)
+- Provider manual instance rows kept when switching instance source to K8s pool and back
+
+### Removed
+
+- Frontend cluster-reference scan on cluster delete (backend enforces references and returns 409)
+
 ## [v0.11.0] - 2026-10-23
 
 ### Added
@@ -323,6 +363,7 @@ AI Gateway Web v0.0.2 — Instance pool & build refresh. Focuses on EPP instance
 - Consumer management: API Key lifecycle with model allowlist, token quota, expiry, IP whitelist
 - User & access: system/tenant views, user management, token management
 
+[v0.1.0]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.1.0
 [v0.11.0]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.11.0
 [v0.0.10]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.10
 [v0.0.9]: https://github.com/rainway-ai-gateway/ai-gateway-web/releases/tag/v0.0.9

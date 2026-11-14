@@ -224,6 +224,14 @@ export default {
   methods: {
     buildRuleColumns() {
       const that = this;
+      const renderClusterTags = (h, items, formatText) => h('div', items.map(item => h('div', {
+        key: `${item.cluster_name}-${item.model}`,
+        style: 'margin-bottom: 4px;'
+      }, [
+        h('Tag', {
+          style: 'display: inline-block; height: auto; max-width: 100%; margin: 0; padding: 1px 8px; line-height: 20px; white-space: normal; word-break: break-all; overflow: visible; vertical-align: middle;'
+        }, formatText(item))
+      ])));
       return [
         {
           title: that.$t('route.ruleName'),
@@ -252,18 +260,10 @@ export default {
           searchable: true,
           render(h, params) {
             const targets = params.row.targets || [];
-            return h('div', targets.map(t => {
-              const text = `${t.cluster_name}/${t.model || ''}: ${t.weight}%`;
-              return h('Tooltip', {
-                props: { content: text, transfer: true, maxWidth: 600 },
-                style: 'display: block; width: 100%; margin-bottom: 4px;'
-              }, [
-                h('Tag', {
-                  key: `${t.cluster_name}-${t.model}`,
-                  style: 'max-width: calc(100% - 5px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;'
-                }, text)
-              ]);
-            }));
+            if (!targets.length) {
+              return <span>-</span>;
+            }
+            return renderClusterTags(h, targets, t => `${t.cluster_name}/${t.model || ''}: ${t.weight}%`);
           }
         },
         {
@@ -276,18 +276,7 @@ export default {
             if (!fallbacks.length) {
               return <span>-</span>;
             }
-            return h('div', fallbacks.map(f => {
-              const text = `${f.cluster_name}/${f.model || ''}`;
-              return h('Tooltip', {
-                props: { content: text, transfer: true, maxWidth: 600 },
-                style: 'display: block; width: 100%; margin-bottom: 4px;'
-              }, [
-                h('Tag', {
-                  key: `${f.cluster_name}-${f.model}`,
-                  style: 'max-width: calc(100% - 5px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;'
-                }, text)
-              ]);
-            }));
+            return renderClusterTags(h, fallbacks, f => `${f.cluster_name}/${f.model || ''}`);
           }
         },
         {
@@ -620,12 +609,6 @@ export default {
 
 <style lang="less" scoped>
 .route-rules {
-  // Tooltip 外层为 inline-block 且宽度随内容收缩，导致内部标签
-  // max-width:100% 循环解析失效、溢出单元格被裁剪贴边；约束到单元格宽度
-  .ivu-table-cell .ivu-tooltip {
-    max-width: 100%;
-  }
-
   .route-editor-header {
     display: flex;
     align-items: center;
